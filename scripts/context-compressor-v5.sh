@@ -24,6 +24,12 @@ mkdir -p "$CACHE_DIR" "$(dirname "$HISTORY_FILE")" 2>/dev/null || true
 touch "$HISTORY_FILE" 2>/dev/null || true
 
 # 自动读取 API Key
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 get_glm_key() {
     # 优先从 OpenClaw 配置读取
     local key=$(cat ~/.openclaw/agents/main/agent/auth-profiles.json 2>/dev/null | \
@@ -40,6 +46,12 @@ get_glm_key() {
 GLM_KEY=$(get_glm_key)
 
 # Token 估算
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 estimate_tokens() {
     local text=$1
     local char_count=$(echo "$text" | wc -c)
@@ -47,6 +59,12 @@ estimate_tokens() {
 }
 
 # 获取会话 token 使用率
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 get_token_usage() {
     local session_file=$1
     local file_size=$(stat -c%s "$session_file" 2>/dev/null || echo 0)
@@ -56,6 +74,12 @@ get_token_usage() {
 }
 
 # 根据使用率决定压缩策略
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 get_compress_strategy() {
     local usage=$1
     
@@ -98,6 +122,12 @@ extract_messages_v5() {
 }
 
 # 检查缓存
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 check_cache() {
     local content_hash=$1
     local cache_file="$CACHE_DIR/$content_hash.txt"
@@ -113,6 +143,12 @@ check_cache() {
 }
 
 # 保存缓存
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 save_cache() {
     local content_hash=$1
     local summary=$2
@@ -124,6 +160,12 @@ save_cache() {
 }
 
 # 记录压缩历史
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 record_history() {
     local session_id=$1
     local strategy=$2
@@ -141,6 +183,12 @@ record_history() {
 }
 
 # 更新指标
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 update_metrics() {
     local session_id=$1
     local action=$2
@@ -188,7 +236,21 @@ EOF
 }
 
 # 压缩会话历史（主函数）
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 compress_session() {
+    # 获取并发锁，防止同时压缩同一会话
+    local session_id=$(basename "$session_file" .jsonl)
+    exec 200>"/tmp/compress-.lock"
+    if ! flock -n 200; then
+        echo "❌ 会话正在被压缩，跳过"
+        return 1
+    fi
+
     local session_id=$1
     local session_file="$SESSIONS_DIR/${session_id}.jsonl"
     
@@ -321,7 +383,7 @@ $old_messages"
         local summary=$(echo "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
         
         if [ -z "$summary" ] || [ "$summary" = "null" ]; then
-            echo "❌ 压缩失败: $(echo "$response" | head -100)"
+            echo "❌ 压缩失败: $(sanitize_response "$response" | head -100)"
             
             # 容错：回退到本地压缩
             echo "🔄 尝试本地压缩..."
@@ -429,6 +491,12 @@ $old_messages"
 }
 
 # 预防性扫描
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 scan_and_compress() {
     echo "🔍 预防性扫描开始（v5 智能引擎）..."
     local compressed=0
@@ -470,6 +538,12 @@ scan_and_compress() {
 }
 
 # 显示指标
+# 清理 API 响应中的敏感信息
+sanitize_response() {
+    local response=$1
+    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
+}
+
 show_metrics() {
     if [ -f "$METRICS_FILE" ]; then
         echo "📊 压缩指标统计（v5）"

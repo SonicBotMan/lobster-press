@@ -207,6 +207,11 @@ smart_layered_extraction() {
         
         if [ $keep -gt 0 ]; then
             local step=$((cat_count / keep))
+    # 防止除零错误
+    if [ $step -eq 0 ]; then
+        step=1
+    fi
+
             result="$result$(echo "${category_messages[context]}" | awk "NR % $step == 0")"$'\n'
         fi
     fi
