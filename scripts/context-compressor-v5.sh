@@ -4,24 +4,37 @@
 
 set -e
 
+# 默认配置（可被环境变量覆盖）
+AUTO_APPLY=${AUTO_APPLY:-true}
+LOG_LEVEL=${LOG_LEVEL:-INFO}
+
 SESSIONS_DIR="$HOME/.openclaw/agents/main/sessions"
 GLM_API="https://open.bigmodel.cn/api/paas/v4/chat/completions"
 CACHE_DIR="/tmp/compress-cache"
 METRICS_FILE="/tmp/compress-metrics.json"
-HISTORY_FILE="$HOME/.openclaw/workspace/memory/compression-history.md"
-ENGINE_SH="$HOME/message-importance-engine.sh"
+HISTORY_FILE="$HOME/.lobster-press/compression-history.md"
+ENGINE_SH="$HOME/bin/message-importance-engine.sh"
 
 # 引入重要性评估引擎和自适应学习引擎
 source "$ENGINE_SH" 2>/dev/null || true
-source ~/adaptive-learning-engine.sh 2>/dev/null || true
+source ~/bin/adaptive-learning-engine.sh 2>/dev/null || true
 
-# 创建必要目录
+# 创建必要目录和文件
 mkdir -p "$CACHE_DIR" "$(dirname "$HISTORY_FILE")" 2>/dev/null || true
+touch "$HISTORY_FILE" 2>/dev/null || true
 
 # 自动读取 API Key
 get_glm_key() {
-    cat ~/.openclaw/agents/main/agent/auth-profiles.json 2>/dev/null | \
-        jq -r '.profiles."zai:default".key' 2>/dev/null
+    # 优先从 OpenClaw 配置读取
+    local key=$(cat ~/.openclaw/agents/main/agent/auth-profiles.json 2>/dev/null | \
+        jq -r '.profiles."zai:default".key' 2>/dev/null)
+    
+    # fallback 到环境变量
+    if [ -z "$key" ] || [ "$key" = "null" ]; then
+        key=$GLM_API_KEY
+    fi
+    
+    echo "$key"
 }
 
 GLM_KEY=$(get_glm_key)
@@ -244,7 +257,7 @@ compress_session() {
         local original_size=$(echo "$old_messages" | wc -c)
         echo "📏 原始大小: $original_size 字节"
         
-        # 调用 GLM-4-Flash 压缩
+        # 调用 GLM-4-Flash 压缩（带重试机制）
         echo "🤖 正在调用 GLM-4-Flash 压缩（策略: $strategy + 智能评估）..."
         
         local max_tokens=800
@@ -264,16 +277,45 @@ compress_session() {
 
 $old_messages"
         
-        local response
-        response=$(curl -s -m 30 -X POST "$GLM_API" \
-            -H "Authorization: Bearer $GLM_KEY" \
-            -H "Content-Type: application/json" \
-            -d "{
-                \"model\": \"glm-4-flash\",
-                \"messages\": [{\"role\": \"user\", \"content\": $(echo "$prompt" | jq -Rs .)}],
-                \"max_tokens\": $max_tokens,
-                \"temperature\": 0.3
-            }" 2>&1)
+        # 重试配置
+        local max_retries=3
+        local retry_delay=2
+        local retry_count=0
+        local response=""
+        local summary=""
+        
+        while [ $retry_count -lt $max_retries ]; do
+            response=$(curl -s -m 30 -X POST "$GLM_API" \
+                -H "Authorization: Bearer $GLM_KEY" \
+                -H "Content-Type: application/json" \
+                -d "{
+                    \"model\": \"glm-4-flash\",
+                    \"messages\": [{\"role\": \"user\", \"content\": $(echo "$prompt" | jq -Rs .)}],
+                    \"max_tokens\": $max_tokens,
+                    \"temperature\": 0.3
+                }" 2>&1)
+            
+            # 提取压缩结果
+            summary=$(echo "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
+            
+            # 检查是否成功
+            if [ -n "$summary" ] && [ "$summary" != "null" ]; then
+                break
+            fi
+            
+            # 检查是否是限流错误
+            if echo "$response" | grep -q "速率限制\|rate limit\|1302"; then
+                retry_count=$((retry_count + 1))
+                if [ $retry_count -lt $max_retries ]; then
+                    echo "⏳ API 限流，等待 ${retry_delay}s 后重试（$retry_count/$max_retries）..."
+                    sleep $retry_delay
+                    retry_delay=$((retry_delay * 2))  # 指数退避
+                fi
+            else
+                # 其他错误直接退出
+                break
+            fi
+        done
         
         # 提取压缩结果
         local summary=$(echo "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
@@ -283,11 +325,28 @@ $old_messages"
             
             # 容错：回退到本地压缩
             echo "🔄 尝试本地压缩..."
-            summary=$(echo "$old_messages" | \
-                grep -oE '[\u4e00-\u9fa5]{2,10}' | \
-                sort | uniq -c | sort -rn | \
-                head -30 | awk '{print $2}' | tr '\n' ' ')
-            
+
+            # 跨平台中文字符提取（兼容 GNU grep 和 BSD grep）
+            if grep --version 2>&1 | grep -q "GNU"; then
+                # GNU grep 支持 -P (Perl 正则)
+                summary=$(echo "$old_messages" | \
+                    grep -oP '[\x{4e00}-\x{9fa5}]{2,10}' | \
+                    sort | uniq -c | sort -rn | \
+                    head -30 | awk '{print $2}' | tr '\n' ' ')
+            else
+                # BSD/macOS grep 使用传统正则
+                summary=$(echo "$old_messages" | \
+                    LC_ALL=UTF-8 grep -o '[一-龥]\{2,10\}' | \
+                    sort | uniq -c | sort -rn | \
+                    head -30 | awk '{print $2}' | tr '\n' ' ')
+            fi
+
+            if [ -z "$summary" ]; then
+                # 最后的 fallback：直接取前 5 条消息的关键词
+                summary=$(echo "$old_messages" | head -5 | tr ' ' '\n' | \
+                    grep -E '^[a-zA-Z0-9_-]{3,}$' | head -20 | tr '\n' ' ')
+            fi
+
             if [ -z "$summary" ]; then
                 return 1
             fi

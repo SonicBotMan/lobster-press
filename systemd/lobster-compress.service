@@ -4,8 +4,10 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/home/h523034406/bin/predictive-compressor.sh
-User=%u
+ExecStart=%h/bin/predictive-compressor.sh
+WorkingDirectory=%h
+Environment=AUTO_APPLY=true
+Environment=LOG_LEVEL=INFO
 
 [Install]
 WantedBy=default.target
