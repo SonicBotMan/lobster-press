@@ -4,6 +4,12 @@
 
 </div>
 
+<div align="center">
+
+**中文** | [English](README_EN.md)
+
+</div>
+
 # 🦞 龙虾饼 (LobsterPress)
 
 <div align="center">
@@ -20,6 +26,12 @@
 
 **最新版本**: [v1.0.2](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.0.2) - 2026-03-08
 **更新内容**: [CHANGELOG.md](CHANGELOG.md)
+
+</div>
+
+<div align="center">
+
+**中文** | [English](README_EN.md)
 
 </div>
 
@@ -566,5 +578,11 @@ strategy=$(recommend_strategy $token_usage)
 Made with ❤️ by the LobsterPress Team
 
 🦞 让 AI 记忆永不溢出
+
+</div>
+
+<div align="center">
+
+**中文** | [English](README_EN.md)
 
 </div>
