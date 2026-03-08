@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://media.githubusercontent.com/media/SonicBotMan/lobster-press/master/docs/images/banner.png" alt="LobsterPress - 智能上下文压缩系统" width="800">
+<img src="docs/images/banner.jpg" alt="LobsterPress - 智能上下文压缩系统" width="800">
 
 </div>
 
