@@ -136,7 +136,7 @@ Heavy  → 深度压缩（节省 40-50%）
 #### 1️⃣ 克隆项目
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/lobster-press.git
+git clone https://github.com/SonicBotMan/lobster-press.git
 cd lobster-press
 ```
 
@@ -437,8 +437,8 @@ strategy=$(recommend_strategy $token_usage)
 
 ## 💬 联系方式
 
-- **Issues**: [GitHub Issues](https://github.com/YOUR_USERNAME/lobster-press/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/YOUR_USERNAME/lobster-press/discussions)
+- **Issues**: [GitHub Issues](https://github.com/SonicBotMan/lobster-press/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/SonicBotMan/lobster-press/discussions)
 
 ---
 
