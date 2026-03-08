@@ -1,3 +1,9 @@
+<div align="center">
+
+<img src="docs/images/banner.png" alt="LobsterPress - 智能上下文压缩系统" width="800">
+
+</div>
+
 # 🦞 龙虾饼 (LobsterPress)
 
 <div align="center">
