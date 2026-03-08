@@ -12,14 +12,14 @@
 
 *把龙虾般膨胀的上下文，压成一张薄饼*
 
-**最新版本**: [v1.0.1](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.0.1) - 2026-03-08
+**最新版本**: [v1.0.2](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.0.2) - 2026-03-08
 **更新内容**: [CHANGELOG.md](CHANGELOG.md)
 
 </div>
 
 ---
 
-## 🎉 v1.0.1 新特性
+## 🎉 v1.0.2 新特性
 
 ### 🐛 关键修复
 
@@ -518,6 +518,16 @@ strategy=$(recommend_strategy $token_usage)
 ---
 
 ## 📝 更新日志
+
+### v1.0.2 (2026-03-08)
+- 🔒 **安全修复**: API 响应清理，防止敏感信息泄露
+- 🛡️ **稳定性修复**: 并发锁机制、除零保护
+- 📝 **代码改进**: README 去重、缓存键优化
+
+### v1.0.1 (2026-03-08)
+- 🐛 关键 Bug 修复
+- ⚡ 性能优化
+
 
 ### v1.0.0 (2026-03-08)
 
