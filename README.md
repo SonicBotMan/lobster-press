@@ -258,6 +258,16 @@ systemctl --user list-timers | grep lobster
 
 ### 配置说明
 
+#### 📖 **详细配置指南**
+
+**强烈推荐阅读**: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
+
+该文档包含：
+- ✅ **模型配置**（GLM、OpenAI、Claude 等）
+- ✅ **OpenClaw 集成**（自动/手动/API 三种方式）
+- ✅ **快速开始**（针对不同使用场景）
+- ✅ **常见问题**（API Key、配置、压缩效果等）
+
 #### 基础配置 (`~/.config/lobster-press/config.json`)
 
 ```json
