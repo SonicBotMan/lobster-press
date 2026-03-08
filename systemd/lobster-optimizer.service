@@ -4,8 +4,9 @@ After=network.target
 
 [Service]
 Type=oneshot
-ExecStart=/home/h523034406/bin/cost-optimizer.sh
-User=%u
+ExecStart=%h/bin/cost-optimizer.sh
+WorkingDirectory=%h
+Environment=LOG_LEVEL=INFO
 
 [Install]
 WantedBy=default.target

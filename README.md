@@ -12,7 +12,29 @@
 
 *把龙虾般膨胀的上下文，压成一张薄饼*
 
+**最新版本**: [v1.0.1](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.0.1) - 2026-03-08
+**更新内容**: [CHANGELOG.md](CHANGELOG.md)
+
 </div>
+
+---
+
+## 🎉 v1.0.1 新特性
+
+### 🐛 关键修复
+
+- ✅ **修复本地压缩兼容性** - GNU/BSD grep 跨平台支持
+- ✅ **修复 Systemd 配置错误** - 移除 `User=%u` 错误配置
+- ✅ **自动应用压缩结果** - 默认 `AUTO_APPLY=true`
+- ✅ **自动创建历史文件** - 首次运行自动初始化
+
+### ✨ 新功能
+
+- 🔄 **API 限流重试** - 指数退避，最多重试 3 次
+- 📊 **日志级别配置** - 支持 DEBUG/INFO/WARN/ERROR
+- 🛡️ **更好的错误处理** - 详细的错误提示和容错机制
+
+**查看完整更新**: [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
