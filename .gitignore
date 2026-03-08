@@ -1,0 +1,62 @@
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 临时文件
+*.tmp
+*.log
+*.bak
+*.backup
+
+# 配置文件（可能包含敏感信息）
+config.json
+*.key
+*.pem
+
+# 数据目录
+data/
+cache/
+logs/
+
+# 压缩历史
+compression-history.md
+compression-history-*.md
+
+# 学习数据
+adaptive-learning/
+*.json.bak
+
+# 测试文件
+test/
+tests/
+*.test.sh
+
+# 文档生成
+docs/_build/
+docs/.doctrees/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 其他
+.env
+.env.local
+.env.*.local

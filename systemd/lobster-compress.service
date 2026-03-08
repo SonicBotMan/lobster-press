@@ -1,0 +1,11 @@
+[Unit]
+Description=LobsterPress Compressor - 预测性压缩引擎
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/h523034406/bin/predictive-compressor.sh
+User=%u
+
+[Install]
+WantedBy=default.target

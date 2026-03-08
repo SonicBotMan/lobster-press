@@ -1,0 +1,10 @@
+[Unit]
+Description=LobsterPress Optimizer Timer
+Requires=lobster-optimizer.service
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

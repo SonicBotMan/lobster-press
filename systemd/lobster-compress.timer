@@ -1,0 +1,10 @@
+[Unit]
+Description=LobsterPress Compressor Timer
+Requires=lobster-compress.service
+
+[Timer]
+OnCalendar=*:0/30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

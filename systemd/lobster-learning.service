@@ -1,0 +1,11 @@
+[Unit]
+Description=LobsterPress Learning - 智能学习调度器
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/h523034406/bin/smart-learning-scheduler.sh
+User=%u
+
+[Install]
+WantedBy=default.target

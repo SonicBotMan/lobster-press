@@ -1,0 +1,11 @@
+[Unit]
+Description=LobsterPress Optimizer - 成本优化器
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/home/h523034406/bin/cost-optimizer.sh
+User=%u
+
+[Install]
+WantedBy=default.target

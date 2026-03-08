@@ -1,0 +1,53 @@
+{
+  "api": {
+    "provider": "glm",
+    "key": "your_api_key_here",
+    "base_url": "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+  },
+  "threshold": {
+    "light": 70,
+    "medium": 85,
+    "heavy": 95
+  },
+  "weights": {
+    "decision": 100,
+    "error": 90,
+    "config": 85,
+    "preference": 80,
+    "question": 70,
+    "fact": 60,
+    "action": 50,
+    "feedback": 45,
+    "context": 30,
+    "chitchat": 10
+  },
+  "strategy": {
+    "light": {
+      "max_messages": 150,
+      "summary_ratio": 0.3
+    },
+    "medium": {
+      "max_messages": 100,
+      "summary_ratio": 0.5
+    },
+    "heavy": {
+      "max_messages": 70,
+      "summary_ratio": 0.7
+    }
+  },
+  "learning": {
+    "enabled": true,
+    "adjust_interval": 3600,
+    "min_samples": 10,
+    "learning_rate": 0.1
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 3600,
+    "max_size": 100
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "/var/log/lobster-press/lobster.log"
+  }
+}
