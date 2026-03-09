@@ -24,7 +24,7 @@
 
 *把龙虾般膨胀的上下文，压成一张薄饼*
 
-**最新版本**: [v1.0.2](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.0.2) - 2026-03-08
+**最新版本**: [v1.1.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.1.0) - 2026-03-09
 **更新内容**: [CHANGELOG.md](CHANGELOG.md)
 
 </div>
@@ -37,20 +37,20 @@
 
 ---
 
-## 🎉 v1.0.2 新特性
+## 🎉 v1.1.0 新特性
 
-### 🐛 关键修复
+### ✨ OpenClaw 集成协调器
 
-- ✅ **修复本地压缩兼容性** - GNU/BSD grep 跨平台支持
-- ✅ **修复 Systemd 配置错误** - 移除 `User=%u` 错误配置
-- ✅ **自动应用压缩结果** - 默认 `AUTO_APPLY=true`
-- ✅ **自动创建历史文件** - 首次运行自动初始化
+- 🦞 **分层压缩策略** - 60% 报告 → 80% 轻度 → 90% 中度 → 95% OpenClaw 处理
+- 🔍 **检测压缩历史** - 跳过近期已压缩的会话，避免重复操作
+- 📊 **JSON 输出** - 支持程序调用，方便集成
+- 📖 **完整文档** - [OpenClaw 集成指南](docs/OPENCLAW-INTEGRATION.md)
 
-### ✨ 新功能
+### 📦 新增文件
 
-- 🔄 **API 限流重试** - 指数退避，最多重试 3 次
-- 📊 **日志级别配置** - 支持 DEBUG/INFO/WARN/ERROR
-- 🛡️ **更好的错误处理** - 详细的错误提示和容错机制
+- `scripts/lobster-openclaw-coordinator.sh` - 协调器脚本
+- `docs/OPENCLAW-INTEGRATION.md` - 集成文档
+- `examples/openclaw-integration-config.json` - 配置示例
 
 **查看完整更新**: [CHANGELOG.md](CHANGELOG.md)
 
@@ -537,6 +537,11 @@ strategy=$(recommend_strategy $token_usage)
 ---
 
 ## 📝 更新日志
+
+### v1.1.0 (2026-03-09)
+- ✨ **OpenClaw 集成协调器** - 与 OpenClaw Compaction 协调工作
+- 🦞 **分层压缩策略** - 智能分配压缩任务
+- 📖 **新增文档** - OpenClaw 集成指南
 
 ### v1.0.2 (2026-03-08)
 - 🔒 **安全修复**: API 响应清理，防止敏感信息泄露
