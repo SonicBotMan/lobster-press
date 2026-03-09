@@ -5,6 +5,41 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.1.0] - 2026-03-09
+
+### ✨ 新增
+
+#### OpenClaw 集成协调器 (#21)
+- **功能**：与 OpenClaw 内置 Compaction 功能协调工作，避免重复压缩
+- **新增文件**：
+  - `scripts/lobster-openclaw-coordinator.sh` - 协调器脚本
+  - `docs/OPENCLAW-INTEGRATION.md` - 集成文档
+  - `examples/openclaw-integration-config.json` - 配置示例
+- **分层策略**：
+  | Token 使用率 | 处理方式 |
+  |-------------|----------|
+  | < 60% | 无需处理 |
+  | 60-80% | 龙虾饼报告 |
+  | 80-90% | 龙虾饼轻度压缩（可选） |
+  | 90-95% | 等待 OpenClaw 或龙虾饼压缩 |
+  | > 95% | OpenClaw 自动压缩 |
+- **协调功能**：
+  - 检测 OpenClaw compaction 历史
+  - 跳过近期已压缩的会话（默认 1 小时窗口）
+  - JSON 输出支持（供程序调用）
+
+### 📝 文档
+
+#### 更新文档
+- README.md 添加 OpenClaw 集成文档链接
+- 新增 `examples/openclaw-integration-config.json` 配置示例
+
+### 🙏 贡献者
+
+- 小华 (Xiao Hua) - OpenClaw 集成协调器
+
+---
+
 ## [1.0.1] - 2026-03-08
 
 ### 🐛 修复
