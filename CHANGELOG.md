@@ -5,6 +5,32 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.1] - 2026-03-10
+
+### ✨ 新增
+
+#### 质量守卫（Quality Guard）(#30)
+- **decision_preserved** - 关键决策保留检查
+- **config_intact** - 配置信息完整检查
+- **context_coherent** - 上下文连贯性检查
+- **自动回滚** - 质量不达标时自动恢复原始会话
+
+#### 架构说明（#36）
+- README 添加新旧系统关系表
+- BENCHMARK 添加测试方法论
+- v1.3.0 架构计划文档
+
+### 🔧 优化
+- `compression_validator.py` 升级到 v1.2.1（质量守卫）
+
+### 📋 关闭 Issues
+- #25 Token 成本透明度 ✅
+- #26 动态模型选择 ✅
+- #30 压缩质量守卫 ✅
+- #36 Shell/Python 双栈架构 ✅
+
+---
+
 ## [1.2.0] - 2026-03-10
 
 ### ✨ 新增
