@@ -441,36 +441,64 @@ tail -10 ~/.lobster-press/compression-history.md
 
 ---
 
+## 🏗️ 架构说明
+
+### v1.2.0 新旧系统关系
+
+> **推荐入口**：`lobster_press_v120.py`（Python 版）
+> **Legacy 支持**：Shell 脚本继续可用，但不推荐新用户使用
+
+| 组件 | 文件 | 状态 | 说明 |
+|------|------|------|------|
+| **Python 核心** | `lobster_press_v120.py` | ✅ 推荐 | TF-IDF + 语义去重 + 提取式摘要 |
+| Shell Legacy | `context-compressor-v5.sh` | ⚠️ Legacy | 硬编码评分，保留兼容性 |
+
+### 压缩阈值
+
+| 条件 | 行为 |
+|------|------|
+| Token < 4000 | 跳过压缩（净收益不足） |
+| Token 4000-10000 | Light 策略（保留 85%） |
+| Token 10000-20000 | Medium 策略（保留 70%） |
+| Token > 20000 | Heavy 策略（保留 55%） |
+
+### v1.3.0 架构目标
+
+```
+systemd timer
+    └── lobster_runner.sh（轻量调用层）
+            └── lobster_press_v120.py（所有核心逻辑）
+```
+
+---
+
 ## 📁 项目结构
 
 ```
 lobster-press/
 ├── README.md                          # 项目文档
 ├── LICENSE                            # MIT 协议
-├── .gitignore                         # Git 忽略文件
+├── requirements.txt                   # Python 依赖
 ├── scripts/                           # 核心脚本
-│   ├── context-compressor-v5.sh       # 核心压缩引擎
+│   ├── lobster_press_v120.py          # ⭐ Python 核心（推荐）
+│   ├── tfidf_scorer.py                # TF-IDF 三层评分
+│   ├── semantic_dedup.py              # 语义去重
+│   ├── extractive_summarizer.py       # 提取式摘要
+│   ├── token_counter.py               # Token 精确计量
+│   ├── compression_validator.py       # 净收益校验
+│   ├── lobster_press_v111.py          # v1.1.1 引擎
+│   ├── context-compressor-v5.sh       # Shell Legacy（兼容）
 │   ├── message-importance-engine.sh   # 消息重要性评估
 │   ├── adaptive-learning-engine.sh    # 自适应学习引擎
-│   ├── smart-learning-scheduler.sh    # 智能学习调度器
-│   ├── predictive-compressor.sh       # 预测性压缩
+│   ├── lobster-openclaw-coordinator.sh # OpenClaw 协调器
 │   └── cost-optimizer.sh              # 成本优化器
-├── systemd/                           # Systemd 服务
-│   ├── lobster-compress.service       # 压缩服务
-│   ├── lobster-compress.timer         # 压缩定时器
-│   ├── lobster-learning.service       # 学习服务
-│   ├── lobster-learning.timer         # 学习定时器
-│   ├── lobster-optimizer.service      # 优化服务
-│   └── lobster-optimizer.timer        # 优化定时器
 ├── docs/                              # 文档
 │   ├── ARCHITECTURE.md                # 架构设计
-│   ├── API.md                         # API 文档
-│   ├── CUSTOMIZATION.md               # 自定义指南
+│   ├── BENCHMARK.md                   # 性能测试报告
+│   ├── OPENCLAW-INTEGRATION.md        # OpenClaw 集成
 │   └── FAQ.md                         # 常见问题
 └── examples/                          # 示例
-    ├── basic-usage.sh                 # 基础用法
-    ├── advanced-config.json           # 高级配置
-    └── integration-example.sh         # 集成示例
+    └── openclaw-integration-config.json # 配置示例
 ```
 
 ---
