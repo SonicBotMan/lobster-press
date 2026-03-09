@@ -1,0 +1,36 @@
+{
+  "api_key": "",
+  "threshold": {
+    "report": 60,
+    "light": 80,
+    "medium": 90,
+    "heavy": 95
+  },
+  "weights": {
+    "decision": 100,
+    "error": 90,
+    "config": 85,
+    "preference": 80,
+    "question": 70,
+    "fact": 60,
+    "action": 50,
+    "feedback": 45,
+    "context": 30,
+    "chitchat": 10
+  },
+  "learning": {
+    "enabled": true,
+    "adjust_interval": 3600
+  },
+  "cache": {
+    "enabled": true,
+    "ttl": 3600
+  },
+  "integration": {
+    "openclaw_compaction": {
+      "enabled": true,
+      "skip_if_recent": 3600,
+      "coordinate_threshold": 90
+    }
+  }
+}

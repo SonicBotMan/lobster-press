@@ -301,6 +301,7 @@ systemctl --user list-timers | grep lobster
 #### 📖 **详细配置指南**
 
 **强烈推荐阅读**: [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
+| OpenClaw 集成 | [docs/OPENCLAW-INTEGRATION.md](docs/OPENCLAW-INTEGRATION.md) |
 
 该文档包含：
 - ✅ **模型配置**（GLM、OpenAI、Claude 等）
