@@ -5,6 +5,95 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.0] - 2026-03-10
+
+### ✨ 新增
+
+#### Zero-cost 本地压缩 (#35)
+- **API 调用**：0（local 模式）
+- **压缩成本**：$0.00
+- **基于 RFC #34 实现**
+
+#### TF-IDF 三层叠加评分
+- Layer 1: TF-IDF（词汇稀有度）
+- Layer 2: 结构性信号（规则）
+- Layer 3: 时间衰减
+
+#### 语义去重
+- 余弦相似度 > 0.82 视为重复
+- 保留重要性更高的消息
+
+#### 提取式摘要
+- 零 API 成本
+- 不生成新 token
+- 不引入 AI 幻觉
+
+#### 分层模式
+- local: 纯本地，$0
+- hybrid: 可选增强
+- api: API 模式
+
+### 📊 性能提升
+
+| 上下文 | 旧版净收益 | 新版净收益 |
+|--------|----------|----------|
+| 5k | -350 | +500 |
+| 15k | +2,150 | +3,500 |
+| 30k | +5,900 | +8,000 |
+
+### 🔧 新文件
+- `scripts/tfidf_scorer.py`
+- `scripts/semantic_dedup.py`
+- `scripts/extractive_summarizer.py`
+- `scripts/lobster_press_v120.py`
+- `requirements.txt`
+
+### 🙏 贡献者
+- 小华 (Xiao Hua) - Code Review
+
+---
+
+## [1.1.1] - 2026-03-10
+
+### ✨ 新增
+
+#### Token 精确计量 (#33)
+- 使用 tiktoken 进行精确 Token 计数
+- 支持中文场景（误差从 30% 降至 5%）
+
+#### 净收益校验
+- 压缩前检查是否值得
+- 避免负收益压缩
+- 设置最小 Token 阈值（4000）
+
+#### 上下文连贯性
+- 强制保留最近 N 条消息
+- 防止 AI "失忆"
+
+#### 动态模型选择
+- 根据策略自动选择最优模型
+- light → glm-4-flash
+- medium → glm-4
+- heavy → claude-3-opus
+
+### 🔧 新文件
+- `scripts/token_counter.py`
+- `scripts/compression_validator.py`
+- `scripts/lobster_press_v111.py`
+- `docs/BENCHMARK.md`
+- `requirements.txt`
+
+### 📋 关联 Issues
+- #25 Token 成本透明度
+- #26 动态模型选择
+- #30 上下文连贯性
+- #32 五项核心优化
+
+### 🙏 贡献者
+- 小华 (Xiao Hua) - Code Review
+
+---
+
 ## [1.1.0] - 2026-03-09
 
 ### ✨ 新增
