@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-压缩净收益校验器
-确保压缩操作真正节省 Token
+压缩校验器 + 质量守卫
+确保压缩操作真正节省 Token，并保护关键信息
 
-Issue: #25, #32 - Token 成本透明度 + 净收益校验
+Issue: #25, #30, #32 - Token 成本透明度 + 质量守卫 + 净收益校验
 Author: LobsterPress Team
-Version: v1.1.1
+Version: v1.2.1
 """
 
 import sys
 import json
-from dataclasses import dataclass
-from typing import List, Dict, Optional
+import re
+from dataclasses import dataclass, field
+from typing import List, Dict, Optional, Tuple
 
 
 @dataclass
@@ -167,18 +168,325 @@ class CompressionValidator:
         }
 
 
+@dataclass
+class QualityCheckResult:
+    """质量检查结果"""
+    check_name: str
+    passed: bool
+    score: int  # 0-100
+    details: str
+
+
+@dataclass
+class QualityGuardConfig:
+    """质量守卫配置"""
+    enabled: bool = True
+    min_score: int = 60  # 最低分数阈值
+    auto_rollback: bool = True  # 自动回滚
+    
+    # 检查项权重
+    check_weights: Dict[str, int] = field(default_factory=lambda: {
+        "decision_preserved": 40,  # 决策保留
+        "config_intact": 30,       # 配置完整
+        "context_coherent": 30,    # 上下文连贯
+    })
+    
+    # 关键决策关键词
+    decision_keywords: List[str] = field(default_factory=lambda: [
+        "决定", "采用", "选择", "使用", "方案", "chosed", "will use",
+        "decided", "selected", "option", "solution", "final",
+    ])
+    
+    # 配置关键词
+    config_keywords: List[str] = field(default_factory=lambda: [
+        "配置", "设置", "参数", "环境变量", "config", "setting",
+        "parameter", "env", "variable", "API_KEY", "token",
+    ])
+
+
+class QualityGuard:
+    """压缩质量守卫
+    
+    在压缩后验证关键信息是否保留：
+    1. decision_preserved - 关键决策是否保留
+    2. config_intact - 配置信息是否完整
+    3. context_coherent - 上下文是否连贯
+    """
+    
+    def __init__(self, config: Optional[QualityGuardConfig] = None):
+        """初始化质量守卫
+        
+        Args:
+            config: 质量守卫配置
+        """
+        self.config = config or QualityGuardConfig()
+    
+    def check_decision_preserved(self, 
+                                  original_messages: List[Dict],
+                                  compressed_messages: List[Dict]) -> QualityCheckResult:
+        """检查关键决策是否保留
+        
+        Args:
+            original_messages: 原始消息列表
+            compressed_messages: 压缩后消息列表
+        
+        Returns:
+            质量检查结果
+        """
+        # 提取原始消息中的决策
+        original_decisions = set()
+        for msg in original_messages:
+            content = msg.get("content", "")
+            for keyword in self.config.decision_keywords:
+                if keyword.lower() in content.lower():
+                    # 提取包含决策的句子
+                    sentences = re.split(r'[。.!?！？]', content)
+                    for sentence in sentences:
+                        if keyword.lower() in sentence.lower():
+                            original_decisions.add(sentence.strip()[:100])  # 截取前100字符
+                    break
+        
+        if not original_decisions:
+            return QualityCheckResult(
+                check_name="decision_preserved",
+                passed=True,
+                score=100,
+                details="原始消息中无关键决策",
+            )
+        
+        # 检查压缩后是否保留
+        compressed_content = " ".join([msg.get("content", "") for msg in compressed_messages])
+        preserved_count = 0
+        
+        for decision in original_decisions:
+            # 模糊匹配：检查关键词是否出现
+            keywords = decision.split()[:5]  # 取前5个词
+            if any(kw.lower() in compressed_content.lower() for kw in keywords if len(kw) > 2):
+                preserved_count += 1
+        
+        score = int(preserved_count / len(original_decisions) * 100) if original_decisions else 100
+        passed = score >= 60
+        
+        return QualityCheckResult(
+            check_name="decision_preserved",
+            passed=passed,
+            score=score,
+            details=f"决策保留率: {preserved_count}/{len(original_decisions)} ({score}%)",
+        )
+    
+    def check_config_intact(self,
+                           original_messages: List[Dict],
+                           compressed_messages: List[Dict]) -> QualityCheckResult:
+        """检查配置信息是否完整
+        
+        Args:
+            original_messages: 原始消息列表
+            compressed_messages: 压缩后消息列表
+        
+        Returns:
+            质量检查结果
+        """
+        # 提取配置项
+        original_configs = set()
+        for msg in original_messages:
+            content = msg.get("content", "")
+            # 匹配 key=value 模式
+            config_patterns = re.findall(r'[\w_]+=\S+', content)
+            original_configs.update(config_patterns)
+            
+            # 匹配配置关键词
+            for keyword in self.config.config_keywords:
+                if keyword.lower() in content.lower():
+                    original_configs.add(keyword)
+        
+        if not original_configs:
+            return QualityCheckResult(
+                check_name="config_intact",
+                passed=True,
+                score=100,
+                details="原始消息中无配置信息",
+            )
+        
+        # 检查压缩后是否保留
+        compressed_content = " ".join([msg.get("content", "") for msg in compressed_messages])
+        preserved_count = sum(1 for cfg in original_configs if cfg.lower() in compressed_content.lower())
+        
+        score = int(preserved_count / len(original_configs) * 100) if original_configs else 100
+        passed = score >= 70  # 配置保留阈值更高
+        
+        return QualityCheckResult(
+            check_name="config_intact",
+            passed=passed,
+            score=score,
+            details=f"配置保留率: {preserved_count}/{len(original_configs)} ({score}%)",
+        )
+    
+    def check_context_coherent(self,
+                               compressed_messages: List[Dict]) -> QualityCheckResult:
+        """检查上下文是否连贯
+        
+        Args:
+            compressed_messages: 压缩后消息列表
+        
+        Returns:
+            质量检查结果
+        """
+        if not compressed_messages:
+            return QualityCheckResult(
+                check_name="context_coherent",
+                passed=False,
+                score=0,
+                details="压缩后消息为空",
+            )
+        
+        # 检查角色分布
+        roles = [msg.get("role", "") for msg in compressed_messages]
+        role_set = set(roles)
+        
+        # 应该至少有 user 和 assistant
+        has_user = "user" in role_set
+        has_assistant = "assistant" in role_set
+        
+        # 检查是否有突兀的跳跃（连续多条相同角色）
+        max_consecutive = 1
+        current_consecutive = 1
+        for i in range(1, len(roles)):
+            if roles[i] == roles[i-1]:
+                current_consecutive += 1
+                max_consecutive = max(max_consecutive, current_consecutive)
+            else:
+                current_consecutive = 1
+        
+        # 评分
+        score = 100
+        details = []
+        
+        if not has_user:
+            score -= 30
+            details.append("缺少 user 角色")
+        if not has_assistant:
+            score -= 30
+            details.append("缺少 assistant 角色")
+        if max_consecutive > 5:
+            score -= 20
+            details.append(f"连续 {max_consecutive} 条相同角色")
+        
+        passed = score >= 60
+        details_str = " | ".join(details) if details else "上下文连贯"
+        
+        return QualityCheckResult(
+            check_name="context_coherent",
+            passed=passed,
+            score=max(0, score),
+            details=details_str,
+        )
+    
+    def run_quality_checks(self,
+                          original_messages: List[Dict],
+                          compressed_messages: List[Dict]) -> Tuple[bool, Dict]:
+        """运行所有质量检查
+        
+        Args:
+            original_messages: 原始消息列表
+            compressed_messages: 压缩后消息列表
+        
+        Returns:
+            (passed: bool, report: Dict)
+        """
+        if not self.config.enabled:
+            return True, {"enabled": False, "message": "质量守卫已禁用"}
+        
+        checks = [
+            self.check_decision_preserved(original_messages, compressed_messages),
+            self.check_config_intact(original_messages, compressed_messages),
+            self.check_context_coherent(compressed_messages),
+        ]
+        
+        # 计算加权总分
+        total_score = 0
+        total_weight = 0
+        all_passed = True
+        
+        check_results = []
+        for check in checks:
+            weight = self.config.check_weights.get(check.check_name, 20)
+            total_score += check.score * weight
+            total_weight += weight
+            
+            if not check.passed:
+                all_passed = False
+            
+            check_results.append({
+                "check": check.check_name,
+                "passed": check.passed,
+                "score": check.score,
+                "details": check.details,
+                "weight": weight,
+            })
+        
+        final_score = total_score // total_weight if total_weight > 0 else 0
+        passed = final_score >= self.config.min_score and all_passed
+        
+        report = {
+            "enabled": True,
+            "passed": passed,
+            "final_score": final_score,
+            "min_score": self.config.min_score,
+            "auto_rollback": self.config.auto_rollback,
+            "checks": check_results,
+            "recommendation": "",
+        }
+        
+        if passed:
+            report["recommendation"] = f"✅ 质量检查通过 ({final_score}分)"
+        else:
+            report["recommendation"] = f"❌ 质量检查失败 ({final_score}分 < {self.config.min_score}分)"
+            if self.config.auto_rollback:
+                report["recommendation"] += "，建议回滚"
+        
+        return passed, report
+
+
 def main():
     """命令行入口"""
     import argparse
     
-    parser = argparse.ArgumentParser(description="压缩净收益校验器")
-    parser.add_argument("original_tokens", type=int, help="原始 Token 数")
+    parser = argparse.ArgumentParser(description="压缩校验器 + 质量守卫")
+    parser.add_argument("original_tokens", type=int, nargs="?", help="原始 Token 数")
     parser.add_argument("--strategy", default="medium", choices=["light", "medium", "heavy"],
                        help="压缩策略")
     parser.add_argument("--validate", help="验证压缩结果（JSON 格式）")
     parser.add_argument("--break-even", action="store_true", help="计算盈亏平衡点")
+    parser.add_argument("--quality-check", help="质量检查（JSON 格式：{original, compressed}）")
+    parser.add_argument("--quality-config", help="质量守卫配置（JSON 格式）")
     
     args = parser.parse_args()
+    
+    # 质量检查模式
+    if args.quality_check:
+        try:
+            data = json.loads(args.quality_check)
+            original = data.get("original", [])
+            compressed = data.get("compressed", [])
+            
+            # 加载配置
+            config = QualityGuardConfig()
+            if args.quality_config:
+                config_data = json.loads(args.quality_config)
+                for key, value in config_data.items():
+                    if hasattr(config, key):
+                        setattr(config, key, value)
+            
+            guard = QualityGuard(config)
+            passed, report = guard.run_quality_checks(original, compressed)
+            print(json.dumps(report, indent=2, ensure_ascii=False))
+            
+            if not passed:
+                sys.exit(1)
+        except (json.JSONDecodeError, TypeError) as e:
+            print(f"❌ JSON 解析失败: {e}", file=sys.stderr)
+            sys.exit(1)
+        return
     
     validator = CompressionValidator(args.strategy)
     
@@ -196,7 +504,7 @@ def main():
         except (json.JSONDecodeError, TypeError) as e:
             print(f"❌ JSON 解析失败: {e}", file=sys.stderr)
             sys.exit(1)
-    else:
+    elif args.original_tokens:
         # 判断是否应该压缩
         should, reason = validator.should_compress(args.original_tokens)
         print(json.dumps({
@@ -205,6 +513,8 @@ def main():
             "strategy": args.strategy,
             "min_threshold": validator.min_threshold,
         }, indent=2, ensure_ascii=False))
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":
