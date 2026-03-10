@@ -5,6 +5,44 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.8] - 2026-03-11
+
+### 🚀 架构演进
+- **MCP Server 实现** (#42)
+  - 创建 `mcp_server/` 目录
+  - 实现 5 个 MCP 工具
+  - 支持 Claude Desktop / Cursor / Windsurf 等
+  - 资源访问接口
+
+### 📋 新增工具
+
+| 工具 | 功能 |
+|------|------|
+| `compress_session` | 压缩会话 |
+| `preview_compression` | 预览压缩效果 |
+| `get_compression_stats` | 获取统计数据 |
+| `update_weights` | 更新权重配置 |
+| `list_sessions` | 列出可压缩会话 |
+
+### 📋 集成方式
+
+**Claude Desktop:**
+```json
+{
+  "mcpServers": {
+    "lobster-press": {
+      "command": "python3",
+      "args": ["/path/to/lobster-press/mcp_server/lobster_mcp_server.py"]
+    }
+  }
+}
+```
+
+### 📋 关闭 Issues
+- #42 v2.0 架构演进：向 MCP Server 演进 ✅
+
+---
+
 ## [1.2.7] - 2026-03-11
 
 ### ✨ 新增功能
