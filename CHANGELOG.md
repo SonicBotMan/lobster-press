@@ -5,6 +5,16 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.2] - 2026-03-10
+
+### 🐛 修复
+- `predictive-compressor.sh` 路径修复：`$HOME/context-compressor-v5.sh` → `$HOME/bin/context-compressor-v5.sh` (#38)
+
+### 📋 关闭 Issues
+- #38 预测性压缩器路径与安装文档不一致 ✅
+
+---
+
 ## [1.2.1] - 2026-03-10
 
 ### ✨ 新增
