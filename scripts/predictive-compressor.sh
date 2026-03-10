@@ -56,8 +56,8 @@ predict_compression_time() {
         return
     fi
     
-    # 假设最大大小为 1MB (1000000 bytes)
-    local max_size=1000000
+    # 基于实际 token 窗口 (200k tokens ≈ 800k bytes)
+    local max_size=${MAX_CONTEXT_SIZE:-800000}
     local current_percent=$((current_size * 100 / max_size))
     local remaining=$((max_size - current_size))
     
@@ -88,7 +88,12 @@ for session_file in "$SESSIONS_DIR"/*.jsonl; do
         # 提前压缩
         if [ $minutes -lt 5 ]; then
             log "🚀 执行预测性压缩..."
-            AUTO_APPLY=true timeout 60 $COMPRESSOR "$session_id" 2>&1 | grep -E "✅|节省" | head -3
+            # 移除 grep 过滤，保留完整输出以检测错误
+            if AUTO_APPLY=true timeout 60 $COMPRESSOR "$session_id" 2>&1; then
+                log "✅ 预测性压缩成功"
+            else
+                log "❌ 预测性压缩失败，退出码: $?"
+            fi
         fi
     fi
 done
