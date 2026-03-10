@@ -5,6 +5,54 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.2.7] - 2026-03-11
+
+### ✨ 新增功能
+- **多语言/多模型 Token 计数** (#40)
+  - 添加统一 TokenCounter 接口
+  - 支持 tiktoken (OpenAI)、GLM (智谱)、Qwen (阿里) 等多种模型
+  - 改进中英文混合场景的 Token 估算
+  - 增加置信度指标
+
+- **增量压缩与断点续传** (#45)
+  - 创建增量压缩器 (IncrementalCompressor)
+  - 支持断点续传 (`--resume`)
+  - 进度持久化 (`~/.lobster-press/progress/`)
+  - 定期检查点机制
+  - 进度查询和清除功能
+
+### 📋 技术细节
+
+**Token 计数优化 (#40)**
+```python
+# 支持多种模型
+counter = TokenCounter(model="glm-4")  # GLM-4
+counter = TokenCounter(model="qwen")   # Qwen
+counter = TokenCounter(model="gpt-4")  # GPT-4
+
+# 改进的中文支持
+result = counter.get_count_result("中文文本")
+# TokenCountResult(count=10, model="glm-4", method="approximate", confidence=0.85)
+```
+
+**增量压缩 (#45)**
+```bash
+# 开始压缩
+python incremental_compressor.py session.jsonl -o compressed.jsonl
+
+# 恢复进度
+python incremental_compressor.py session.jsonl -o compressed.jsonl --resume
+
+# 查看进度
+python incremental_compressor.py session.jsonl --progress
+```
+
+### 📋 关闭 Issues
+- #40 多语言/多模型 Token 计数优化 ✅
+- #45 增量压缩与断点续传 ✅
+
+---
+
 ## [1.2.4] - 2026-03-11
 
 ### 🐛 修复（严重 Bug - Issue #47）
