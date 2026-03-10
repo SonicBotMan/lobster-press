@@ -1,0 +1,8 @@
+# LobsterPress Dependencies
+# Python 3.8+
+
+# Token 计数（可选，无此依赖时使用近似计算）
+tiktoken>=0.5.0
+
+# 开发依赖
+# pytest>=7.0.0  # 单元测试（后续添加）
