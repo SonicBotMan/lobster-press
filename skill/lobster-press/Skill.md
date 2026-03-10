@@ -67,7 +67,7 @@ python3 scripts/lobster_press_v120.py --strategy medium
 - 保留重要性更高的消息
 - 避免信息冗余
 
-### 质量守卫（v1.2.1）
+### 质量守卫（v1.2.2）
 
 压缩后自动检查：
 - `decision_preserved` - 关键决策是否保留
@@ -78,7 +78,7 @@ python3 scripts/lobster_press_v120.py --strategy medium
 
 ## 性能基准
 
-| 上下文大小 | 旧版净收益 | v1.2.1 净收益 | 提升 |
+| 上下文大小 | 旧版净收益 | v1.2.2 净收益 | 提升 |
 |-----------|----------|--------------|------|
 | 5k tokens | -350 | +500 | +850 |
 | 15k tokens | +2,150 | +3,500 | +1,350 |
@@ -158,7 +158,7 @@ pip install -r scripts/requirements.txt
 
 ## 版本历史
 
-### v1.2.1 (2026-03-10)
+### v1.2.2 (2026-03-10)
 - 新增质量守卫（自动回滚）
 - 新增架构说明文档
 - 优化压缩校验器
@@ -189,5 +189,5 @@ A: 根据会话长度，净收益从 +500 到 +8,000 不等。
 ---
 
 **License**: MIT
-**Version**: v1.2.1
+**Version**: v1.2.2
 **Author**: LobsterPress Team

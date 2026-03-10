@@ -5,7 +5,7 @@
 set -e
 
 SESSIONS_DIR="$HOME/.openclaw/agents/main/sessions"
-COMPRESSOR="$HOME/context-compressor-v5.sh"
+COMPRESSOR="$HOME/bin/context-compressor-v5.sh"
 METRICS_FILE="/tmp/predictive-metrics.json"
 
 # 初始化指标
