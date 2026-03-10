@@ -635,6 +635,8 @@ strategy=$(recommend_strategy $token_usage)
 
 **如果这个项目对你有帮助，请给一个 ⭐ Star！**
 
+![Star History Chart](https://api.star-history.com/svg?repos=SonicBotMan/lobster-press&type=Date)
+
 Made with ❤️ by the LobsterPress Team
 
 🦞 让 AI 记忆永不溢出
