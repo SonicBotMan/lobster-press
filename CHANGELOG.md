@@ -9,6 +9,23 @@
 
 ### 🐛 修复（严重 Bug - Issue #47）
 
+## [1.2.6] - 2026-03-11
+
+### 🔧 修复（Python 算法优化 - Issue #51）
+- **余弦相似度**：修复 `semantic_dedup.py`，使用真正的 TF 向量余弦相似度
+- **中文分词**：`tfidf_scorer.py` 改用 bi-gram，提升 TF-IDF 效果
+
+### 📋 技术细节
+| 文件 | 问题 | 修复 |
+|------|------|------|
+| semantic_dedup.py | Jaccard 变体，非真正余弦相似度 | TF 向量余弦相似度 |
+| tfidf_scorer.py | 中文按单字切分，TF-IDF 失效 | bi-gram 切分 |
+
+### 📋 关闭 Issues
+- #51 v1.2.3 多个严重 Bug ✅ (完全修复)
+
+---
+
 ## [1.2.5] - 2026-03-11
 
 ### 🐛 修复（Shell 脚本严重 Bug - Issue #51）
