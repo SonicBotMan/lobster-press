@@ -243,16 +243,15 @@ sanitize_response() {
 }
 
 compress_session() {
+    local session_id=$1
+    local session_file="$SESSIONS_DIR/${session_id}.jsonl"
+    
     # 获取并发锁，防止同时压缩同一会话
-    local session_id=$(basename "$session_file" .jsonl)
-    exec 200>"/tmp/compress-.lock"
+    exec 200>"/tmp/compress-${session_id}.lock"
     if ! flock -n 200; then
         echo "❌ 会话正在被压缩，跳过"
         return 1
     fi
-
-    local session_id=$1
-    local session_file="$SESSIONS_DIR/${session_id}.jsonl"
     
     if [ ! -f "$session_file" ]; then
         echo "❌ 会话文件不存在: $session_id"
