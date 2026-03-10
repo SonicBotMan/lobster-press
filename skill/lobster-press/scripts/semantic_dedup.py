@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-语义去重器
+语义去重器 v1.2.1
 基于 RFC #34 的余弦相似度去重方案
 
+修复 Issue #51: 使用真正的 TF 向量余弦相似度，而非 Jaccard 变体
+
 功能：
+- 基于 TF 向量的真正余弦相似度
 - 检测语义相似的消息
 - 保留重要性更高的消息
 - 零 API 成本，纯本地计算
 
 Author: LobsterPress Team
-Version: v1.2.0
+Version: v1.2.1
 """
 
 import sys
 import math
 from typing import List, Dict, Tuple, Set
 from dataclasses import dataclass
+from collections import Counter
 
 
 @dataclass
@@ -31,7 +35,7 @@ class SimilarityResult:
 class SemanticDeduplicator:
     """语义去重器
     
-    基于 TF-IDF 向量的余弦相似度：
+    基于 TF 向量的真正余弦相似度：
     - 相似度 > 0.82 视为重复
     - 保留重要性更高的消息
     - 完全本地计算，零 API 成本
@@ -52,7 +56,12 @@ class SemanticDeduplicator:
         self.threshold = threshold
     
     def cosine_similarity(self, tokens_a: List[str], tokens_b: List[str]) -> float:
-        """计算余弦相似度
+        """计算真正的余弦相似度（基于 TF 向量）
+        
+        修复 Issue #51: 原实现是 Jaccard 变体，现在是真正的余弦相似度
+        
+        公式: cos(A, B) = (A · B) / (||A|| * ||B||)
+        其中 A 和 B 是 TF 向量
         
         Args:
             tokens_a: 消息 A 的 token 列表
@@ -64,19 +73,24 @@ class SemanticDeduplicator:
         if not tokens_a or not tokens_b:
             return 0.0
         
-        set_a = set(tokens_a)
-        set_b = set(tokens_b)
+        # 构建 TF 向量
+        tf_a = Counter(tokens_a)
+        tf_b = Counter(tokens_b)
         
-        # 交集大小
-        intersection = len(set_a & set_b)
+        # 所有词项
+        all_terms = set(tf_a) | set(tf_b)
         
-        # 分母：sqrt(|A| * |B|)
-        denominator = math.sqrt(len(set_a) * len(set_b))
+        # 计算点积
+        dot_product = sum(tf_a.get(t, 0) * tf_b.get(t, 0) for t in all_terms)
         
-        if denominator == 0:
+        # 计算模长
+        norm_a = math.sqrt(sum(v ** 2 for v in tf_a.values()))
+        norm_b = math.sqrt(sum(v ** 2 for v in tf_b.values()))
+        
+        if norm_a == 0 or norm_b == 0:
             return 0.0
         
-        return intersection / denominator
+        return dot_product / (norm_a * norm_b)
     
     def find_duplicates(self, 
                         messages: List[Dict],
@@ -175,7 +189,7 @@ class SemanticDeduplicator:
         duplicates, results = self.find_duplicates(messages, tokens_list, scores)
         
         lines = [
-            f"📊 语义去重报告",
+            f"📊 语义去重报告（v1.2.1 - 真正的余弦相似度）",
             f"",
             f"总消息数: {len(messages)}",
             f"重复消息数: {len(duplicates)}",
@@ -206,7 +220,7 @@ def main():
     import argparse
     import json
     
-    parser = argparse.ArgumentParser(description="语义去重器")
+    parser = argparse.ArgumentParser(description="语义去重器 v1.2.1")
     parser.add_argument("input_file", help="输入文件（JSON 格式的消息列表）")
     parser.add_argument("--threshold", type=float, default=0.82, help="重复阈值")
     parser.add_argument("--report", action="store_true", help="输出详细报告")

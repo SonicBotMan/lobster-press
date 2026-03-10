@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-TF-IDF 评分器
+TF-IDF 评分器 v1.2.1
 基于 RFC #34 的 Zero-cost 本地评分方案
+
+修复 Issue #51: 中文分词改用 bi-gram，提升 TF-IDF 效果
 
 Layer 1 — TF-IDF（无依赖，纯本地）
 Layer 2 — 结构性信号（规则，零成本）
 Layer 3 — 时间衰减（连续函数）
 
 Author: LobsterPress Team
-Version: v1.2.0
+Version: v1.2.1
 """
 
 import sys
@@ -68,7 +70,10 @@ class TFIDFScorer:
         self.corpus_tokens: List[List[str]] = []
     
     def tokenize(self, text: str) -> List[str]:
-        """分词（简单版，中英文混合）
+        """分词（改进版，支持中文 bi-gram）
+        
+        修复 Issue #51: 中文按 bi-gram 切分，而非单字
+        这样可以保留词汇的语义信息，提升 TF-IDF 效果
         
         Args:
             text: 输入文本
@@ -76,20 +81,27 @@ class TFIDFScorer:
         Returns:
             Token 列表
         """
-        # 简单分词：中文字符单独提取，英文按空格分割
         tokens = []
         
-        # 提取中文字符（每个字作为 token）
-        chinese_chars = re.findall(r'[\u4e00-\u9fff]', text)
-        tokens.extend(chinese_chars)
-        
-        # 提取英文单词
+        # 提取英文单词（保持不变）
         english_words = re.findall(r'[a-zA-Z]+', text.lower())
         tokens.extend(english_words)
         
-        # 提取数字
+        # 提取数字（保持不变）
         numbers = re.findall(r'\d+', text)
         tokens.extend(numbers)
+        
+        # 提取中文 bi-gram（修复 Issue #51）
+        # 原来是单字：'数据库' → ['数', '据', '库']
+        # 现在是 bi-gram：'数据库' → ['数据', '据库']
+        chinese_chars = re.findall(r'[\u4e00-\u9fff]', text)
+        for i in range(len(chinese_chars) - 1):
+            bi_gram = chinese_chars[i] + chinese_chars[i + 1]
+            tokens.append(bi_gram)
+        
+        # 单字也保留（用于短词匹配）
+        # 但权重会通过 IDF 自然降低
+        tokens.extend(chinese_chars)
         
         return tokens
     
@@ -265,7 +277,7 @@ def main():
     import argparse
     import json
     
-    parser = argparse.ArgumentParser(description="TF-IDF 评分器")
+    parser = argparse.ArgumentParser(description="TF-IDF 评分器 v1.2.1")
     parser.add_argument("input_file", help="输入文件（JSON 格式的消息列表）")
     parser.add_argument("--top", type=int, default=10, help="显示前 N 条高分消息")
     parser.add_argument("--json", action="store_true", help="输出 JSON 格式")
@@ -302,7 +314,7 @@ def main():
             })
         print(json.dumps(output, indent=2, ensure_ascii=False))
     else:
-        print(f"\n📊 Top {args.top} 高分消息:\n")
+        print(f"\n📊 Top {args.top} 高分消息（v1.2.1 - 中文 bi-gram）:\n")
         for i, msg in enumerate(sorted_scored[:args.top], 1):
             print(f"{i}. [{msg.msg_type}] 分数: {msg.final_score:.1f}")
             print(f"   TF-IDF: {msg.tfidf_score:.1f} | 结构: {msg.structural_bonus:+.1f} | 衰减: {msg.time_decay:.1f}")
