@@ -1,0 +1,11 @@
+# LobsterPress MCP Server Dependencies
+
+# 核心依赖
+# Python 3.8+ required
+
+# 可选依赖（用于精确 Token 计数）
+tiktoken>=0.5.0
+
+# 测试依赖
+pytest>=7.0.0
+pytest-asyncio>=0.21.0

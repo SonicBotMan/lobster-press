@@ -1,0 +1,56 @@
+{
+  "name": "lobster-press",
+  "version": "1.2.8",
+  "description": "LobsterPress - 智能 OpenClaw 会话压缩服务 (MCP Server)",
+  "main": "lobster_mcp_server.py",
+  "type": "mcp-server",
+  "tools": [
+    {
+      "name": "compress_session",
+      "description": "压缩 OpenClaw 会话历史，保留重要信息"
+    },
+    {
+      "name": "preview_compression",
+      "description": "预览压缩效果，显示将要保留和删除的消息"
+    },
+    {
+      "name": "get_compression_stats",
+      "description": "获取压缩统计数据"
+    },
+    {
+      "name": "update_weights",
+      "description": "更新消息类型权重配置"
+    },
+    {
+      "name": "list_sessions",
+      "description": "列出所有可压缩的会话"
+    }
+  ],
+  "resources": [
+    {
+      "uri": "lobster://sessions/{session_id}",
+      "description": "访问 OpenClaw 会话数据"
+    }
+  ],
+  "config": {
+    "sessions_dir": "~/.openclaw/agents/main/sessions",
+    "default_strategy": "medium",
+    "strategies": {
+      "light": {
+        "retention_ratio": 0.7,
+        "description": "轻度压缩，保留 70% 消息"
+      },
+      "medium": {
+        "retention_ratio": 0.5,
+        "description": "中度压缩，保留 50% 消息"
+      },
+      "aggressive": {
+        "retention_ratio": 0.3,
+        "description": "激进压缩，保留 30% 消息"
+      }
+    }
+  },
+  "author": "LobsterPress Team",
+  "repository": "https://github.com/SonicBotMan/lobster-press",
+  "license": "MIT"
+}
