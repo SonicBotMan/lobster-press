@@ -24,6 +24,7 @@ mkdir -p "$CACHE_DIR" "$(dirname "$HISTORY_FILE")" 2>/dev/null || true
 touch "$HISTORY_FILE" 2>/dev/null || true
 
 # 自动读取 API Key
+
 # 清理 API 响应中的敏感信息
 sanitize_response() {
     local response=$1
@@ -46,11 +47,6 @@ get_glm_key() {
 GLM_KEY=$(get_glm_key)
 
 # Token 估算
-# 清理 API 响应中的敏感信息
-sanitize_response() {
-    local response=$1
-    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
-}
 
 estimate_tokens() {
     local text=$1
@@ -59,26 +55,16 @@ estimate_tokens() {
 }
 
 # 获取会话 token 使用率
-# 清理 API 响应中的敏感信息
-sanitize_response() {
-    local response=$1
-    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
-}
 
 get_token_usage() {
     local session_file=$1
     local file_size=$(stat -c%s "$session_file" 2>/dev/null || echo 0)
-    local estimated_tokens=$((file_size / 4))
+    local estimated_tokens=$((file_size / 3))
     local usage=$((estimated_tokens * 100 / 200000))
     echo "$usage"
 }
 
 # 根据使用率决定压缩策略
-# 清理 API 响应中的敏感信息
-sanitize_response() {
-    local response=$1
-    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
-}
 
 get_compress_strategy() {
     local usage=$1
@@ -122,11 +108,6 @@ extract_messages_v5() {
 }
 
 # 检查缓存
-# 清理 API 响应中的敏感信息
-sanitize_response() {
-    local response=$1
-    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
-}
 
 check_cache() {
     local content_hash=$1
@@ -143,11 +124,6 @@ check_cache() {
 }
 
 # 保存缓存
-# 清理 API 响应中的敏感信息
-sanitize_response() {
-    local response=$1
-    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
-}
 
 save_cache() {
     local content_hash=$1
@@ -160,11 +136,6 @@ save_cache() {
 }
 
 # 记录压缩历史
-# 清理 API 响应中的敏感信息
-sanitize_response() {
-    local response=$1
-    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
-}
 
 record_history() {
     local session_id=$1
@@ -183,11 +154,6 @@ record_history() {
 }
 
 # 更新指标
-# 清理 API 响应中的敏感信息
-sanitize_response() {
-    local response=$1
-    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
-}
 
 update_metrics() {
     local session_id=$1
@@ -236,11 +202,6 @@ EOF
 }
 
 # 压缩会话历史（主函数）
-# 清理 API 响应中的敏感信息
-sanitize_response() {
-    local response=$1
-    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
-}
 
 compress_session() {
     local session_id=$1
@@ -490,14 +451,9 @@ $old_messages"
 }
 
 # 预防性扫描
-# 清理 API 响应中的敏感信息
-sanitize_response() {
-    local response=$1
-    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
-}
 
 scan_and_compress() {
-    echo "🔍 预防性扫描开始（v5 智能引擎）..."
+    echo "🔍 预防性扫描开始（v5.1 (Bug Fix)）..."
     local compressed=0
     local skipped=0
     local total=0
@@ -514,7 +470,7 @@ scan_and_compress() {
         total=$((total + 1))
         
         local token_usage=$(get_token_usage "$session_file")
-        local session_id=$(basename "$session_file" .jsonl)
+        session_id=$(basename "$session_file" .jsonl)
         
         if [ $token_usage -gt 70 ]; then
             echo ""
@@ -526,7 +482,7 @@ scan_and_compress() {
     
     echo ""
     echo "===================="
-    echo "✅ 扫描完成（v5 智能引擎）"
+    echo "✅ 扫描完成（v5.1 (Bug Fix)）"
     echo "📊 统计: 总计 $total 个会话, 压缩 $compressed 个, 跳过 $skipped 个"
     
     if [ -f "$METRICS_FILE" ]; then
@@ -537,11 +493,6 @@ scan_and_compress() {
 }
 
 # 显示指标
-# 清理 API 响应中的敏感信息
-sanitize_response() {
-    local response=$1
-    echo "$response" | sed -E 's/(api[_-]?key|token|authorization|bearer)[^,}]*/1=***REDACTED***/gi'
-}
 
 show_metrics() {
     if [ -f "$METRICS_FILE" ]; then
@@ -557,7 +508,7 @@ show_metrics() {
 case "${1:-}" in
     "test")
         echo "🔍 查找测试会话..."
-        local test_file=$(ls -t "$SESSIONS_DIR"/*.jsonl 2>/dev/null | \
+        test_file=$(ls -t "$SESSIONS_DIR"/*.jsonl 2>/dev/null | \
             grep -v ".backup\|.reset\|.deleted" | head -1)
         
         if [ -z "$test_file" ]; then
@@ -565,7 +516,7 @@ case "${1:-}" in
             exit 1
         fi
         
-        local session_id=$(basename "$test_file" .jsonl)
+        session_id=$(basename "$test_file" .jsonl)
         echo "📁 测试会话: $session_id"
         echo ""
         compress_session "$session_id"
