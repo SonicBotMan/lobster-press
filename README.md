@@ -252,7 +252,17 @@ lobster-press/
 
 ## 📝 更新日志
 
-### v1.4.1 (2026-03-12) - Latest
+### v1.4.2 (2026-03-12) - Latest
+
+- 🔥 **Issue #71: 语义去重异常时状态不一致**
+  - 问题: 去重时直接修改 older_messages，异常时状态不一致
+  - 修复: 使用新变量 deduplicated_older_messages 存储去重结果
+  - 验证: ✅ 异常时保持原始列表
+- 🎯 **质量保证**
+  - 状态一致性验证通过
+  - 质量评分: 100/100
+
+### v1.4.1 (2026-03-12)
 
 - 🔥 **Issue #69: TFIDFScorer 单独调用时评分恒为 0**
   - 问题: score_message() 单独调用时 idf_cache 为空

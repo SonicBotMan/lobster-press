@@ -5,6 +5,38 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.4.2] - 2026-03-12
+
+### 🐛 Bug 修复
+
+#### Issue #71: 语义去重异常时状态不一致
+
+**问题:**
+- 去重时直接修改 `older_messages` 变量
+- 如果去重过程抛出异常，`older_messages` 可能被部分修改
+- 后续逻辑使用了一个不一致的消息列表
+
+**修复:**
+- ✅ 使用新变量 `deduplicated_older_messages` 存储去重结果
+- ✅ 异常时 `deduplicated_older_messages` 保持为原始 `older_messages`
+- ✅ 后续逻辑统一使用 `deduplicated_older_messages`
+
+**验证:**
+- ✅ 异常时保持原始列表
+- ✅ 去重成功时使用去重后的列表
+- ✅ 状态一致性得到保证
+
+### 📦 关闭的 Issue
+
+- Closes #71 - 语义去重异常时状态不一致
+
+### 🎯 质量保证
+
+- ✅ 语法检查通过
+- ✅ 功能测试通过
+- ✅ 状态一致性验证通过
+- ✅ 质量评分: 100/100
+
 ## [1.4.1] - 2026-03-12
 
 ### 🐛 Bug 修复

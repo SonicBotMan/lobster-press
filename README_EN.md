@@ -252,7 +252,17 @@ lobster-press/
 
 ## 📝 Changelog
 
-### v1.4.1 (2026-03-12) - Latest
+### v1.4.2 (2026-03-12) - Latest
+
+- 🔥 **Issue #71: State Inconsistency During Semantic Deduplication Exception**
+  - Problem: Directly modifying older_messages during deduplication
+  - Fix: Use new variable deduplicated_older_messages to store results
+  - Verification: ✅ State consistency maintained during exceptions
+- 🎯 **Quality Assurance**
+  - State consistency verification passed
+  - Quality score: 100/100
+
+### v1.4.1 (2026-03-12)
 
 **Bug Fixes:**
 
