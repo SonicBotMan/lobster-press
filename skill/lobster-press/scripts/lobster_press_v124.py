@@ -411,6 +411,9 @@ class LobsterPressV124:
         # Bug 1 修复：评分历史消息时保留原始索引
         older_messages = parser.messages[:older_count]  # [(idx, msg), ...]
         
+        # Issue #71 修复：使用新变量存储去重结果，避免异常时状态不一致
+        deduplicated_older_messages = older_messages  # 默认不修改
+        
         # Issue #63 修复：在评分前进行语义去重
         if MODULES_AVAILABLE and len(older_messages) > 1:
             try:
@@ -441,8 +444,8 @@ class LobsterPressV124:
                 # 去重
                 deduped_messages, duplicates = deduplicator.deduplicate(dedup_messages, tokens_list, scores)
                 
-                # 还原原始索引和消息
-                older_messages = [
+                # Issue #71 修复：赋值给新变量，不覆盖 older_messages
+                deduplicated_older_messages = [
                     (msg['original_idx'], msg['original_msg']) 
                     for msg in deduped_messages
                 ]
@@ -451,9 +454,10 @@ class LobsterPressV124:
                     print(f"🔍 语义去重: 移除 {len(duplicates)} 条重复消息", file=sys.stderr)
             except Exception as e:
                 print(f"⚠️ 语义去重失败，跳过: {e}", file=sys.stderr)
+                # deduplicated_older_messages 保持为原始 older_messages
         
-        # 评分（Issue #63 修复：使用 TFIDFScorer）
-        scored = [(idx, msg, self._score_message(msg, parser)) for idx, msg in older_messages]
+        # Issue #71 修复：使用去重后的消息列表
+        scored = [(idx, msg, self._score_message(msg, parser)) for idx, msg in deduplicated_older_messages]
         scored.sort(key=lambda x: x[2], reverse=True)
         
         # 选择要保留的历史消息（Bug 1 修复：保留原始索引）
@@ -461,7 +465,7 @@ class LobsterPressV124:
         
         # 要压缩的消息
         dropped_indices = set(idx for idx, msg, score in scored[keep_from_older:])
-        dropped_messages = [msg for idx, msg in older_messages if idx in dropped_indices]
+        dropped_messages = [msg for idx, msg in deduplicated_older_messages if idx in dropped_indices]
         
         # 生成摘要（Issue #63 修复：使用 ExtractiveSummarizer）
         summary = self._generate_summary(dropped_messages, parser)
