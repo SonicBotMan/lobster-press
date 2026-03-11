@@ -192,12 +192,35 @@ class IncrementalCompressor:
                 if (i + 1) % self.checkpoint_size == 0:
                     self._save_checkpoint(progress, processed)
             
-            # 完成压缩
-            # 这里应该调用实际的压缩逻辑
-            # 简化版：直接写入
-            with open(output_file, 'w', encoding='utf-8') as f:
-                for msg in processed:
-                    f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+            # 完成压缩（Bug 4 修复：调用实际的压缩逻辑）
+            try:
+                # 导入并使用 lobster_press_v124 进行实际压缩
+                from lobster_press_v124 import LobsterPressV124
+                
+                # 创建压缩引擎
+                engine = LobsterPressV124(
+                    strategy=strategy,
+                    recent_window=self.config.recent_window,
+                    max_summary_chars=self.config.max_summary_chars,
+                )
+                
+                # 执行压缩
+                input_content = '\n'.join([json.dumps(msg, ensure_ascii=False) for msg in processed])
+                compressed_result, stats = engine.compress(input_content)
+                
+                # 写入压缩结果
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    f.write(compressed_result)
+                
+                compression_ratio = stats.compression_ratio
+                
+            except ImportError:
+                # Fallback: 简化版直接写入（无压缩）
+                print("⚠️ 未找到 lobster_press_v124，使用简化版直接写入")
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    for msg in processed:
+                        f.write(json.dumps(msg, ensure_ascii=False) + '\n')
+                compression_ratio = 1.0
             
             # 更新进度状态
             progress.status = "completed"
