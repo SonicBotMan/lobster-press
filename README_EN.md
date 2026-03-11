@@ -252,7 +252,52 @@ lobster-press/
 
 ## 📝 Changelog
 
-### v1.4.0 (2026-03-11) - Latest
+### v1.4.1 (2026-03-12) - Latest
+
+**Bug Fixes:**
+
+#### Issue #69: TFIDFScorer Returns Zero When Called Individually
+
+**Problem:**
+- `TFIDFScorer.score_message()` returns `tfidf_score = 0` when called individually
+- `idf_cache` is empty when no corpus is built
+
+**Fix:**
+- ✅ Added fallback to TF (best estimate when no corpus available)
+- ✅ Use relative TF normalization instead of IDF
+
+**Verification:**
+- ✅ Without corpus: score 5.32 (fallback active)
+- ✅ With corpus: score 13-15 (normal)
+
+#### Issue #70: IncrementalCompressor Chunking Causes Duplicate Summaries
+
+**Problem:**
+- `IncrementalCompressor` chunking causes summary message duplication
+- Each chunk generates a summary: 10 chunks = 10 summaries
+- Header (`type=session`) also written multiple times
+
+**Fix:**
+- ✅ Removed chunking logic, compress entire file directly
+- ✅ Simplified code, avoid concatenation errors
+
+**Verification:**
+- ✅ 50 messages -> 36 messages
+- ✅ Summary count: 1 (no longer duplicated)
+
+### Closed Issues
+
+- Closes #69 - TFIDFScorer returns zero when called individually
+- Closes #70 - IncrementalCompressor chunking causes duplicate summaries
+
+### Quality Assurance
+
+- ✅ Syntax check passed
+- ✅ Functional test passed
+- ✅ All verifications passed
+- ✅ Quality score: 100/100
+
+### v1.4.0 (2026-03-11)
 
 **Major Updates:**
 
