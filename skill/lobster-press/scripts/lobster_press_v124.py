@@ -11,7 +11,7 @@ LobsterPress v1.2.4 - OpenClaw 兼容的压缩引擎
 4. 摘要作为新消息添加，不破坏原始结构
 
 Author: LobsterPress Team
-Version: v1.2.4-hotfix2
+Version: v1.2.4-hotfix3
 """
 
 import sys
@@ -300,8 +300,10 @@ class LobsterPressV124:
         Returns:
             摘要消息对象
         """
-        timestamp = datetime.now().isoformat()
-        msg_id = f"compress-{int(datetime.now().timestamp())}"
+        # Bug 3 修复：只调用一次 datetime.now()
+        now = datetime.now()
+        timestamp = now.isoformat()
+        msg_id = f"compress-{int(now.timestamp())}"
         
         return {
             "type": "message",
@@ -312,12 +314,12 @@ class LobsterPressV124:
                 "role": "assistant",
                 "content": [{
                     "type": "text",
-                    "text": f"[历史摘要 - {strategy} - v1.2.4]\n{summary}"
+                    "text": f"[历史摘要 - {strategy} - v1.2.4-hotfix3]\n{summary}"
                 }],
                 "api": "openai-responses",
                 "provider": "openclaw",
                 "model": "lobster-press-v124",
-                "timestamp": int(datetime.now().timestamp() * 1000)
+                "timestamp": int(now.timestamp() * 1000)
             }
         }
     
