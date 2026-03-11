@@ -516,7 +516,9 @@ def main():
         print(f"  输入文件: {args.input_file}")
         print(f"  策略: {args.strategy}")
         print(f"  保留最近: {args.recent_window} 条")
-        print(f"  预计保留率: {CompressionStrategy.KEEP_RATES[args.strategy]:.0%}")
+        # Bug 5 修复：防止 KeyError
+        keep_rate = CompressionStrategy.KEEP_RATES.get(args.strategy, 0.70)
+        print(f"  预计保留率: {keep_rate:.0%}")
         
         # 解析并统计
         parser = OpenClawSessionParser()
