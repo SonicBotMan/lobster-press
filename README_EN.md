@@ -22,7 +22,7 @@
 
 *Compress bloated context like pressing a lobster into a cake*
 
-**Latest Version**: [v1.3.3](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.3.3) - 2026-03-11
+**Latest Version**: [v1.4.2](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.4.2) - 2026-03-12
 **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 
 </div>
