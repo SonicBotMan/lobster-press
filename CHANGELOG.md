@@ -11,6 +11,73 @@
 
 #### 批量压缩性能优化 (Issue #54)
 
+新增 `batch_compressor.py`， 支持：
+
+**特性:**
+1. **并发处理** - 支持多线程并发处理多个会话
+2. **实时进度** - 显示进度百分比、速度、预计剩余时间
+3. **超时控制** - 单个会话超时控制，4. **优雅关闭** - 支持 SIGINT/SIGTERM
+5. **限制数量** - 支持限制处理的会话数量
+6. **压缩策略** - 支持轻/中/重度压缩
+
+**性能提升:**
+- 并发处理：速度提升 2-4 倍
+- 超时控制：避免单会话卡死整体进度
+- 进度可见:实时掌握压缩进度
+
+**使用方法:**
+```bash
+# 基础用法
+python scripts/batch_compressor.py sessions/ compressed/
+
+# 高级用法
+python scripts/batch_compressor.py sessions/ compressed/ \
+  --strategy aggressive \
+  --workers 8 \
+  --timeout 600 \
+  --limit 100
+```
+
+**文档:** 参见 `docs/BATCH-COMPRESSION.md`
+
+#### 智能线程配置 (Issue #56)
+
+新增 `resource_detector.py`， 支持：
+
+**特性:**
+1. **自动检测** - 根据 CPU 核心数和可用内存自动推荐线程数
+2. **资源报告** - 生成详细的系统资源报告
+3. **智能限制** - 避免资源竞争和过载
+
+**使用方法:**
+```bash
+# 自动检测（推荐）
+python scripts/batch_compressor.py sessions/ compressed/ --workers auto
+
+# 手动指定
+python scripts/batch_compressor.py sessions/ compressed/ --workers 4
+```
+
+**算法:**
+```python
+# 基于 CPU 的推荐值
+cpu_based = cpu_count - 1
+
+# 基于内存的推荐值
+memory_based = available_memory * 0.7 / memory_per_thread
+
+# 取最小值
+recommended = min(cpu_based, memory_based)
+```
+
+---
+
+## [1.3.1] - 2026-03-11
+
+### 🚀 新增功能
+
+#### 批量压缩性能优化 (Issue #54)
+
 新增 `batch_compressor.py`，支持：
 
 **特性:**
