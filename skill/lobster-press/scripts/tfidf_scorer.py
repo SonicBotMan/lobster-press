@@ -210,10 +210,18 @@ class TFIDFScorer:
         
         # Layer 1: TF-IDF 基础分
         tfidf_score = 0.0
-        if tokens and self.idf_cache:
-            # 计算该消息的平均 IDF 值
-            idf_values = [self.idf_cache.get(t, 1.0) for t in tokens]
-            tfidf_score = sum(idf_values) / len(idf_values) * 10  # 缩放到 0-100
+        if tokens:
+            if self.idf_cache:
+                # 计算该消息的平均 IDF 值
+                idf_values = [self.idf_cache.get(t, 1.0) for t in tokens]
+                tfidf_score = sum(idf_values) / len(idf_values) * 10  # 缩放到 0-100
+            else:
+                # Issue #69 修复：fallback 到 TF（无语料库时的最佳估算）
+                tf = Counter(tokens)
+                max_tf = max(tf.values())
+                # 使用相对 TF 归一化
+                tf_values = [tf[t] / max_tf for t in tokens]
+                tfidf_score = sum(tf_values) / len(tf_values) * 10  # 缩放到 0-100
         
         # Layer 2: 结构性信号加成
         structural_bonus = self._compute_structural_bonus(content)
