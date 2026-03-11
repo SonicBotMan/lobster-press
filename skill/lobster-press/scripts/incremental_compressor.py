@@ -16,7 +16,7 @@ import hashlib
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 
 
 @dataclass
@@ -149,7 +149,10 @@ class IncrementalCompressor:
                           session_file: str,
                           output_file: str,
                           strategy: str) -> Tuple[bool, str]:
-        """开始新的压缩"""
+        """开始新的压缩
+        
+        Issue #65 修复：集成真正的压缩逻辑
+        """
         # 读取会话文件
         try:
             with open(session_file, 'r', encoding='utf-8') as f:
@@ -172,31 +175,41 @@ class IncrementalCompressor:
         
         self.progress_manager.save_progress(progress)
         
-        # 处理消息
+        # 处理消息（Issue #65 修复：分块压缩）
         try:
-            processed = []
+            from lobster_press_v124 import LobsterPressV124
             
-            for i, line in enumerate(lines):
-                # 解析并处理
-                try:
-                    msg = json.loads(line)
-                    processed.append(msg)
-                except json.JSONDecodeError:
-                    continue
+            engine = LobsterPressV124(strategy=strategy)
+            chunk_size = 500  # 每个压缩块的大小
+            all_compressed = []
+            
+            # 分块处理
+            for chunk_start in range(0, total_messages, chunk_size):
+                chunk_end = min(chunk_start + chunk_size, total_messages)
+                chunk_lines = lines[chunk_start:chunk_end]
+                
+                # 准备 chunk 内容
+                chunk_content = ''.join(chunk_lines)
+                
+                # 调用真正的压缩逻辑
+                compressed_content, stats = engine.compress(chunk_content)
+                
+                # 解析压缩后的内容
+                for line in compressed_content.strip().split('\n'):
+                    if line.strip():
+                        all_compressed.append(json.loads(line))
                 
                 # 更新进度
-                progress.processed_messages = i + 1
+                progress.processed_messages = chunk_end
                 progress.last_checkpoint = datetime.now().isoformat()
                 
-                # 定期保存检查点
-                if (i + 1) % self.checkpoint_size == 0:
-                    self._save_checkpoint(progress, processed)
+                # 保存检查点
+                if chunk_end % (self.checkpoint_size * 5) == 0:
+                    self._save_checkpoint(progress, all_compressed)
             
-            # 完成压缩
-            # 这里应该调用实际的压缩逻辑
-            # 简化版：直接写入
+            # 完成压缩：写入最终结果
             with open(output_file, 'w', encoding='utf-8') as f:
-                for msg in processed:
+                for msg in all_compressed:
                     f.write(json.dumps(msg, ensure_ascii=False) + '\n')
             
             # 更新进度状态
@@ -207,7 +220,7 @@ class IncrementalCompressor:
             if os.path.exists(partial_file):
                 os.unlink(partial_file)
             
-            return True, f"压缩完成: {total_messages} 条消息"
+            return True, f"压缩完成: {total_messages} 条消息 -> {len(all_compressed)} 条消息"
         
         except Exception as e:
             progress.status = "failed"
@@ -220,7 +233,10 @@ class IncrementalCompressor:
                            session_file: str,
                            output_file: str,
                            strategy: str) -> Tuple[bool, str]:
-        """恢复压缩"""
+        """恢复压缩
+        
+        Issue #65 修复：集成真正的压缩逻辑
+        """
         print(f"🔄 恢复压缩: {progress.session_id} ({progress.progress_percent:.1f}%)")
         
         # 读取已处理的部分
@@ -244,29 +260,29 @@ class IncrementalCompressor:
         # 跳过已处理的消息
         remaining_lines = lines[progress.processed_messages:]
         
-        # 继续处理
+        # 继续处理（Issue #65 修复：使用真正的压缩逻辑）
         try:
-            for i, line in enumerate(remaining_lines):
-                try:
-                    msg = json.loads(line)
-                    processed.append(msg)
-                except json.JSONDecodeError:
-                    continue
-                
-                # 更新进度
-                progress.processed_messages += 1
-                progress.last_checkpoint = datetime.now().isoformat()
-                
-                # 定期保存
-                if (progress.processed_messages) % self.checkpoint_size == 0:
-                    self._save_checkpoint(progress, processed)
+            from lobster_press_v124 import LobsterPressV124
             
-            # 完成
+            engine = LobsterPressV124(strategy=strategy)
+            
+            # 处理剩余消息
+            if remaining_lines:
+                chunk_content = ''.join(remaining_lines)
+                compressed_content, stats = engine.compress(chunk_content)
+                
+                # 解析压缩后的消息
+                for line in compressed_content.strip().split('\n'):
+                    if line.strip():
+                        processed.append(json.loads(line))
+            
+            # 完成：写入最终结果
             with open(output_file, 'w', encoding='utf-8') as f:
                 for msg in processed:
                     f.write(json.dumps(msg, ensure_ascii=False) + '\n')
             
             progress.status = "completed"
+            progress.processed_messages = progress.total_messages
             self.progress_manager.save_progress(progress)
             
             if os.path.exists(progress.partial_result_path):
@@ -281,7 +297,10 @@ class IncrementalCompressor:
             return False, f"压缩失败: {e}"
     
     def _save_checkpoint(self, progress: CompressionProgress, messages: List[Dict]):
-        """保存检查点"""
+        """保存检查点
+        
+        Issue #65 修复：保存压缩进度和部分结果
+        """
         # 保存部分结果
         with open(progress.partial_result_path, 'w', encoding='utf-8') as f:
             for msg in messages:
