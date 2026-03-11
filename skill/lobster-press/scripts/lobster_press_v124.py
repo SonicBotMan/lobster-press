@@ -28,9 +28,21 @@ from pathlib import Path
 from datetime import datetime
 import re
 
+# Issue #63 修复：集成三个核心模块
+try:
+    from tfidf_scorer import TFIDFScorer
+    from semantic_dedup import SemanticDeduplicator
+    from extractive_summarizer import ExtractiveSummarizer
+    MODULES_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ 核心模块导入失败: {e}", file=sys.stderr)
+    print("⚠️ 将使用 fallback 模式", file=sys.stderr)
+    MODULES_AVAILABLE = False
+
 
 # Bug 2 修复：统一版本常量
-VERSION = "v1.2.4-hotfix5"
+# Issue #63 修复：版本号更新
+VERSION = "v1.3.4-issue63"
 
 
 @dataclass
@@ -207,7 +219,7 @@ class LobsterPressV124:
     def _score_message(self, msg: Dict, parser: OpenClawSessionParser) -> float:
         """评分消息重要性
         
-        Logic 2 修复：调整评分权重，避免工具调用优先级过高
+        Issue #63 修复：集成 TFIDFScorer
         
         Args:
             msg: 消息对象
@@ -216,6 +228,22 @@ class LobsterPressV124:
         Returns:
             重要性分数 (0-1)
         """
+        if MODULES_AVAILABLE:
+            # 使用 TF-IDF 评分器（高质量）
+            try:
+                scorer = TFIDFScorer()
+                # 提取消息内容
+                content = parser.get_text_content(msg)
+                role = msg.get('message', {}).get('role', 'user')
+                timestamp = msg.get('timestamp', 0)
+                
+                # 评分单个消息
+                scored_msg = scorer.score_message(content, timestamp, role)
+                return scored_msg.score
+            except Exception as e:
+                print(f"⚠️ TF-IDF 评分失败，使用 fallback: {e}", file=sys.stderr)
+        
+        # Fallback: 简单规则评分
         score = 0.5  # 基础分
         
         # 角色权重（调整：user 权重提高）
@@ -258,6 +286,8 @@ class LobsterPressV124:
     def _generate_summary(self, messages: List[Dict], parser: OpenClawSessionParser) -> str:
         """生成消息摘要
         
+        Issue #63 修复：集成 ExtractiveSummarizer
+        
         Args:
             messages: 要压缩的消息列表
             parser: 解析器
@@ -268,8 +298,28 @@ class LobsterPressV124:
         if not messages:
             return ""
         
-        # 提取关键信息
-        # PR fix: 移除从未使用的 decisions 死代码变量
+        if MODULES_AVAILABLE:
+            # 使用提取式摘要器（高质量）
+            try:
+                summarizer = ExtractiveSummarizer()
+                
+                # 准备消息格式（ExtractiveSummarizer 需要）
+                summarizer_messages = []
+                for msg in messages:
+                    content = parser.get_text_content(msg)
+                    role = msg.get('message', {}).get('role', 'unknown')
+                    summarizer_messages.append({
+                        'content': content,
+                        'role': role
+                    })
+                
+                # 生成摘要
+                summary_obj = summarizer.summarize(summarizer_messages)
+                return summary_obj.summary
+            except Exception as e:
+                print(f"⚠️ ExtractiveSummarizer 失败，使用 fallback: {e}", file=sys.stderr)
+        
+        # Fallback: 简单摘要
         topics = []
         
         for msg in messages:
@@ -331,6 +381,7 @@ class LobsterPressV124:
         Bug 1 修复：使用原始索引，避免索引空间冲突
         PR fix：summary_index 使用已有索引最大值+1，而非 len(parser.lines)+1
         PR fix：content_preserved 统计移至 drop 操作后，反映实际保留量
+        Issue #63 修复：集成 SemanticDeduplicator, TFIDFScorer, ExtractiveSummarizer
         
         Args:
             content: JSONL 文件内容
@@ -359,6 +410,49 @@ class LobsterPressV124:
         
         # Bug 1 修复：评分历史消息时保留原始索引
         older_messages = parser.messages[:older_count]  # [(idx, msg), ...]
+        
+        # Issue #63 修复：在评分前进行语义去重
+        if MODULES_AVAILABLE and len(older_messages) > 1:
+            try:
+                # 准备 tokens_list 和 scores（用于语义去重）
+                deduplicator = SemanticDeduplicator()
+                scorer = TFIDFScorer()
+                
+                # 提取内容
+                dedup_messages = []
+                tokens_list = []
+                for idx, msg in older_messages:
+                    content = parser.get_text_content(msg)
+                    role = msg.get('message', {}).get('role', 'user')
+                    timestamp = msg.get('timestamp', 0)
+                    dedup_messages.append({
+                        'content': content,
+                        'role': role,
+                        'timestamp': timestamp,
+                        'original_idx': idx,
+                        'original_msg': msg
+                    })
+                    tokens_list.append(scorer.tokenize(content))
+                
+                # 评分用于去重
+                scored_msgs = scorer.score_messages(dedup_messages)
+                scores = [sm.score for sm in scored_msgs]
+                
+                # 去重
+                deduped_messages, duplicates = deduplicator.deduplicate(dedup_messages, tokens_list, scores)
+                
+                # 还原原始索引和消息
+                older_messages = [
+                    (msg['original_idx'], msg['original_msg']) 
+                    for msg in deduped_messages
+                ]
+                
+                if duplicates:
+                    print(f"🔍 语义去重: 移除 {len(duplicates)} 条重复消息", file=sys.stderr)
+            except Exception as e:
+                print(f"⚠️ 语义去重失败，跳过: {e}", file=sys.stderr)
+        
+        # 评分（Issue #63 修复：使用 TFIDFScorer）
         scored = [(idx, msg, self._score_message(msg, parser)) for idx, msg in older_messages]
         scored.sort(key=lambda x: x[2], reverse=True)
         
@@ -369,7 +463,7 @@ class LobsterPressV124:
         dropped_indices = set(idx for idx, msg, score in scored[keep_from_older:])
         dropped_messages = [msg for idx, msg in older_messages if idx in dropped_indices]
         
-        # 生成摘要
+        # 生成摘要（Issue #63 修复：使用 ExtractiveSummarizer）
         summary = self._generate_summary(dropped_messages, parser)
         
         # PR fix：content_preserved 统计实际保留的消息内容类型（drop 操作后）
