@@ -22,7 +22,7 @@
 
 *把龙虾般膨胀的上下文，压成一张薄饼*
 
-**最新版本**: [v1.3.3](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.3.3) - 2026-03-11
+**最新版本**: [v1.4.2](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.4.2) - 2026-03-12
 **更新内容**: [CHANGELOG.md](CHANGELOG.md)
 
 </div>
