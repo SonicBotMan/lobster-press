@@ -13,7 +13,7 @@
 - 零 API 成本，纯本地计算
 
 Author: LobsterPress Team
-Version: v1.2.1
+Version: v1.3.0
 """
 
 import sys

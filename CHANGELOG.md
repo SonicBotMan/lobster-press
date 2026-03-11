@@ -5,6 +5,43 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.0] - 2026-03-11
+
+### 🐛 Bug 修复
+
+#### P0 - 严重问题（已修复）
+- **skill/ 目录同步 v1.2.9** (Issue #1)
+  - 同步所有脚本到最新版本
+  - ISO 8601 时间戳修复现已生效
+
+- **未来时间戳 bug** (Issue #4)
+  - 修复 `tfidf_scorer.py` 对未来时间戳产生正数衰减的问题
+  - 只对过去的时间进行衰减，未来消息不处理
+
+- **大文件内存风险** (Issue #8)
+  - 修复 `incremental_compressor.py` 使用 `readlines()` 的内存风险
+  - 改为逐行读取，避免 OOM
+
+#### P1 - 重要问题（已修复）
+- **parse_timestamp 负数处理** (Issue #5)
+  - 负数时间戳视为无效，返回 0.0
+
+- **路径遍历攻击风险** (Issue #12)
+  - 添加 `validate_session_id` 函数
+  - 只允许字母、数字、下划线、连字符
+  - 防止 `..`、`/`、`\\` 等路径遍历字符
+
+### 📦 新增
+
+- **单元测试** (Issue #15)
+  - 添加 `tests/test_tfidf_scorer.py`
+  - 测试覆盖：时间戳解析、边界条件、时间衰减
+
+### 📋 改进
+
+- **版本号统一** (Issue #14)
+  - 统一所有文件版本号为 v1.3.0
+
 ## [1.2.9] - 2026-03-11
 
 ### 🐛 Bug 修复

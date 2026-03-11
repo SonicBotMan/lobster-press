@@ -10,7 +10,7 @@
 - 保留原始文字，不引入 AI 幻觉
 
 Author: LobsterPress Team
-Version: v1.2.0
+Version: v1.3.0
 """
 
 import sys

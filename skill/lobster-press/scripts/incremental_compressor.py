@@ -6,7 +6,7 @@
 
 Issue: #45 - 增量压缩与断点续传
 Author: LobsterPress Team
-Version: v1.0.0
+Version: v1.3.0
 """
 
 import sys

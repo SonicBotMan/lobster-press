@@ -6,13 +6,14 @@ LobsterPress MCP Server v1.0.0
 
 Issue: #42 - v2.0 架构演进：向 MCP Server 演进
 Author: LobsterPress Team
-Version: v1.0.0
+Version: v1.3.0
 """
 
 import sys
 import json
 import asyncio
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
@@ -231,8 +232,39 @@ class LobsterPressMCPServer:
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
     
+    def _validate_session_id(self, session_id: str) -> str:
+        """验证 session_id 防止路径遍历攻击（修复 Issue #12）
+        
+        Args:
+            session_id: 会话 ID
+        
+        Returns:
+            验证后的会话 ID
+        
+        Raises:
+            ValueError: 无效的会话 ID
+        """
+        if not session_id:
+            raise ValueError("Session ID cannot be empty")
+        
+        # 只允许字母、数字、下划线、连字符
+        if not re.match(r'^[a-zA-Z0-9_-]+$', session_id):
+            raise ValueError(f"Invalid session_id: {session_id} (only alphanumeric, underscore, hyphen allowed)")
+        
+        # 防止路径遍历
+        if '..' in session_id or '/' in session_id or '\\' in session_id:
+            raise ValueError(f"Invalid session_id: {session_id} (path traversal detected)")
+        
+        # 长度限制
+        if len(session_id) > 255:
+            raise ValueError(f"Session ID too long: {len(session_id)} > 255")
+        
+        return session_id
+    
     async def _compress_session(self, session_id: str, strategy: str, dry_run: bool) -> Dict[str, Any]:
         """压缩会话"""
+        # 验证 session_id（修复 Issue #12）
+        session_id = self._validate_session_id(session_id)
         session_file = self.sessions_dir / f"{session_id}.jsonl"
         
         if not session_file.exists():

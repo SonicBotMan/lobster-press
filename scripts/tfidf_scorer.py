@@ -11,7 +11,7 @@ Layer 2 — 结构性信号（规则，零成本）
 Layer 3 — 时间衰减（连续函数）
 
 Author: LobsterPress Team
-Version: v1.2.1
+Version: v1.3.0
 """
 
 import sys
@@ -39,8 +39,10 @@ def parse_timestamp(ts: Union[str, int, float, None]) -> float:
     if ts is None:
         return 0.0
     
-    # 数值类型直接返回
+    # 数值类型直接返回（修复 Issue #5: 负数时间戳视为无效）
     if isinstance(ts, (int, float)):
+        if ts < 0:
+            return 0.0  # 负数时间戳无效
         return float(ts)
     
     # 字符串类型尝试解析

@@ -6,7 +6,7 @@ Token 计数器 v1.2.0
 
 Issue: #40 - 多语言/多模型 Token 计数优化
 Author: LobsterPress Team
-Version: v1.2.0
+Version: v1.3.0
 """
 
 import sys

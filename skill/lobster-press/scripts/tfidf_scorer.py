@@ -11,7 +11,7 @@ Layer 2 — 结构性信号（规则，零成本）
 Layer 3 — 时间衰减（连续函数）
 
 Author: LobsterPress Team
-Version: v1.2.1
+Version: v1.3.0
 """
 
 import sys
