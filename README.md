@@ -279,6 +279,8 @@ lobster-press/
 
 **如果觉得有用，请给个 ⭐ Star 支持一下！**
 
+![Star History Chart](https://api.star-history.com/svg?repos=SonicBotMan/lobster-press&type=Date)
+
 Made with 💕 by SonicBotMan
 
 </div>
