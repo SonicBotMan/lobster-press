@@ -297,8 +297,8 @@ class QualityGuard:
                 details="原始消息中无关键决策",
             )
         
-        # 检查压缩后是否保留
-        compressed_content = " ".join([msg.get("content", "") for msg in compressed_messages])
+        # 检查压缩后是否保留（Issue #64 修复：使用正确的消息提取方法）
+        compressed_content = " ".join([self._extract_message_content(msg) for msg in compressed_messages])
         preserved_count = 0
         
         for decision in original_decisions:
@@ -350,8 +350,8 @@ class QualityGuard:
                 details="原始消息中无配置信息",
             )
         
-        # 检查压缩后是否保留
-        compressed_content = " ".join([msg.get("content", "") for msg in compressed_messages])
+        # 检查压缩后是否保留（Issue #64 修复：使用正确的消息提取方法）
+        compressed_content = " ".join([self._extract_message_content(msg) for msg in compressed_messages])
         preserved_count = sum(1 for cfg in original_configs if cfg.lower() in compressed_content.lower())
         
         score = int(preserved_count / len(original_configs) * 100) if original_configs else 100
@@ -382,8 +382,8 @@ class QualityGuard:
                 details="压缩后消息为空",
             )
         
-        # 检查角色分布
-        roles = [msg.get("role", "") for msg in compressed_messages]
+        # 检查角色分布（Issue #64 修复：使用正确的消息结构）
+        roles = [msg.get("message", {}).get("role", "") for msg in compressed_messages]
         role_set = set(roles)
         
         # 应该至少有 user 和 assistant
