@@ -11,7 +11,7 @@ LobsterPress v1.2.4 - OpenClaw 兼容的压缩引擎
 4. 摘要作为新消息添加，不破坏原始结构
 
 Author: LobsterPress Team
-Version: v1.3.0
+Version: v1.2.4-hotfix2
 """
 
 import sys
@@ -378,23 +378,39 @@ class LobsterPressV124:
         if parser.header:
             output_lines.append(json.dumps(parser.header, ensure_ascii=False))
         
-        # 2. 添加其他非消息行
-        for _, line in parser.other_lines:
-            output_lines.append(json.dumps(line, ensure_ascii=False))
+        # 2. 添加其他非消息行（Bug 5 修复：按原始位置插回，而非统一前置）
+        # 收集所有行及其索引
+        all_indexed_lines = []
         
-        # 3. 添加摘要消息
+        # 添加 header（如果有）
+        if parser.header:
+            all_indexed_lines.append((0, parser.header))
+        
+        # 添加 other_lines 按原始位置
+        for idx, line in parser.other_lines:
+            all_indexed_lines.append((idx, line))
+        
+        # 添加摘要消息（位置在 header 后）
+        summary_index = 1 if parser.header else 0
         if summary:
             summary_msg = self._create_summary_message(summary, self.strategy)
-            output_lines.append(json.dumps(summary_msg, ensure_ascii=False))
+            all_indexed_lines.append((summary_index, summary_msg))
         
-        # 4. 添加保留的历史消息
-        for msg in kept_older:
-            output_lines.append(json.dumps(msg, ensure_ascii=False))
+        # 添加保留的历史消息
+        for i, msg in enumerate(kept_older):
+            msg_index = summary_index + 1 + i  # 在摘要之后
+            all_indexed_lines.append((msg_index, msg))
         
-        # 5. 添加最近的完整消息
+        # 添加最近的完整消息
         recent_messages = parser.messages[-recent_count:]
-        for msg in recent_messages:
-            output_lines.append(json.dumps(msg, ensure_ascii=False))
+        for i, msg in enumerate(recent_messages):
+            msg_index = summary_index + 1 + len(kept_older) + i
+            all_indexed_lines.append((msg_index, msg))
+        
+        # 按索引排序并输出
+        all_indexed_lines.sort(key=lambda x: x[0])
+        for _, line in all_indexed_lines:
+            output_lines.append(json.dumps(line, ensure_ascii=False))
         
         # 构建输出
         result = '\n'.join(output_lines) + '\n'
@@ -474,8 +490,8 @@ def main():
                        help="预览模式，不写入文件")
     parser.add_argument("--backup", 
                        action="store_true",
-                       default=True,
-                       help="自动备份原文件 (default: True)")
+                       default=False,  # Bug 6 修复：默认不备份，避免意外行为
+                       help="备份原始输入文件（仅当原地压缩时有效，default: False)")
     
     args = parser.parse_args()
     
@@ -526,12 +542,14 @@ def main():
                     print(f"  {i+1}. [parse error]")
     else:
         if args.output:
-            # 备份
-            if args.backup:
+            # 备份（Bug 6 修复：仅当输出到同一文件时才备份）
+            if args.backup and args.output == args.input_file:
                 backup_file = f"{args.input_file}.backup.{int(datetime.now().timestamp())}"
                 with open(backup_file, 'w', encoding='utf-8') as f:
                     f.write(content)
                 print(f"📦 已备份: {backup_file}", file=sys.stderr)
+            elif args.backup and args.output != args.input_file:
+                print(f"ℹ️  输出到不同文件，跳过备份（原文件保持不变）", file=sys.stderr)
             
             # 写入
             with open(args.output, 'w', encoding='utf-8') as f:
