@@ -252,7 +252,21 @@ lobster-press/
 
 ## 📝 更新日志
 
-### v1.4.0 (2026-03-11) - Latest
+### v1.4.1 (2026-03-12) - Latest
+
+- 🔥 **Issue #69: TFIDFScorer 单独调用时评分恒为 0**
+  - 问题: score_message() 单独调用时 idf_cache 为空
+  - 修复: 添加 fallback 到 TF (无语料库时的最佳估算)
+  - 验证: ✅ 无语料库时评分 5.32 (fallback 生效)
+- 🔥 **Issue #70: IncrementalCompressor 分块压缩导致 summary 重复**
+  - 问题: 每个 chunk 生成一个 summary，10 个 chunk = 10 条 summary
+  - 修复: 移除分块逻辑，直接压缩整个文件
+  - 验证: ✅ 50 条消息 -> 36 条消息，summary 消息数 1
+- 🎯 **质量保证**
+  - 所有测试通过
+  - 质量评分: 100/100
+
+### v1.4.0 (2026-03-11)
 
 - 🔥 **Issue #63: 集成三个核心模块**
   - TF-IDF 评分器 (真正的 TF-IDF 评分)

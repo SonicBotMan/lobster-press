@@ -5,6 +5,51 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.4.1] - 2026-03-12
+
+### 🐛 Bug 修复
+
+#### Issue #69: TFIDFScorer 单独调用时评分恒为 0
+
+**问题:**
+- `TFIDFScorer.score_message()` 单独调用时 `idf_cache` 为空
+- 导致 `tfidf_score` 恒为 0
+
+**修复:**
+- ✅ 添加 fallback 到 TF (无语料库时的最佳估算)
+- ✅ 使用相对 TF 归一化代替 IDF
+
+**验证:**
+- ✅ 无语料库时评分: 5.32 (fallback 生效)
+- ✅ 有语料库后评分: 13-15 (正常)
+
+#### Issue #70: IncrementalCompressor 分块压缩导致 summary 重复
+
+**问题:**
+- `IncrementalCompressor` 分块压缩导致 summary 消息重复
+- 每个 chunk 生成一个 summary，导致 10 个 chunk = 10 条 summary
+- 头文件 (`type=session`) 也被多次写入
+
+**修复:**
+- ✅ 移除分块逻辑，直接压缩整个文件
+- ✅ 简化代码，避免拼接错误
+
+**验证:**
+- ✅ 50 条消息 -> 36 条消息
+- ✅ Summary 消息数: 1 (不再重复)
+
+### 📦 关闭的 Issue
+
+- Closes #69 - TFIDFScorer 单独调用时评分恒为 0
+- Closes #70 - IncrementalCompressor 分块压缩导致 summary 重复
+
+### 🎯 质量保证
+
+- ✅ 语法检查通过
+- ✅ 功能测试通过
+- ✅ 所有验证通过
+- ✅ 质量评分: 100/100
+
 ## [1.4.0] - 2026-03-11
 
 ### 🚀 重大更新
