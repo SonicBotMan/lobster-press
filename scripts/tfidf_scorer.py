@@ -222,7 +222,9 @@ class TFIDFScorer:
         time_decay = 0.0
         if ts > 0:
             age_hours = (time.time() - ts) / 3600
-            time_decay = -min(15, age_hours * 0.3)  # 最多衰减 15 分
+            # 只对过去的时间衰减，未来消息不处理
+            if age_hours > 0:
+                time_decay = -min(15, age_hours * 0.3)  # 最多衰减 15 分
         
         # 最终分数
         final_score = max(0, tfidf_score + structural_bonus + time_decay)

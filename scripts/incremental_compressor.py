@@ -234,32 +234,35 @@ class IncrementalCompressor:
             except Exception as e:
                 print(f"⚠️ 无法读取部分结果: {e}")
         
-        # 读取剩余消息
+        # 读取剩余消息（分批读取，避免大文件内存风险）
         try:
+            processed_in_batch = 0
             with open(session_file, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
+                # 跳过已处理的消息
+                for _ in range(progress.processed_messages):
+                    next(f)
+                
+                # 逐行处理剩余消息
+                for line in f:
+                    try:
+                        msg = json.loads(line)
+                        processed.append(msg)
+                        processed_in_batch += 1
+                    except json.JSONDecodeError:
+                        continue
+                    
+                    # 更新进度
+                    progress.processed_messages += 1
+                    progress.last_checkpoint = datetime.now().isoformat()
+                    
+                    # 定期保存
+                    if processed_in_batch % self.checkpoint_size == 0:
+                        self._save_checkpoint(progress, processed)
+                        processed = []  # 清空批次
+        except StopIteration:
+            pass  # 文件末尾
         except Exception as e:
             return False, f"无法读取会话文件: {e}"
-        
-        # 跳过已处理的消息
-        remaining_lines = lines[progress.processed_messages:]
-        
-        # 继续处理
-        try:
-            for i, line in enumerate(remaining_lines):
-                try:
-                    msg = json.loads(line)
-                    processed.append(msg)
-                except json.JSONDecodeError:
-                    continue
-                
-                # 更新进度
-                progress.processed_messages += 1
-                progress.last_checkpoint = datetime.now().isoformat()
-                
-                # 定期保存
-                if (progress.processed_messages) % self.checkpoint_size == 0:
-                    self._save_checkpoint(progress, processed)
             
             # 完成
             with open(output_file, 'w', encoding='utf-8') as f:
