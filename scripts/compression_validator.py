@@ -6,7 +6,7 @@
 
 Issue: #25, #30, #32 - Token 成本透明度 + 质量守卫 + 净收益校验
 Author: LobsterPress Team
-Version: v1.2.1
+Version: v1.3.0
 """
 
 import sys

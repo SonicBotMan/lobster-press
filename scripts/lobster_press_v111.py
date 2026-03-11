@@ -11,7 +11,7 @@ LobsterPress v1.1.1 - 改进版压缩引擎
 4. 动态模型选择（根据策略选择最优模型）
 
 Author: LobsterPress Team
-Version: v1.1.1
+Version: v1.3.0
 """
 
 import sys

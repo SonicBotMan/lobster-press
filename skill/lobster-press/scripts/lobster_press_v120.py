@@ -14,7 +14,7 @@ API 调用：0 次（local 模式）
 压缩成本：$0.00
 
 Author: LobsterPress Team
-Version: v1.2.0
+Version: v1.3.0
 """
 
 import sys

@@ -11,7 +11,7 @@ LobsterPress v1.2.4 - OpenClaw 兼容的压缩引擎
 4. 摘要作为新消息添加，不破坏原始结构
 
 Author: LobsterPress Team
-Version: v1.2.4
+Version: v1.3.0
 """
 
 import sys
