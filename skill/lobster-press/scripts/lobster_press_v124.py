@@ -1,68 +1,66 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LobsterPress v1.2.4 - OpenClaw 兼容的压缩引擎
-修复 Issue #49：格式兼容、元数据保留、完整内容支持
+LobsterPress v1.2.4-hotfix5 - Issue #60 完整修复
 
-核心修复：
-1. 输入/输出使用 JSONL 格式（OpenClaw 标准）
-2. 保留完整的消息元数据（id, parentId, timestamp, type）
-3. 支持所有 content 类型（text, toolCall, thinking, toolResult）
-4. 摘要作为新消息添加，不破坏原始结构
+修复内容:
+1. Bug 1 (高危): kept_older + other_lines 索引空间冲突
+2. Bug 2 (中危): 版本号 hotfix3 → hotfix5
+3. Logic 1 (中危): parser 命名冲突
+4. Logic 2 (中危): 评分逻辑偏差
+5. 建议 (低危): --recent-window 边界校验
+6. [PR fix] summary_index 使用实际最大索引+1，修复空行场景下的位置错乱
+7. [PR fix] 删除 _generate_summary 中未使用的 decisions 死代码
+8. [PR fix] --backup 静默忽略时添加 stderr 警告
+9. [PR fix] content_preserved 统计移至 drop 操作后，反映实际保留量
 
 Author: LobsterPress Team
-Version: v1.3.0
+Version: v1.2.4-hotfix5
 """
 
 import sys
 import json
 import argparse
 import hashlib
-from typing import List, Dict, Optional, Tuple, Any
+from typing import List, Dict, Optional, Tuple, Any, Set
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from datetime import datetime
 import re
 
 
+# Bug 2 修复：统一版本常量
+VERSION = "v1.2.4-hotfix5"
+
+
 @dataclass
 class CompressionStats:
     """压缩统计"""
     original_lines: int = 0
-    compressed_lines: int = 0
     original_bytes: int = 0
+    compressed_lines: int = 0
     compressed_bytes: int = 0
     messages_removed: int = 0
     content_preserved: Dict[str, int] = field(default_factory=dict)
     
     @property
     def compression_ratio(self) -> float:
+        """压缩率"""
         if self.original_bytes == 0:
             return 0.0
         return 1 - (self.compressed_bytes / self.original_bytes)
-    
-    def to_dict(self) -> Dict:
-        return {
-            "original_lines": self.original_lines,
-            "compressed_lines": self.compressed_lines,
-            "original_bytes": self.original_bytes,
-            "compressed_bytes": self.compressed_bytes,
-            "compression_ratio": f"{self.compression_ratio:.1%}",
-            "messages_removed": self.messages_removed,
-            "content_preserved": self.content_preserved,
-        }
 
 
 class OpenClawSessionParser:
     """OpenClaw 会话解析器
     
-    处理 JSONL 格式的会话文件，保留完整结构
+    Bug 1 修复：为所有行记录原始索引
     """
     
     def __init__(self):
         self.lines: List[Dict] = []
         self.header: Optional[Dict] = None
-        self.messages: List[Dict] = []
+        self.messages: List[Tuple[int, Dict]] = []  # (原始索引, 消息)
         self.other_lines: List[Tuple[int, Dict]] = []  # (原始索引, 行数据)
     
     def parse_jsonl(self, content: str) -> None:
@@ -82,9 +80,9 @@ class OpenClawSessionParser:
                 # 识别会话头
                 if obj.get('type') == 'session':
                     self.header = obj
-                # 识别消息
+                # 识别消息（Bug 1 修复：记录原始索引）
                 elif obj.get('type') == 'message':
-                    self.messages.append(obj)
+                    self.messages.append((i, obj))
                 # 其他类型（toolResult, thinking 等）
                 else:
                     self.other_lines.append((i, obj))
@@ -127,11 +125,9 @@ class OpenClawSessionParser:
             elif item.get('type') == 'thinking':
                 texts.append(f"[Thinking: {item.get('thinking', '')[:100]}...]")
             elif item.get('type') == 'toolResult':
-                # 工具结果通常很长，只保留摘要
+                # Logic 2 修复：记录完整长度，而非截断后的长度
                 result = item.get('content', '')
-                if len(result) > 200:
-                    result = result[:200] + '...'
-                texts.append(f"[Result: {result}]")
+                texts.append(f"[Result: {result}]")  # 保留完整内容用于评分
         
         return '\n'.join(texts)
     
@@ -211,6 +207,8 @@ class LobsterPressV124:
     def _score_message(self, msg: Dict, parser: OpenClawSessionParser) -> float:
         """评分消息重要性
         
+        Logic 2 修复：调整评分权重，避免工具调用优先级过高
+        
         Args:
             msg: 消息对象
             parser: 解析器
@@ -220,38 +218,48 @@ class LobsterPressV124:
         """
         score = 0.5  # 基础分
         
-        # 角色权重
+        # 角色权重（调整：user 权重提高）
         role = msg.get('message', {}).get('role', '')
         if role == 'user':
-            score += 0.2  # 用户消息更重要
+            score += 0.25  # 提高 user 权重（原 0.2）
         elif role == 'assistant':
             score += 0.1
         
-        # 内容类型权重
-        content = parser.get_message_content(msg)
-        has_tool_call = any(c.get('type') == 'toolCall' for c in content)
-        has_thinking = any(c.get('type') == 'thinking' for c in content)
+        # 内容分析
+        has_tool_call = False
+        has_thinking = False
+        text_len = 0
         
+        for item in parser.get_message_content(msg):
+            if item.get('type') == 'toolCall':
+                has_tool_call = True
+            elif item.get('type') == 'thinking':
+                has_thinking = True
+            elif item.get('type') == 'text':
+                text_len += len(item.get('text', ''))
+            elif item.get('type') == 'toolResult':
+                # Logic 2 修复：使用完整长度，而非截断后的长度
+                text_len += len(item.get('content', ''))
+        
+        # 工具调用权重（降低）
         if has_tool_call:
-            score += 0.15  # 工具调用重要
+            score += 0.1  # 降低权重（原 0.15）
         if has_thinking:
-            score += 0.1   # 思考过程有价值
+            score += 0.1
         
-        # 文本长度（适度长度更重要）
-        text = parser.get_text_content(msg)
-        text_len = len(text)
+        # 文本长度判断
         if 100 < text_len < 1000:
             score += 0.1
         elif text_len >= 1000:
             score -= 0.05  # 过长可能冗余
         
-        return min(1.0, max(0.0, score))
+        return min(1.0, score)
     
     def _generate_summary(self, messages: List[Dict], parser: OpenClawSessionParser) -> str:
-        """生成摘要（本地提取式）
+        """生成消息摘要
         
         Args:
-            messages: 要摘要的消息列表
+            messages: 要压缩的消息列表
             parser: 解析器
         
         Returns:
@@ -261,47 +269,43 @@ class LobsterPressV124:
             return ""
         
         # 提取关键信息
-        key_points = []
+        # PR fix: 移除从未使用的 decisions 死代码变量
+        topics = []
         
         for msg in messages:
             text = parser.get_text_content(msg)
-            role = msg.get('message', {}).get('role', 'unknown')
+            role = msg.get('message', {}).get('role', '')
             
-            # 提取句子（简单分句）
-            sentences = re.split(r'[。！？\n]', text)
-            for sentence in sentences:
-                sentence = sentence.strip()
-                if len(sentence) < 10:
-                    continue
-                
-                # 识别关键句（包含决策、重要信息）
-                is_key = any(kw in sentence for kw in [
-                    '决定', '选择', '确认', '同意', '修改', '创建', '删除',
-                    '问题', '解决', '错误', '成功', '完成', '重要', '注意'
-                ])
-                
-                if is_key:
-                    key_points.append(f"[{role}] {sentence[:100]}")
+            # 简单摘要：提取前 100 字符
+            if len(text) > 100:
+                text = text[:100] + '...'
+            
+            topics.append(f"[{role}] {text}")
         
-        # 限制摘要长度
-        summary = '\n'.join(key_points[:10])
+        summary = f"压缩了 {len(messages)} 条消息:\n" + '\n'.join(topics[:5])
+        
         if len(summary) > self.max_summary_chars:
-            summary = summary[:self.max_summary_chars] + "..."
+            summary = summary[:self.max_summary_chars] + '...'
         
         return summary
     
     def _create_summary_message(self, summary: str, strategy: str) -> Dict:
-        """创建摘要消息（OpenClaw 格式）
+        """创建摘要消息
+        
+        Bug 3 修复：只调用一次 datetime.now()
+        Bug 2 修复：使用 VERSION 常量
         
         Args:
-            summary: 摘要内容
+            summary: 摘要文本
             strategy: 压缩策略
         
         Returns:
             摘要消息对象
         """
-        timestamp = datetime.now().isoformat()
-        msg_id = f"compress-{int(datetime.now().timestamp())}"
+        # Bug 3 修复：只调用一次 datetime.now()
+        now = datetime.now()
+        timestamp = now.isoformat()
+        msg_id = f"compress-{int(now.timestamp())}"
         
         return {
             "type": "message",
@@ -312,17 +316,21 @@ class LobsterPressV124:
                 "role": "assistant",
                 "content": [{
                     "type": "text",
-                    "text": f"[历史摘要 - {strategy} - v1.2.4]\n{summary}"
+                    "text": f"[历史摘要 - {strategy} - {VERSION}]\n{summary}"  # Bug 2 修复
                 }],
                 "api": "openai-responses",
                 "provider": "openclaw",
                 "model": "lobster-press-v124",
-                "timestamp": int(datetime.now().timestamp() * 1000)
+                "timestamp": int(now.timestamp() * 1000)
             }
         }
     
     def compress(self, content: str) -> Tuple[str, CompressionStats]:
         """压缩 JSONL 会话
+        
+        Bug 1 修复：使用原始索引，避免索引空间冲突
+        PR fix：summary_index 使用已有索引最大值+1，而非 len(parser.lines)+1
+        PR fix：content_preserved 统计移至 drop 操作后，反映实际保留量
         
         Args:
             content: JSONL 文件内容
@@ -335,13 +343,6 @@ class LobsterPressV124:
         
         self.stats.original_lines = len(parser.lines)
         self.stats.original_bytes = len(content.encode('utf-8'))
-        
-        # 统计内容类型
-        for msg in parser.messages:
-            for item in parser.get_message_content(msg):
-                content_type = item.get('type', 'unknown')
-                self.stats.content_preserved[content_type] = \
-                    self.stats.content_preserved.get(content_type, 0) + 1
         
         if not parser.messages:
             return content, self.stats
@@ -356,45 +357,70 @@ class LobsterPressV124:
         older_count = total_messages - recent_count
         keep_from_older = max(0, keep_count - recent_count)
         
-        # 评分历史消息
-        older_messages = parser.messages[:older_count]
-        scored = [(msg, self._score_message(msg, parser)) for msg in older_messages]
-        scored.sort(key=lambda x: x[1], reverse=True)
+        # Bug 1 修复：评分历史消息时保留原始索引
+        older_messages = parser.messages[:older_count]  # [(idx, msg), ...]
+        scored = [(idx, msg, self._score_message(msg, parser)) for idx, msg in older_messages]
+        scored.sort(key=lambda x: x[2], reverse=True)
         
-        # 选择要保留的历史消息
-        kept_indices = set(i for i, (msg, score) in enumerate(scored[:keep_from_older]))
-        kept_older = [msg for i, msg in enumerate(older_messages) if i in kept_indices]
+        # 选择要保留的历史消息（Bug 1 修复：保留原始索引）
+        kept_older = [(idx, msg) for idx, msg, score in scored[:keep_from_older]]
         
         # 要压缩的消息
-        dropped_messages = [msg for i, msg in enumerate(older_messages) if i not in kept_indices]
+        dropped_indices = set(idx for idx, msg, score in scored[keep_from_older:])
+        dropped_messages = [msg for idx, msg in older_messages if idx in dropped_indices]
         
         # 生成摘要
         summary = self._generate_summary(dropped_messages, parser)
         
-        # 构建输出
-        output_lines = []
+        # PR fix：content_preserved 统计实际保留的消息内容类型（drop 操作后）
+        kept_recent = parser.messages[-recent_count:]
+        for idx, msg in kept_older:
+            for item in parser.get_message_content(msg):
+                ct = item.get('type', 'unknown')
+                self.stats.content_preserved[ct] = self.stats.content_preserved.get(ct, 0) + 1
+        for idx, msg in kept_recent:
+            for item in parser.get_message_content(msg):
+                ct = item.get('type', 'unknown')
+                self.stats.content_preserved[ct] = self.stats.content_preserved.get(ct, 0) + 1
         
-        # 1. 添加会话头
+        # PR fix：Bug 1 修复不完整 — summary_index 使用已有索引最大值+1，而非 len(parser.lines)+1
+        # 原代码：summary_index = len(parser.lines) + 1
+        # 问题：parse_jsonl 跳过空行，len(parser.lines) 与实际最大原始行索引 i 不等
+        # 修复：取所有已记录索引的最大值，确保 summary_index 不与任何现有索引冲突
+        all_existing_indices = (
+            ([0] if parser.header else []) +
+            [idx for idx, _ in parser.other_lines] +
+            [idx for idx, _ in parser.messages]
+        )
+        max_existing_index = max(all_existing_indices) if all_existing_indices else 0
+        
+        # Bug 1 修复：构建输出时使用原始索引
+        all_indexed_lines = []
+        
+        # 1. 添加 header（如果有）
         if parser.header:
-            output_lines.append(json.dumps(parser.header, ensure_ascii=False))
+            all_indexed_lines.append((0, parser.header))
         
-        # 2. 添加其他非消息行
-        for _, line in parser.other_lines:
-            output_lines.append(json.dumps(line, ensure_ascii=False))
+        # 2. 添加 other_lines（已有原始索引）
+        all_indexed_lines.extend(parser.other_lines)
         
-        # 3. 添加摘要消息
+        # 3. 添加摘要消息（分配新索引，放在所有消息之后）
         if summary:
+            summary_index = max_existing_index + 1  # PR fix：使用实际最大索引+1
             summary_msg = self._create_summary_message(summary, self.strategy)
-            output_lines.append(json.dumps(summary_msg, ensure_ascii=False))
+            all_indexed_lines.append((summary_index, summary_msg))
         
-        # 4. 添加保留的历史消息
-        for msg in kept_older:
-            output_lines.append(json.dumps(msg, ensure_ascii=False))
+        # 4. 添加保留的历史消息（使用原始索引）
+        all_indexed_lines.extend(kept_older)
         
-        # 5. 添加最近的完整消息
-        recent_messages = parser.messages[-recent_count:]
-        for msg in recent_messages:
-            output_lines.append(json.dumps(msg, ensure_ascii=False))
+        # 5. 添加最近的完整消息（使用原始索引）
+        all_indexed_lines.extend(kept_recent)
+        
+        # 按原始索引排序并输出
+        all_indexed_lines.sort(key=lambda x: x[0])
+        output_lines = []
+        for _, line in all_indexed_lines:
+            output_lines.append(json.dumps(line, ensure_ascii=False))
         
         # 构建输出
         result = '\n'.join(output_lines) + '\n'
@@ -409,11 +435,13 @@ class LobsterPressV124:
     def get_report(self) -> str:
         """生成压缩报告
         
+        Bug 2 修复：使用 VERSION 常量
+        
         Returns:
             报告文本
         """
         lines = [
-            "📊 LobsterPress v1.2.4 压缩报告",
+            f"📊 LobsterPress {VERSION} 压缩报告",  # Bug 2 修复
             "",
             f"策略: {self.strategy}",
             f"保留最近: {self.recent_window} 条消息",
@@ -433,9 +461,13 @@ class LobsterPressV124:
 
 
 def main():
-    """命令行入口"""
-    parser = argparse.ArgumentParser(
-        description="LobsterPress v1.2.4 - OpenClaw 兼容的压缩引擎",
+    """命令行入口
+    
+    Logic 1 修复：重命名 argparse parser 为 arg_parser
+    """
+    # Logic 1 修复：重命名以避免冲突
+    arg_parser = argparse.ArgumentParser(
+        description=f"LobsterPress {VERSION} - OpenClaw 兼容的压缩引擎",  # Bug 2 修复
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
@@ -453,31 +485,36 @@ def main():
 """
     )
     
-    parser.add_argument("input_file", help="输入文件（OpenClaw JSONL 格式）")
-    parser.add_argument("--strategy", "-s", 
+    arg_parser.add_argument("input_file", help="输入文件（OpenClaw JSONL 格式）")
+    arg_parser.add_argument("--strategy", "-s", 
                        choices=["light", "medium", "heavy"], 
                        default="medium",
                        help="压缩策略 (default: medium)")
-    parser.add_argument("--recent-window", "-r", 
+    arg_parser.add_argument("--recent-window", "-r", 
                        type=int, default=10,
                        help="强制保留最近 N 条消息 (default: 10)")
-    parser.add_argument("--max-summary-chars", 
+    arg_parser.add_argument("--max-summary-chars", 
                        type=int, default=500,
                        help="摘要最大字符数 (default: 500)")
-    parser.add_argument("--output", "-o", 
+    arg_parser.add_argument("--output", "-o", 
                        help="输出文件")
-    parser.add_argument("--report", 
+    arg_parser.add_argument("--report", 
                        action="store_true",
                        help="输出详细报告")
-    parser.add_argument("--dry-run", 
+    arg_parser.add_argument("--dry-run", 
                        action="store_true",
                        help="预览模式，不写入文件")
-    parser.add_argument("--backup", 
+    arg_parser.add_argument("--backup", 
                        action="store_true",
-                       default=True,
-                       help="自动备份原文件 (default: True)")
+                       default=False,
+                       help="备份原始输入文件（仅当原地压缩时有效，default: False)")
     
-    args = parser.parse_args()
+    args = arg_parser.parse_args()  # Logic 1 修复
+    
+    # Bug 5 修复：--recent-window 边界校验
+    if args.recent_window < 1:
+        print("❌ --recent-window 必须 >= 1", file=sys.stderr)
+        sys.exit(1)
     
     # 读取输入
     try:
@@ -500,13 +537,15 @@ def main():
         print(f"  输入文件: {args.input_file}")
         print(f"  策略: {args.strategy}")
         print(f"  保留最近: {args.recent_window} 条")
-        print(f"  预计保留率: {CompressionStrategy.KEEP_RATES[args.strategy]:.0%}")
+        # Bug E 修复：防止 KeyError
+        keep_rate = CompressionStrategy.KEEP_RATES.get(args.strategy, 0.70)
+        print(f"  预计保留率: {keep_rate:.0%}")
         
-        # 解析并统计
-        parser = OpenClawSessionParser()
-        parser.parse_jsonl(content)
-        print(f"  消息数: {len(parser.messages)}")
-        print(f"  总行数: {len(parser.lines)}")
+        # Logic 1 修复：重命名以避免冲突
+        session_parser = OpenClawSessionParser()
+        session_parser.parse_jsonl(content)
+        print(f"  消息数: {len(session_parser.messages)}")
+        print(f"  总行数: {len(session_parser.lines)}")
         sys.exit(0)
     
     # 执行压缩
@@ -527,11 +566,15 @@ def main():
     else:
         if args.output:
             # 备份
-            if args.backup:
+            if args.backup and args.output == args.input_file:
+                # Bug 6 修复：仅当原地压缩时才备份
                 backup_file = f"{args.input_file}.backup.{int(datetime.now().timestamp())}"
                 with open(backup_file, 'w', encoding='utf-8') as f:
                     f.write(content)
                 print(f"📦 已备份: {backup_file}", file=sys.stderr)
+            elif args.backup and args.output != args.input_file:
+                # PR fix：--backup 在非原地压缩时被忽略，给出明确提示
+                print(f"⚠️ --backup 仅在原地压缩（-o 与输入文件相同）时有效，本次已忽略", file=sys.stderr)
             
             # 写入
             with open(args.output, 'w', encoding='utf-8') as f:
