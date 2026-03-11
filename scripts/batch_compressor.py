@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-批量压缩器 v1.3.1
-支持并发处理、进度显示、超时控制
+批量压缩器 v1.3.3
+支持并发处理、进度显示、超时控制、智能线程配置
 
 Issue: #54 - 批量压缩性能优化
+Issue: #56 - 智能线程配置
 Author: LobsterPress Team
-Version: v1.3.1
+Version: v1.3.3
 """
 
 import sys
@@ -14,13 +15,27 @@ import json
 import os
 import time
 import signal
-import asyncio
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Callable
+from typing import Dict, List, Optional, Tuple, Callable, Union
 from dataclasses import dataclass, asdict
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import multiprocessing
+
+# 导入资源检测器
+try:
+    from resource_detector import ResourceDetector, SystemResources
+    HAS_RESOURCE_DETECTOR = True
+except ImportError:
+    HAS_RESOURCE_DETECTOR = False
+    # 简化版资源检测
+    @dataclass
+    class SystemResources:
+        cpu_count: int
+        cpu_percent: float
+        memory_total_mb: int
+        memory_available_mb: int
+        memory_percent: float
 
 
 @dataclass
@@ -61,22 +76,43 @@ class BatchCompressor:
     1. 并发处理多个会话
     2. 实时进度显示
     3. 超时控制
-    4. 数量限制
-    5. 快速完成关键压缩
+    4. 智能线程配置（根据 CPU/内存自动调整）
+    5. 优雅关闭
     """
     
     def __init__(self,
-                 max_workers: int = 4,
+                 max_workers: Union[int, str] = "auto",
                  timeout_per_session: int = 300,
-                 progress_callback: Optional[Callable[[BatchProgress], None]] = None):
+                 progress_callback: Optional[Callable[[BatchProgress], None]] = None,
+                 memory_per_thread_mb: int = 100,
+                 reserved_cpu: int = 1):
         """初始化批量压缩器
         
         Args:
-            max_workers: 最大并发数（默认 4）
+            max_workers: 最大并发数（"auto" 自动检测，或指定数字，默认 "auto"）
             timeout_per_session: 单个会话超时时间（秒，默认 300）
             progress_callback: 进度回调函数
+            memory_per_thread_mb: 每个线程的内存消耗（MB，用于自动检测，默认 100）
+            reserved_cpu: 保留的 CPU 核心数（用于自动检测，默认 1）
         """
-        self.max_workers = min(max_workers, multiprocessing.cpu_count())
+        # 智能线程数检测
+        if max_workers == "auto" or max_workers is None:
+            if HAS_RESOURCE_DETECTOR:
+                detector = ResourceDetector()
+                self.max_workers, resources = detector.recommend_workers(
+                    reserved_cpu=reserved_cpu,
+                    memory_per_thread_mb=memory_per_thread_mb
+                )
+                print(f"🔍 自动检测: CPU {resources.cpu_count}核, 可用内存 {resources.memory_available_mb}MB")
+                print(f"   推荐线程数: {self.max_workers}")
+            else:
+                # 无资源检测器，使用 CPU 核心数 - 1
+                self.max_workers = max(1, multiprocessing.cpu_count() - 1)
+                print(f"⚠️  未找到资源检测器，使用默认线程数: {self.max_workers}")
+        else:
+            # 用户指定线程数
+            self.max_workers = min(int(max_workers), multiprocessing.cpu_count())
+        
         self.timeout_per_session = timeout_per_session
         self.progress_callback = progress_callback
         self.start_time = None
@@ -178,19 +214,6 @@ class BatchCompressor:
                     else:
                         failed_count += 1
                         progress.failed_sessions = failed_count
-                    
-                except TimeoutError:
-                    failed_count += 1
-                    progress.failed_sessions = failed_count
-                    self.results.append(SessionCompressionResult(
-                        session_id=session_id,
-                        success=False,
-                        original_size=0,
-                        compressed_size=0,
-                        processing_time=self.timeout_per_session,
-                        error=f"超时（>{self.timeout_per_session}s）"
-                    ))
-                    print(f"⏱️ {session_id}: 超时")
                     
                 except Exception as e:
                     failed_count += 1
@@ -309,7 +332,6 @@ class BatchCompressor:
         keep_count = max(1, int(len(messages) * ratio))
         
         # 简化评分：保留前 10% 和后 90%
-        # 实际应用中应使用 TF-IDF 评分
         if len(messages) <= keep_count:
             return messages
         
@@ -345,12 +367,13 @@ def main():
     """命令行入口"""
     import argparse
     
-    parser = argparse.ArgumentParser(description="批量压缩器 v1.3.1")
+    parser = argparse.ArgumentParser(description="批量压缩器 v1.3.3")
     parser.add_argument("input_dir", help="输入目录（包含会话文件）")
     parser.add_argument("output_dir", help="输出目录")
     parser.add_argument("--strategy", default="medium", choices=["light", "medium", "aggressive"],
                        help="压缩策略（默认: medium）")
-    parser.add_argument("--workers", type=int, default=4, help="并发数（默认: 4）")
+    parser.add_argument("--workers", type=str, default="auto",
+                       help="并发数（'auto' 自动检测，或指定数字，默认: auto）")
     parser.add_argument("--timeout", type=int, default=300, help="超时时间（秒，默认: 300）")
     parser.add_argument("--limit", type=int, help="限制处理的会话数量")
     parser.add_argument("--pattern", default="*.jsonl", help="文件模式（默认: *.jsonl）")
@@ -390,8 +413,7 @@ def main():
     print(f"   失败: {summary['failed']}")
     print(f"   压缩率: {summary['compression_ratio']}")
     print(f"   平均时间: {summary['average_time_per_session']:.2f}s/会话")
-    total_time = summary.get('total_time', 0)
-    print(f"   总耗时: {total_time:.1f}s")
+    print(f"   总耗时: {summary['total_time']:.1f}s")
     print("=" * 60)
 
 
