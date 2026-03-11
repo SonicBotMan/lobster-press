@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-增量压缩与断点续传 v1.0.0
+增量压缩与断点续传 v1.2.4-hotfix2
 支持大文件的增量压缩和断点续传
 
 Issue: #45 - 增量压缩与断点续传
 Author: LobsterPress Team
-Version: v1.3.0
+Version: v1.2.4-hotfix2
 """
 
 import sys
