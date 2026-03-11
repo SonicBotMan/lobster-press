@@ -18,9 +18,65 @@ import sys
 import re
 import math
 import time
+from datetime import datetime
 from collections import Counter
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Union
 from dataclasses import dataclass
+
+
+def parse_timestamp(ts: Union[str, int, float, None]) -> float:
+    """解析时间戳（支持 ISO 8601 和数值格式）
+    
+    Args:
+        ts: 时间戳（字符串、数值或 None）
+    
+    Returns:
+        Unix 时间戳（秒）
+    
+    Raises:
+        ValueError: 无法解析的时间戳格式
+    """
+    if ts is None:
+        return 0.0
+    
+    # 数值类型直接返回
+    if isinstance(ts, (int, float)):
+        return float(ts)
+    
+    # 字符串类型尝试解析
+    if isinstance(ts, str):
+        # 尝试解析为数值
+        try:
+            return float(ts)
+        except ValueError:
+            pass
+        
+        # ISO 8601 格式
+        iso_formats = [
+            "%Y-%m-%dT%H:%M:%SZ",           # 2026-03-11T05:24:40Z
+            "%Y-%m-%dT%H:%M:%S.%fZ",        # 2026-03-11T05:24:40.123Z
+            "%Y-%m-%dT%H:%M:%S%z",          # 2026-03-11T05:24:40+00:00
+            "%Y-%m-%dT%H:%M:%S.%f%z",       # 2026-03-11T05:24:40.123+00:00
+            "%Y-%m-%dT%H:%M:%S",            # 2026-03-11T05:24:40
+            "%Y-%m-%dT%H:%M:%S.%f",         # 2026-03-11T05:24:40.123
+            "%Y-%m-%d %H:%M:%S",            # 2026-03-11 05:24:40
+        ]
+        
+        for fmt in iso_formats:
+            try:
+                dt = datetime.strptime(ts, fmt)
+                # 如果没有时区信息，假设为 UTC
+                if dt.tzinfo is None:
+                    return dt.timestamp()
+                else:
+                    return dt.timestamp()
+            except ValueError:
+                continue
+        
+        # 无法解析，返回 0
+        return 0.0
+    
+    return 0.0
 
 
 @dataclass
@@ -134,18 +190,21 @@ class TFIDFScorer:
     
     def score_message(self, 
                       content: str, 
-                      timestamp: float = 0,
+                      timestamp: Union[str, int, float, None] = 0,
                       role: str = "user") -> ScoredMessage:
         """对单条消息评分
         
         Args:
             content: 消息内容
-            timestamp: 时间戳
+            timestamp: 时间戳（支持 ISO 8601 字符串或数值）
             role: 角色
         
         Returns:
             评分后的消息
         """
+        # 解析时间戳（修复 Issue #52）
+        ts = parse_timestamp(timestamp)
+        
         # 分词
         tokens = self.tokenize(content)
         
@@ -161,8 +220,8 @@ class TFIDFScorer:
         
         # Layer 3: 时间衰减
         time_decay = 0.0
-        if timestamp > 0:
-            age_hours = (time.time() - timestamp) / 3600
+        if ts > 0:
+            age_hours = (time.time() - ts) / 3600
             time_decay = -min(15, age_hours * 0.3)  # 最多衰减 15 分
         
         # 最终分数
@@ -174,7 +233,7 @@ class TFIDFScorer:
         return ScoredMessage(
             role=role,
             content=content,
-            timestamp=timestamp,
+            timestamp=ts,
             tfidf_score=tfidf_score,
             structural_bonus=structural_bonus,
             time_decay=time_decay,
