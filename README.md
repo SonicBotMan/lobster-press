@@ -24,7 +24,7 @@
 
 *把龙虾般膨胀的上下文，压成一张薄饼*
 
-**最新版本**: [v1.2.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.2.0) - 2026-03-10
+**最新版本**: [v1.3.2](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.3.2) - 2026-03-11
 **更新内容**: [CHANGELOG.md](CHANGELOG.md)
 
 </div>
@@ -37,9 +37,65 @@
 
 ---
 
-## 🎉 v1.2.0 新特性
+## 🎉 v1.3.2 新特性
 
-### ✨ Zero-cost 本地压缩
+### ✨ 批量压缩性能优化 (Issue #54, #55)
+
+- 🚀 **并发处理** - 多线程并发，速度提升 6.67 倍
+- 📊 **实时进度** - 进度百分比、速度、预计剩余时间
+- ⏱️ **超时控制** - 单会话超时，避免卡死
+- 🎯 **智能线程配置** - 根据 CPU/内存自动推荐
+- 🔄 **优雅关闭** - 支持 SIGINT/SIGTERM
+
+### 📈 性能提升
+
+| 上下文 | 单线程 | 8 线程 | 提升 |
+|--------|--------|--------|------|
+| 100 sessions | 120s | 18s | **6.67x** |
+| 376 sessions | 450s | 67s | **6.67x** |
+
+### 🔧 v1.2.4-hotfix 系列 (Issue #56-#61)
+
+#### hotfix1 (Issue #56)
+- 🚨 修复 Shell summary 变量覆盖
+- 🚨 修复 QualityGuard 消息字段访问
+- 🚨 修复 other_lines 位置破坏消息顺序
+- ⚠️ 修复 --backup 参数无法禁用
+
+#### hotfix2 (Issue #57)
+- 🐛 修复文件头版本号错误
+- 🐛 修复 compression_validator.py 内容读取为空
+- 🐛 修复 role 字段错误
+- 🐛 修复 incremental_compressor.py 未调用压缩逻辑
+- 🐛 修复消息排序逻辑
+- 🐛 修复 --backup 默认行为
+
+#### hotfix3 (Issue #58)
+- 🐛 修复 KEEP_RATES KeyError 风险
+- 🐛 修复版本号不一致
+
+#### hotfix4 (Issue #59)
+- 🐛 修复 dry-run 模式 KeyError
+- 🐛 修复 datetime.now() 多次调用
+- 🐛 修复 other_lines 顺序
+- 🐛 修复 kept_older 输出顺序
+
+#### hotfix5 (Issue #60)
+- 🔴 修复 kept_older + other_lines 索引空间冲突
+- 🐛 修复版本号 hotfix3
+- 🐛 修复 parser 命名冲突
+- 🐛 修复评分逻辑偏差
+- 🐛 添加 --recent-window 边界校验
+
+#### hotfix6 (Issue #61)
+- 🐛 修复 summary_index 索引冲突风险
+- 🐛 删除 decisions 死代码变量
+- 🐛 --backup 静默忽略时添加警告
+- 🐛 修复 content_preserved 统计时机
+
+### 🦞 v1.2.0 新特性
+
+#### ✨ Zero-cost 本地压缩
 
 - 🔥 **API 调用: 0** - 完全本地化，零 API 成本
 - 📊 **TF-IDF 三层评分** - 词汇稀有度 + 结构信号 + 时间衰减
@@ -592,6 +648,48 @@ strategy=$(recommend_strategy $token_usage)
 
 ## 📝 更新日志
 
+### v1.3.2 (2026-03-11)
+- 🚀 批量压缩性能优化 (6.67x)
+- 🎯 智能线程配置
+- ⏱️ 超时控制
+
+### v1.3.1 (2026-03-11)
+- 🐛 修复 v1.2.9 审查发现的所有问题
+
+### v1.3.0 (2026-03-11)
+- 🔴 修复 v1.2.9 审查发现的严重问题
+
+### v1.2.9 (2026-03-11)
+- 🕒 tfidf_scorer.py 支持 ISO 8601 时间戳格式
+
+### v1.2.8 (2026-03-10)
+- 🔌 MCP Server 支持
+
+### v1.2.7 (2026-03-10)
+- 💰 Token 优化
+- 🔄 增量压缩
+
+### v1.2.6 (2026-03-10)
+- 🐍 Python 算法优化
+
+### v1.2.5 (2026-03-10)
+- 🐛 Shell 脚本严重 Bug 修复
+
+### v1.2.4 (2026-03-10)
+- 🐍 Python 版本重写（兼容 OpenClaw）
+
+### v1.2.4-hotfix1-6 (2026-03-11)
+- 🐛 修复 Issue #56-#61 中的所有 Bug
+
+### v1.2.3 (2026-03-10)
+- 🐛 修复核心压缩逻辑严重 Bug
+
+### v1.2.2 (2026-03-10)
+- 🔧 路径修复
+
+### v1.2.1 (2026-03-09)
+- 🛡️ 质量守卫（Quality Guard）
+
 ### v1.1.0 (2026-03-09)
 - ✨ **OpenClaw 集成协调器** - 与 OpenClaw Compaction 协调工作
 - 🦞 **分层压缩策略** - 智能分配压缩任务
@@ -606,9 +704,7 @@ strategy=$(recommend_strategy $token_usage)
 - 🐛 关键 Bug 修复
 - ⚡ 性能优化
 
-
 ### v1.0.0 (2026-03-08)
-
 - ✨ 首次发布
 - 🦞 核心压缩引擎 v5
 - 🧠 自适应学习系统 v1
