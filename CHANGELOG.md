@@ -5,6 +5,48 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.3.2] - 2026-03-11
+
+### 🚀 新增功能
+
+#### 批量压缩性能优化 (Issue #54)
+
+新增 `batch_compressor.py`，支持：
+
+**特性:**
+1. **并发处理** - 支持多线程并发处理多个会话
+2. **实时进度** - 显示进度百分比、速度、预计剩余时间
+3. **超时控制** - 单个会话超时控制，避免卡死
+4. **优雅关闭** - 支持 SIGINT/SIGTERM 优雅关闭
+5. **限制数量** - 支持限制处理的会话数量
+6. **压缩策略** - 支持轻/中/重度压缩
+
+**性能提升:**
+- 并发处理：速度提升 2-4 倍
+- 超时控制：避免单会话卡死整体进度
+- 进度可见：实时掌握压缩进度
+
+**使用方法:**
+```bash
+# 基础用法
+python scripts/batch_compressor.py sessions/ compressed/
+
+# 高级用法
+python scripts/batch_compressor.py sessions/ compressed/ \
+  --strategy aggressive \
+  --workers 8 \
+  --timeout 600 \
+  --limit 100
+```
+
+**文档:** 参见 `docs/BATCH-COMPRESSION.md`
+
+### 📦 新增
+
+- 新增 `scripts/batch_compressor.py` - 批量压缩器
+- 新增 `tests/test_batch_compressor.py` - 性能测试脚本
+- 新增 `docs/BATCH-COMPRESSION.md` - 使用文档
+
 ## [1.3.0] - 2026-03-11
 
 ### 🐛 Bug 修复
