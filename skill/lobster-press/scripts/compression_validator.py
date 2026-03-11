@@ -221,6 +221,49 @@ class QualityGuard:
         """
         self.config = config or QualityGuardConfig()
     
+    def _extract_message_content(self, msg: Dict) -> str:
+        """从 OpenClaw JSONL 消息中提取文本内容（Bug 2 修复）
+        
+        OpenClaw 消息结构：
+        {
+            "type": "message",
+            "message": {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": "实际内容"},
+                    {"type": "toolCall", ...}
+                ]
+            }
+        }
+        
+        Args:
+            msg: 消息字典
+        
+        Returns:
+            提取的文本内容
+        """
+        # 方法1：直接 content 字段（旧格式）
+        if "content" in msg and isinstance(msg["content"], str):
+            return msg["content"]
+        
+        # 方法2：message.content 列表（OpenClaw 新格式）
+        message = msg.get("message", {})
+        content_list = message.get("content", [])
+        
+        if isinstance(content_list, list):
+            # 提取所有 type="text" 的 text 字段
+            texts = []
+            for item in content_list:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    texts.append(item.get("text", ""))
+            return " ".join(texts)
+        
+        # 方法3：content 是字符串
+        if isinstance(content_list, str):
+            return content_list
+        
+        return ""
+    
     def check_decision_preserved(self, 
                                   original_messages: List[Dict],
                                   compressed_messages: List[Dict]) -> QualityCheckResult:
@@ -233,10 +276,10 @@ class QualityGuard:
         Returns:
             质量检查结果
         """
-        # 提取原始消息中的决策
+        # 提取原始消息中的决策（Bug 2 修复：使用正确的消息结构）
         original_decisions = set()
         for msg in original_messages:
-            content = msg.get("content", "")
+            content = self._extract_message_content(msg)  # 修复：使用正确的提取方法
             for keyword in self.config.decision_keywords:
                 if keyword.lower() in content.lower():
                     # 提取包含决策的句子
@@ -277,7 +320,7 @@ class QualityGuard:
     def check_config_intact(self,
                            original_messages: List[Dict],
                            compressed_messages: List[Dict]) -> QualityCheckResult:
-        """检查配置信息是否完整
+        """检查配置信息是否完整（Bug 2 修复）
         
         Args:
             original_messages: 原始消息列表
@@ -286,10 +329,10 @@ class QualityGuard:
         Returns:
             质量检查结果
         """
-        # 提取配置项
+        # 提取配置项（Bug 2 修复：使用正确的消息结构）
         original_configs = set()
         for msg in original_messages:
-            content = msg.get("content", "")
+            content = self._extract_message_content(msg)  # 修复：使用正确的提取方法
             # 匹配 key=value 模式
             config_patterns = re.findall(r'[\w_]+=\S+', content)
             original_configs.update(config_patterns)

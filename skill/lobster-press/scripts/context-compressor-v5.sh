@@ -339,8 +339,8 @@ $old_messages"
             fi
         done
         
-        # 提取压缩结果
-        local summary=$(echo "$response" | jq -r '.choices[0].message.content // empty' 2>/dev/null)
+        # 提取压缩结果（已在上面的循环中赋值，无需重复）
+        # Bug 1 修复：删除重复的 summary 赋值
         
         if [ -z "$summary" ] || [ "$summary" = "null" ]; then
             echo "❌ 压缩失败: $(sanitize_response "$response" | head -100)"
