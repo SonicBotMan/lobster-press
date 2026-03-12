@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LobsterPress v1.5.4 - OpenClaw 兼容的压缩引擎
-修复 Issue #49：格式兼容、元数据保留、完整内容支持
+LobsterPress v1.5.5 - OpenClaw 兼容的压缩引擎
 
-核心修复：
+变更历史：
+- v1.2.4: 基础版本，OpenClaw JSONL 格式支持
+- v1.5.1: 集成 TFIDFScorer、SemanticDeduplicator、ExtractiveSummarizer（引入5处倒退 BUG）
+- v1.5.2: 尝试修复 Issue #82，失败（5个 BUG 均未修复，另引入2个新 BUG）
+- v1.5.3: 修复 BUG-1/2/3/4，BUG-5 仍残留
+- v1.5.5: 修复全部残留问题，新增 MessageTypeWeights、ToolResultExtractor、EmbeddingDeduplicator 集成
+- v1.5.5: 代码风格收尾，统一 tuple 结构，更新文档
+
+核心功能：
 1. 输入/输出使用 JSONL 格式（OpenClaw 标准）
 2. 保留完整的消息元数据（id, parentId, timestamp, type）
 3. 支持所有 content 类型（text, toolCall, thinking, toolResult）
 4. 摘要作为新消息添加，不破坏原始结构
+5. 基于 TF-IDF 评分 + Embedding 去重 + 提取式摘要的三阶段压缩
 
 Author: LobsterPress Team
-Version: v1.5.4
+Version: v1.5.5
 """
 
 import sys
@@ -212,7 +220,7 @@ class CompressionStrategy:
 
 
 class LobsterPressV124:
-    """LobsterPress v1.5.4 压缩引擎
+    """LobsterPress v1.5.5 压缩引擎
     
     OpenClaw 兼容版本
     """
@@ -396,7 +404,7 @@ class LobsterPressV124:
                 "role": "assistant",
                 "content": [{
                     "type": "text",
-                    "text": f"[历史摘要 - {strategy} - v1.5.4]\n{summary}"
+                    "text": f"[历史摘要 - {strategy} - v1.5.5]\n{summary}"
                 }],
                 "api": "openai-responses",
                 "provider": "openclaw",
@@ -452,7 +460,7 @@ class LobsterPressV124:
                 # 准备去重所需的数据
                 dedup_messages = []
                 tokens_list = []
-                for msg in older_messages:
+                for idx, msg in older_messages:  # 解包 tuple
                     c = parser.get_text_content(msg)
                     role = msg.get('message', {}).get('role', 'user')
                     ts = msg.get('timestamp', 0)
@@ -460,6 +468,7 @@ class LobsterPressV124:
                         'content': c,
                         'role': role,
                         'timestamp': ts,
+                        'original_idx': idx,
                         'original_msg': msg
                     })
                     tokens_list.append(scorer.tokenize(c))
@@ -485,14 +494,14 @@ class LobsterPressV124:
                 print(f"⚠️ EmbeddingDeduplicator 去重失败，跳过: {e}", file=sys.stderr)
         
         # 评分历史消息（去重后）
-        scored = [(msg, self._score_message(msg, parser)) for msg in deduplicated_older_messages]
-        scored.sort(key=lambda x: x[1], reverse=True)
+        scored = [(idx, msg, self._score_message(msg, parser)) for idx, msg in deduplicated_older_messages]
+        scored.sort(key=lambda x: x[2], reverse=True)
         
         # 选择要保留的历史消息
-        kept_older = [msg for msg, score in scored[:keep_from_older]]
+        kept_older = [(idx, msg) for idx, msg, score in scored[:keep_from_older]]
         
         # 要压缩的消息
-        dropped_messages = [msg for msg, score in scored[keep_from_older:]]
+        dropped_messages = [msg for idx, msg, score in scored[keep_from_older:]]
         
         # 生成摘要
         summary = self._generate_summary(dropped_messages, parser)
@@ -525,7 +534,7 @@ class LobsterPressV124:
             output_lines.append(json.dumps(summary_msg, ensure_ascii=False))
         
         # 4. 添加保留的历史消息
-        for msg in kept_older:
+        for idx, msg in kept_older:
             output_lines.append(json.dumps(msg, ensure_ascii=False))
         
         # 5. 添加最近的完整消息（复用上面已定义的 kept_recent）
@@ -549,7 +558,7 @@ class LobsterPressV124:
             报告文本
         """
         lines = [
-            "📊 LobsterPress v1.5.4 压缩报告",
+            "📊 LobsterPress v1.5.5 压缩报告",
             "",
             f"策略: {self.strategy}",
             f"保留最近: {self.recent_window} 条消息",
@@ -571,7 +580,7 @@ class LobsterPressV124:
 def main():
     """命令行入口"""
     arg_parser = argparse.ArgumentParser(
-        description="LobsterPress v1.5.4 - OpenClaw 兼容的压缩引擎",
+        description="LobsterPress v1.5.5 - OpenClaw 兼容的压缩引擎",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
