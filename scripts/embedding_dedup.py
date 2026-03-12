@@ -75,12 +75,14 @@ class EmbeddingDeduplicator:
     
     def deduplicate(self, 
                     messages: List[Dict],
-                    scores: List[float]) -> Tuple[List[Dict], List[int]]:
+                    scores: List[float],
+                    tokens_list: Optional[List[List[str]]] = None) -> Tuple[List[Dict], List[int]]:
         """去重
         
         Args:
             messages: 消息列表
             scores: 每条消息的重要性分数
+            tokens_list: 兼容参数（EmbeddingDeduplicator 不使用，由 Embedding 替代）
         
         Returns:
             (去重后的消息列表, 被删除的消息索引列表)
