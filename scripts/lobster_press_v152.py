@@ -464,10 +464,13 @@ class LobsterPressV124:
                     })
                     tokens_list.append(scorer.tokenize(c))
                 
-                # 执行去重
+                # Step 2 修复：计算真实分数后再去重
+                scored_for_dedup = scorer.score_messages(dedup_messages)
+                real_scores = [sm.score for sm in scored_for_dedup]
+                
                 deduped_result, removed_indices = deduplicator.deduplicate(
                     [{'content': m['content']} for m in dedup_messages],
-                    [0.5] * len(dedup_messages),  # 先用基础分数
+                    real_scores,  # 修复：使用真实分数
                     tokens_list
                 )
                 
@@ -494,6 +497,17 @@ class LobsterPressV124:
         # 生成摘要
         summary = self._generate_summary(dropped_messages, parser)
         
+        # Step 3 修复：在 drop 操作之后， 只统计实际保留的消息
+        kept_recent = parser.messages[-recent_count:]
+        for idx, msg in kept_older:
+            for item in parser.get_message_content(msg):
+                ct = item.get('type', 'unknown')
+                self.stats.content_preserved[ct] = self.stats.content_preserved.get(ct, 0) + 1
+        for idx, msg in kept_recent:
+            for item in parser.get_message_content(msg):
+                ct = item.get('type', 'unknown')
+                self.stats.content_preserved[ct] = self.stats.content_preserved.get(ct, 0) + 1
+        
         # 构建输出
         output_lines = []
         
@@ -514,9 +528,8 @@ class LobsterPressV124:
         for msg in kept_older:
             output_lines.append(json.dumps(msg, ensure_ascii=False))
         
-        # 5. 添加最近的完整消息
-        recent_messages = parser.messages[-recent_count:]
-        for msg in recent_messages:
+        # 5. 添加最近的完整消息（复用上面已定义的 kept_recent）
+        for idx, msg in kept_recent:
             output_lines.append(json.dumps(msg, ensure_ascii=False))
         
         # 构建输出
