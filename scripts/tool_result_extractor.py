@@ -39,14 +39,17 @@ class ToolResultExtractor:
         r'(?:path|file|filepath)[:\s]+([^\s,]+)',  # 明确的 path 标记
     ]
     
-    # 数字模式（行数、字节数、耗时等）
+    # 数字模式（行数、字节数、耗时等）- 使用 (pattern, label) 元组
     NUMBER_PATTERNS = [
-        r'(\d+(?:\.\d+)?)\s*lines?',
-        r'(\d+(?:\.\d+)?)\s*(?:bytes?|KB|MB|GB)',
-        r'(\d+(?:\.\d+)?)\s*(?:seconds?|ms|milliseconds?)',
-        r'(\d+(?:\.\d+)?)\s*(?:hits?|matches?|results?)',
-        r'found\s+(\d+)',
-        r'returned\s+(\d+)',
+        (r'(\d+(?:\.\d+)?)\s*lines?', "lines"),
+        (r'(\d+(?:\.\d+)?)\s*bytes?', "bytes"),
+        (r'(\d+(?:\.\d+)?)\s*KB', "size"),
+        (r'(\d+(?:\.\d+)?)\s*MB', "size"),
+        (r'(\d+(?:\.\d+)?)\s*seconds?', "duration"),
+        (r'(\d+(?:\.\d+)?)\s*ms', "duration"),
+        (r'(\d+(?:\.\d+)?)\s*(?:hits?|matches?)', "matches"),
+        (r'found\s+(\d+)', None),      # None 表示用 "count"
+        (r'returned\s+(\d+)', None),
     ]
     
     # 错误模式
@@ -141,17 +144,15 @@ class ToolResultExtractor:
         """提取数字结果"""
         numbers = []
         
-        for pattern in cls.NUMBER_PATTERNS:
+        for pattern, label in cls.NUMBER_PATTERNS:
             matches = re.findall(pattern, text, re.IGNORECASE)
             for match in matches:
                 if isinstance(match, tuple):
-                    # 带单位的情况
-                    number = match[0]
-                    unit = match[1] if len(match) > 1 else ""
-                    numbers.append((unit.lower(), number))
+                    value = match[0]
                 else:
-                    # 纯数字
-                    numbers.append(("count", match))
+                    value = match
+                key = label if label else "count"
+                numbers.append((key, value))
         
         return numbers
     

@@ -87,16 +87,24 @@ class MessageTypeWeights:
     ]
     
     @classmethod
-    def classify_message(cls, role: str, content: str) -> str:
+    def classify_message(cls, role: str, content: str, content_type: Optional[str] = None) -> str:
         """分类消息类型
         
         Args:
             role: 消息角色 (user/assistant)
             content: 消息内容
+            content_type: 内容类型（thinking/toolResult 等），由调用方从 content items 中推断
         
         Returns:
             消息类型名称
         """
+        # content_type 优先级高于 role
+        if content_type == 'thinking':
+            return "thinking"
+        
+        if content_type == 'toolResult':
+            return "tool_result"
+        
         # user 消息总是高保护
         if role == "user":
             return "user"
