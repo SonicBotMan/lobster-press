@@ -22,8 +22,8 @@
 
 *把龙虾般膨胀的上下文，压成一张薄饼*
 
-**最新版本**: [v1.4.2](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.4.2) - 2026-03-12
-**更新内容**: [CHANGELOG.md](CHANGELOG.md)
+**最新版本**: [v1.5.5](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.5.5) - 2026-03-13
+**更新内容**: [CHANGELOG.md](CHANGELOG.md) | [v1.5.5 亮点](docs/v1.5.5-highlights.md)
 
 </div>
 
@@ -57,12 +57,25 @@ python scripts/batch_compressor.py sessions/ compressed/ --workers auto
 
 ## ✨ 核心特性
 
-### 🔥 零成本本地压缩
+### 🔥 三阶段智能压缩（v1.5.5）
+
+```
+输入对话 → TF-IDF 评分 → Embedding 去重 → 提取式摘要 → 压缩输出
+```
+
+**六大智能模块：**
+- **TFIDFScorer** - TF-IDF 三层评分（词汇稀有度 + 结构信号 + 时间衰减）
+- **SemanticDeduplicator** - 语义去重（余弦相似度 > 0.82 视为重复）
+- **ExtractiveSummarizer** - 提取式摘要（不生成新 token，零 AI 幻觉）
+- **MessageTypeWeights** - 消息类型权重（用户消息优先保留）
+- **ToolResultExtractor** - 工具结果提取（压缩长工具输出）
+- **EmbeddingDeduplicator** - Embedding 去重（语义级别去重）
+
+### 🚀 零 API 成本
 
 - **API 调用: 0** - 完全本地化，零 API 成本
-- **TF-IDF 三层评分** - 词汇稀有度 + 结构信号 + 时间衰减
-- **语义去重** - 余弦相似度 > 0.82 视为重复
-- **提取式摘要** - 不生成新 token，不引入 AI 幻觉
+- **无 AI 幻觉** - 不生成新 token，100% 可解释
+- **100% 可追溯** - 每步压缩都可解释
 
 ### 🚀 批量压缩性能优化
 
@@ -139,32 +152,55 @@ python scripts/resource_detector.py
 
 ## 💡 压缩策略
 
-| 策略 | 保留率 | 使用场景 |
-|------|--------|----------|
-| **light** | 85% | 轻度压缩，保留大部分内容 |
-| **medium** | 70% | 平衡策略（默认） |
-| **heavy** | 55% | 激进压缩，最大化节省 |
+| 策略 | 保留率 | 使用场景 | 压缩强度 |
+|------|--------|----------|----------|
+| **light** | 85% | 轻度压缩，保留大部分内容 | ⭐ |
+| **medium** | 70% | 平衡策略（默认） | ⭐⭐ |
+| **heavy** | 55% | 激进压缩，最大化节省 | ⭐⭐⭐ |
 
 ---
 
 ## 🏗️ 架构说明
 
-### v1.3.x 架构
+### v1.5.x 三阶段压缩架构
+
+```
+输入 JSONL → OpenClawSessionParser
+    │
+    ├─ Stage 1: TF-IDF 评分
+    │   ├─ TFIDFScorer（三层评分）
+    │   └─ MessageTypeWeights（类型权重）
+    │
+    ├─ Stage 2: Embedding 去重
+    │   ├─ EmbeddingDeduplicator（语义去重）
+    │   └─ SemanticDeduplicator（相似度计算）
+    │
+    └─ Stage 3: 提取式摘要
+        ├─ ExtractiveSummarizer（关键句提取）
+        └─ ToolResultExtractor（工具结果压缩）
+    │
+    └─ 输出 JSONL（保留完整元数据）
+```
+
+**关键特点：**
+- ✅ **零 API 调用** - 完全本地化
+- ✅ **零 AI 幻觉** - 不生成新 token
+- ✅ **100% 可解释** - 每步都可追溯
+
+### v1.3.x 批量处理架构
 
 ```
 systemd timer
     └── lobster_runner.sh（轻量 Shell）
             │
-            ├── lobster_press_v124.py（核心引擎）
-            │   ├── TF-IDF 评分
-            │   ├── 语义去重
-            │   ├── 提取式摘要
+            ├── lobster_press_v155.py（核心引擎）
+            │   ├── 三阶段压缩
             │   ├── Token 计数
             │   ├── 净收益校验
             │   └── 质量守卫
             │
             └── batch_compressor.py（批量处理）
-                ├── 并发处理
+                ├── 并发处理（6.67x 性能提升）
                 ├── 实时进度
                 └── 超时控制
 ```
