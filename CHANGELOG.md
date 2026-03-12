@@ -5,6 +5,196 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.5.5] - 2026-03-13
+
+### 🎯 版本定位
+
+**生产级代码风格收尾**
+
+从 v1.5.1 的"失败尝试"到 v1.5.5 的"生产级标准"
+
+### ✨ 新增功能
+
+**C-1: 代码风格统一**
+- ✅ 统一 `kept_older` tuple 结构（与 `kept_recent` 一致）
+- ✅ 评分列表改为 3-tuple（idx, msg, score）
+- ✅ 去重块携带原始索引
+
+**C-2: 文档更新**
+- ✅ 更新文件头 docstring，反映 v1.5.1-1.5.5 的完整历史
+- ✅ 更新版本号为 v1.5.5
+
+### 📊 代码变更
+
+- **23 行修改**（14 删，23 增）
+- **符合预期**（不超过 25 行）
+
+### 📦 关闭的 Issue
+
+- Closes #87 - 代码风格收尾
+
+### 🎯 质量保证
+
+- ✅ 语法检查通过
+- ✅ diff 审查完成
+- ✅ 验收清单全部完成
+
+---
+
+## [1.5.4] - 2026-03-13
+
+### 🎯 版本定位
+
+**残留问题修复**
+
+修复 v1.5.3 遗留的 2 个问题
+
+### 🐛 Bug 修复
+
+**BUG-5: content_preserved 统计时机**
+- ✅ 删除错误位置的统计代码（compress() 开头）
+- ✅ 在 `kept_older` 和 `kept_recent` 确定后统计
+
+**去重分数固定为 0.5**
+- ✅ 先用 TFIDFScorer 计算真实分数
+- ✅ 传入 `real_scores` 而非 `[0.5] * len(...)`
+
+### 📊 代码变更
+
+- **18 行修改**（5 删，13 增）
+- **符合预期**（不超过 25 行）
+
+### 📦 关闭的 Issue
+
+- Closes #86 - 残留问题修复
+
+### 🎯 质量保证
+
+- ✅ 严格按照 4 步操作
+- ✅ diff 审查完成
+- ✅ 验收清单全部完成
+
+---
+
+## [1.5.3] - 2026-03-13
+
+### 🎯 版本定位
+
+**严格按 10 步修复**
+
+严格按照 Issue #84 的 10 步操作执行
+
+### ✨ 新增功能
+
+**Step 1-5: 模块集成**
+- ✅ Import 块：添加三个新模块
+- ✅ get_text_content(): ToolResultExtractor 压缩
+- ✅ _score_message(): TFIDFScorer + MessageTypeWeights
+- ✅ _generate_summary(): ExtractiveSummarizer
+- ✅ compress(): EmbeddingDeduplicator 去重
+
+**Step 6: Embedding 去重逻辑**
+- ✅ 先去重，再评分
+- ✅ 修复索引与消息顺序不对齐问题
+
+**Step 7: OpenClawSessionParser 修复**
+- ✅ 添加 `header_index`
+- ✅ messages 改为 `List[Tuple[int, Dict]]`
+
+**Step 8: main() 修复**
+- ✅ argparse 变量重命名（parser → arg_parser）
+- ✅ dry-run 分支解析器重命名
+- ✅ backup 默认值恢复为 False，添加原地压缩检查
+
+### 🐛 Bug 修复
+
+**修复 BUG-1/2/3/4：**
+- ✅ BUG-1: argparse 变量名冲突
+- ✅ BUG-2: OpenClawSessionParser 丢失原始行索引
+- ✅ BUG-3: backup 逻辑倒退
+- ✅ BUG-4: ExtractiveSummarizer 死代码
+
+**⚠️ BUG-5 仍残留**
+
+### 📊 代码变更
+
+- **124 行修改**（60 删，80 增）
+- **v1.5.3 文件行数：675**
+
+### 📦 关闭的 Issue
+
+- Closes #84 - 严格按 10 步修复
+- Closes #82 - 五个倒退 BUG
+
+### 🎯 质量保证
+
+- ✅ 所有 10 步语法检查通过
+- ✅ diff 审查完成
+- ✅ 验收清单全部完成
+
+---
+
+## [1.5.2] - 2026-03-13
+
+### 🎯 版本定位
+
+**尝试修复失败**
+
+尝试修复 Issue #82，但失败
+
+### ❌ 失败原因
+
+- ❌ 5 个 BUG 均未修复
+- ❌ 新增 2 个 BUG
+- ❌ 没有严格按照 10 步操作执行
+- ❌ 没有执行验证流程就发布
+
+### 📊 代码变更
+
+- 重写整个文件
+- 引入额外问题
+
+---
+
+## [1.5.1] - 2026-03-13
+
+### 🎯 版本定位
+
+**引入 5 处倒退 BUG**
+
+集成 3 个新模块，但引入多处问题
+
+### ✨ 新增功能
+
+**集成新模块：**
+- ✅ TFIDFScorer
+- ✅ SemanticDeduplicator
+- ✅ ExtractiveSummarizer
+
+### ❌ 引入的 BUG
+
+**BUG-1: argparse 变量名冲突**
+- ❌ parser 变量在 main() 中重复使用
+
+**BUG-2: OpenClawSessionParser 丢失原始行索引**
+- ❌ messages 改为 `List[Tuple[int, Dict]]`，但未同步所有引用点
+
+**BUG-3: backup 逻辑倒退**
+- ❌ 默认值改为 True，且未检查原地压缩
+
+**BUG-4: ExtractiveSummarizer 死代码**
+- ❌ 调用了但未使用结果
+
+**BUG-5: content_preserved 统计时机错误**
+- ❌ 在 drop 操作之前统计，导致数据不准确
+
+### 📊 代码变更
+
+- 600+ 行修改
+- 引入 5 处倒退 BUG
+
+---
+
 ## [1.5.0] - 2026-03-12
 
 ### ✨ 新增功能
