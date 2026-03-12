@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LobsterPress v1.5.2 - OpenClaw 兼容的压缩引擎
+LobsterPress v1.5.4 - OpenClaw 兼容的压缩引擎
 修复 Issue #49：格式兼容、元数据保留、完整内容支持
 
 核心修复：
@@ -11,7 +11,7 @@ LobsterPress v1.5.2 - OpenClaw 兼容的压缩引擎
 4. 摘要作为新消息添加，不破坏原始结构
 
 Author: LobsterPress Team
-Version: v1.5.2
+Version: v1.5.4
 """
 
 import sys
@@ -212,7 +212,7 @@ class CompressionStrategy:
 
 
 class LobsterPressV124:
-    """LobsterPress v1.5.2 压缩引擎
+    """LobsterPress v1.5.4 压缩引擎
     
     OpenClaw 兼容版本
     """
@@ -396,7 +396,7 @@ class LobsterPressV124:
                 "role": "assistant",
                 "content": [{
                     "type": "text",
-                    "text": f"[历史摘要 - {strategy} - v1.5.2]\n{summary}"
+                    "text": f"[历史摘要 - {strategy} - v1.5.4]\n{summary}"
                 }],
                 "api": "openai-responses",
                 "provider": "openclaw",
@@ -549,7 +549,7 @@ class LobsterPressV124:
             报告文本
         """
         lines = [
-            "📊 LobsterPress v1.5.2 压缩报告",
+            "📊 LobsterPress v1.5.4 压缩报告",
             "",
             f"策略: {self.strategy}",
             f"保留最近: {self.recent_window} 条消息",
@@ -571,7 +571,7 @@ class LobsterPressV124:
 def main():
     """命令行入口"""
     arg_parser = argparse.ArgumentParser(
-        description="LobsterPress v1.5.2 - OpenClaw 兼容的压缩引擎",
+        description="LobsterPress v1.5.4 - OpenClaw 兼容的压缩引擎",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
