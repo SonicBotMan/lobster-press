@@ -5,6 +5,43 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.4.3] - 2026-03-12
+
+### 🐛 Bug 修复
+
+#### Issue #75: 代码审查发现的多处 Bug
+
+**修复内容：**
+
+1. **BUG-1 + BUG-2: TF-IDF 功能失效与评分不一致**
+   - ✅ 将 TFIDFScorer 提升为实例成员
+   - ✅ 在 compress() 开始时用全部消息统一构建语料库
+   - ✅ 统一去重和排序阶段的评分逻辑
+
+2. **BUG-3: header 行号问题**
+   - ✅ 新增 header_line_index 属性，记录 header 的实际行索引
+   - ✅ 更新 summary_index 计算逻辑，避免索引冲突
+
+3. **健壮-1: stats 多次调用累积**
+   - ✅ 在 compress() 开始时重置 self.stats
+   - ✅ 每次压缩都是独立的统计
+
+4. **健壮-2: 行数统计不准确**
+   - ✅ 使用实际行数而非解析成功行数
+
+### 📦 关闭的 Issue
+
+- Closes #75 - 代码审查发现的多处 Bug
+
+### 🎯 质量保证
+
+- ✅ 语法检查通过
+- ✅ BUG-3 验证通过（header 记录行索引）
+- ✅ 健壮-1 验证通过（stats 重置）
+- ✅ 健壮-2 验证通过（实际行数）
+
+---
+
 ## [1.4.2] - 2026-03-12
 
 ### 🐛 Bug 修复
