@@ -5,6 +5,64 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.5.0] - 2026-03-12
+
+### ✨ 新增功能
+
+#### Issue #76: 压缩质量升级
+
+**Phase 1: 消息类型差异化压缩**
+- ✅ 新增 `message_type_weights.py` 模块
+- ✅ 定义不同消息类型的评分权重：
+  - `user` 消息：高保护（+0.3）
+  - `assistant_decision` 消息：高保护（+0.3）
+  - `assistant_normal` 消息：中等保护（+0.0）
+  - `assistant_chitchat` 消息：低保护（-0.2）
+  - `thinking` 消息：激进压缩（-0.2）
+  - `tool_result` 消息：事实提取（+0.0）
+
+**Phase 2: toolResult 事实提取**
+- ✅ 新增 `tool_result_extractor.py` 模块
+- ✅ 从工具结果中提取关键信息：
+  - 文件路径
+  - 数字结果（行数、字节数、耗时）
+  - 错误信息
+  - 成功/失败状态
+- ✅ 自动生成简洁的事实摘要
+
+#### Issue #77: 本地模型增强
+
+**Phase 3: Embedding 去重增强**
+- ✅ 新增 `embedding_dedup.py` 模块
+- ✅ 基于 `sentence-transformers` 的语义去重：
+  - 模型：`all-MiniLM-L6-v2`（22MB）
+  - 无需 GPU，支持 CPU 推理
+  - 可识别"语义相近但用词不同"的重复消息
+- ✅ 自动 fallback 到精确匹配（无需额外依赖）
+
+### 📦 关闭的 Issue
+
+- Closes #76 - 压缩质量升级
+- Closes #77 - 本地模型增强
+
+### 🎯 质量保证
+
+- ✅ Phase 1 测试通过（消息类型分类）
+- ✅ Phase 2 测试通过（toolResult 事实提取）
+- ✅ Phase 3 测试通过（Embedding 去重，fallback 模式）
+
+### 📝 安装说明
+
+**完整功能（推荐）：**
+```bash
+pip install sentence-transformers
+```
+
+**基础功能（无额外依赖）：**
+无需安装，所有模块都有 fallback 方案
+
+---
+
 ## [1.4.3] - 2026-03-12
 
 ### 🐛 Bug 修复
