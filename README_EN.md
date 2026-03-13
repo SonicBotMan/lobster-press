@@ -57,7 +57,21 @@ python scripts/batch_compressor.py sessions/ compressed/ --workers auto
 
 ## ✨ Core Features
 
-### 🔥 Zero-Cost Local Compression
+### 🔥 Three-Stage Intelligent Compression (v1.5.5)
+
+```
+Input Conversation → TF-IDF Scoring → Embedding Dedup → Extractive Summary → Compressed Output
+```
+
+**Six Intelligent Modules:**
+- **TFIDFScorer** - TF-IDF Three-Layer Scoring (Term Rarity + Structural Signals + Time Decay)
+- **SemanticDeduplicator** - Semantic Deduplication (Cosine Similarity > 0.82 Considered Duplicate)
+- **ExtractiveSummarizer** - Extractive Summarization (No New Tokens Generated, Zero AI Hallucinations)
+- **MessageTypeWeights** - Message Type Weights (User Messages Priority Retained)
+- **ToolResultExtractor** - Tool Result Extraction (Compress Long Tool Outputs)
+- **EmbeddingDeduplicator** - Embedding-Level Deduplication (Semantic-Level Deduplication)
+
+### 🚀 Zero-Cost Local Compression
 
 - **API Calls: 0** - Fully local, zero API cost
 - **TF-IDF Three-Layer Scoring** - Term rarity + structural signals + time decay
