@@ -5,12 +5,13 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: v2.0.0-alpha
+Version: v2.5.0
 """
 
 import sqlite3
 import json
 import hashlib
+import uuid
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime
@@ -219,6 +220,14 @@ class LobsterDatabase:
         structural_bonus = message.get('structural_bonus', 0.0)
         compression_exempt = 1 if message.get('compression_exempt', False) else 0
         
+        # Bug 1 修复：查询是否已存在（区分 INSERT vs REPLACE）
+        self.cursor.execute(
+            "SELECT id FROM messages WHERE message_id = ?", (message_id,)
+        )
+        existing = self.cursor.fetchone()
+        old_rowid = existing[0] if existing else None
+        
+        # 执行 UPSERT
         self.cursor.execute("""
             INSERT OR REPLACE INTO messages 
             (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
@@ -227,11 +236,17 @@ class LobsterDatabase:
         """, (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
               msg_type, tfidf_score, structural_bonus, compression_exempt))
         
-        # 更新 FTS 索引
-        self.cursor.execute("""
-            INSERT INTO messages_fts (rowid, message_id, content)
-            VALUES (last_insert_rowid(), ?, ?)
-        """, (message_id, content))
+        new_rowid = self.cursor.lastrowid
+        
+        # 维护 FTS5 索引：先删旧，再插新
+        if old_rowid is not None:
+            self.cursor.execute(
+                "DELETE FROM messages_fts WHERE rowid = ?", (old_rowid,)
+            )
+        self.cursor.execute(
+            "INSERT INTO messages_fts (rowid, message_id, content) VALUES (?, ?, ?)",
+            (new_rowid, message_id, content)
+        )
         
         self.conn.commit()
         return message_id
@@ -259,6 +274,48 @@ class LobsterDatabase:
         
         return [self._row_to_dict(row, 'messages') for row in rows]
     
+    def remove_messages_from_context(self, conversation_id: str, message_ids: List[str]) -> int:
+        """从 context_items 中移除指定消息（light 去重策略使用）
+        
+        注意：消息本体在 messages 表中永久保留（无损原则），只从上下文视图中移除。
+        
+        Args:
+            conversation_id: 对话 ID
+            message_ids: 要移除的消息 ID 列表
+        
+        Returns:
+            实际移除的条数
+        """
+        if not message_ids:
+            return 0
+        
+        placeholders = ','.join('?' * len(message_ids))
+        self.cursor.execute(f"""
+            DELETE FROM context_items
+            WHERE conversation_id = ?
+              AND item_type = 'message'
+              AND item_id IN ({placeholders})
+        """, [conversation_id] + message_ids)
+        
+        removed_count = self.cursor.rowcount
+        self.conn.commit()
+        return removed_count
+    
+    def get_exempt_message_ids(self, conversation_id: str) -> List[str]:
+        """获取对话中所有 compression_exempt=1 的消息 ID
+        
+        Args:
+            conversation_id: 对话 ID
+        
+        Returns:
+            exempt 消息 ID 列表
+        """
+        self.cursor.execute(
+            "SELECT message_id FROM messages WHERE conversation_id = ? AND compression_exempt = 1",
+            (conversation_id,)
+        )
+        return [row[0] for row in self.cursor.fetchall()]
+    
     # ==================== 摘要操作 ====================
     
     def save_summary(self, summary: Dict) -> str:
@@ -281,6 +338,14 @@ class LobsterDatabase:
         descendant_count = summary.get('descendant_count', 0)
         created_at = datetime.utcnow().isoformat()
         
+        # Bug 1 修复：查询是否已存在
+        self.cursor.execute(
+            "SELECT id FROM summaries WHERE summary_id = ?", (summary_id,)
+        )
+        existing = self.cursor.fetchone()
+        old_rowid = existing[0] if existing else None
+        
+        # 执行 UPSERT
         self.cursor.execute("""
             INSERT OR REPLACE INTO summaries 
             (summary_id, conversation_id, kind, depth, content, token_count, 
@@ -289,11 +354,17 @@ class LobsterDatabase:
         """, (summary_id, conversation_id, kind, depth, content, token_count,
               earliest_at, latest_at, descendant_count, created_at))
         
-        # 更新 FTS 索引
-        self.cursor.execute("""
-            INSERT INTO summaries_fts (rowid, summary_id, content)
-            VALUES (last_insert_rowid(), ?, ?)
-        """, (summary_id, content))
+        new_rowid = self.cursor.lastrowid
+        
+        # 维护 FTS5 索引：先删旧，再插新
+        if old_rowid is not None:
+            self.cursor.execute(
+                "DELETE FROM summaries_fts WHERE rowid = ?", (old_rowid,)
+            )
+        self.cursor.execute(
+            "INSERT INTO summaries_fts (rowid, summary_id, content) VALUES (?, ?, ?)",
+            (new_rowid, summary_id, content)
+        )
         
         # 保存关系
         if kind == 'leaf':
@@ -466,9 +537,8 @@ class LobsterDatabase:
         Returns:
             唯一 ID
         """
-        timestamp = datetime.utcnow().isoformat()
-        random_bytes = hashlib.sha256(timestamp.encode()).hexdigest()[:16]
-        return f"{prefix}_{random_bytes}"
+        # Bug 4 修复：使用 uuid4 避免批量调用时的碰撞
+        return f"{prefix}_{uuid.uuid4().hex[:16]}"
     
     def _extract_content(self, message: Dict) -> str:
         """提取消息内容

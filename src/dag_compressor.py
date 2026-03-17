@@ -5,7 +5,7 @@ LobsterPress DAG Compressor - DAG 压缩器
 借鉴 lossless-claw 的压缩策略
 
 Author: LobsterPress Team
-Version: v2.0.0-alpha
+Version: v2.5.0
 """
 
 import sys
@@ -49,7 +49,7 @@ class DAGCompressor:
     
     # ==================== 叶子压缩 ====================
     
-    def leaf_compact(self, conversation_id: str, max_tokens: int = None) -> Optional[Dict]:
+    def leaf_compact(self, conversation_id: str, max_tokens: int = None, skip_message_ids: List[str] = None) -> Optional[Dict]:
         """叶子压缩：消息 → 叶子摘要
         
         借鉴 lossless-claw 的 leaf pass：
@@ -62,12 +62,15 @@ class DAGCompressor:
         Args:
             conversation_id: 对话 ID
             max_tokens: 最大 token 数（默认 leaf_chunk_tokens）
+            skip_message_ids: 要跳过的消息 ID 列表（Bug 6 修复：支持 compression_exempt）
         
         Returns:
             生成的摘要，如果无需压缩则返回 None
         """
         if max_tokens is None:
             max_tokens = self.leaf_chunk_tokens
+        
+        skip_message_ids = set(skip_message_ids or [])  # Bug 6: 转为 set 提高查询效率
         
         # 1. 获取所有消息
         messages = self.db.get_messages(conversation_id)
@@ -83,10 +86,11 @@ class DAGCompressor:
         # 3. 获取已经被压缩的消息（从 context_items 中排除）
         compressed_message_ids = self._get_compressed_message_ids(conversation_id)
         
-        # 4. 过滤出未被压缩的消息
+        # 4. 过滤出未被压缩且不在 skip_message_ids 中的消息
         uncompressed_messages = [
             m for m in older_messages 
             if m['message_id'] not in compressed_message_ids
+            and m['message_id'] not in skip_message_ids  # Bug 6: 跳过 exempt 消息
         ]
         
         if not uncompressed_messages:
@@ -375,7 +379,7 @@ class DAGCompressor:
     
     # ==================== 完整压缩 ====================
     
-    def full_compact(self, conversation_id: str) -> Dict:
+    def full_compact(self, conversation_id: str, skip_message_ids: List[str] = None) -> Dict:
         """完整压缩（手动触发）
         
         执行完整的压缩流程：
@@ -384,12 +388,17 @@ class DAGCompressor:
         
         Args:
             conversation_id: 对话 ID
+            skip_message_ids: 要跳过的消息 ID 列表（Bug 6 修复：支持 compression_exempt）
         
         Returns:
             压缩统计
         """
+        skip_message_ids = skip_message_ids or []
+        
         print(f"\n{'=' * 60}")
         print(f"  🦞 完整压缩: {conversation_id}")
+        if skip_message_ids:
+            print(f"  🚫 跳过 {len(skip_message_ids)} 条 exempt 消息")
         print(f"{'=' * 60}\n")
         
         stats = {
@@ -404,7 +413,7 @@ class DAGCompressor:
         print("-" * 60)
         
         while True:
-            leaf = self.leaf_compact(conversation_id)
+            leaf = self.leaf_compact(conversation_id, skip_message_ids)
             
             if not leaf:
                 break

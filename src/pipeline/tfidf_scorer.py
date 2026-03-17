@@ -173,6 +173,36 @@ class TFIDFScorer:
         
         return idf
     
+    def _cosine_similarity(self, tokens1: List[str], tokens2: List[str]) -> float:
+        """计算两组 token 的余弦相似度（缺陷 2 修复）
+        
+        Args:
+            tokens1: 第一组 token
+            tokens2: 第二组 token
+        
+        Returns:
+            余弦相似度（0.0 - 1.0）
+        """
+        if not tokens1 or not tokens2:
+            return 0.0
+        
+        # 构建 TF 向量
+        tf1 = Counter(tokens1)
+        tf2 = Counter(tokens2)
+        
+        # 找到所有词
+        all_terms = set(tf1.keys()) | set(tf2.keys())
+        
+        # 计算点积和模长
+        dot_product = sum(tf1.get(term, 0) * tf2.get(term, 0) for term in all_terms)
+        norm1 = math.sqrt(sum(v ** 2 for v in tf1.values()))
+        norm2 = math.sqrt(sum(v ** 2 for v in tf2.values()))
+        
+        if norm1 == 0 or norm2 == 0:
+            return 0.0
+        
+        return dot_product / (norm1 * norm2)
+    
     def score_and_tag(self, messages: List[Dict]) -> List[ScoredMessage]:
         """批量评分并打标签（v2.5.0 核心接口）
         
@@ -184,8 +214,8 @@ class TFIDFScorer:
         Returns:
             ScoredMessage 列表，含 msg_type 和 compression_exempt
         """
-        # 先构建语料库并计算 IDF
-        self.corpus_tokens = []
+        # 缺陷 1 修复：使用局部变量，确保线程安全
+        corpus_tokens = []
         for msg in messages:
             content = msg.get("content", "")
             if isinstance(content, list):
@@ -197,9 +227,9 @@ class TFIDFScorer:
                 content = ' '.join(texts)
             
             tokens = self.tokenize(str(content))
-            self.corpus_tokens.append(tokens)
+            corpus_tokens.append(tokens)
         
-        self.idf_cache = self.compute_idf(self.corpus_tokens)
+        idf_cache = self.compute_idf(corpus_tokens)
         
         # 逐条评分
         results = []
@@ -221,12 +251,12 @@ class TFIDFScorer:
             ts = parse_timestamp(timestamp)
             
             # 分词
-            tokens = self.corpus_tokens[i]
+            tokens = corpus_tokens[i]
             
             # Layer 1: TF-IDF 基础分
             tfidf_score = 0.0
-            if tokens and self.idf_cache:
-                idf_values = [self.idf_cache.get(t, 1.0) for t in tokens]
+            if tokens and idf_cache:
+                idf_values = [idf_cache.get(t, 1.0) for t in tokens]
                 tfidf_score = sum(idf_values) / len(idf_values) * 10
             
             # Layer 2: 结构性信号加成
@@ -312,7 +342,7 @@ class TFIDFScorer:
         if re.search(r'error|exception|bug|报错|失败', content_lower):
             return "error"
         
-        if re.search(r'config|host|port|key|secret|配置|设置', content_lower):
+        if re.search(r'config|host|port|\bkey\b|\bsecret\b|配置|设置', content_lower):
             return "config"
         
         if re.search(r'```|`[^`]+`|function|def |class ', content_lower):
