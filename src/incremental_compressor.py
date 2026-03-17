@@ -60,7 +60,8 @@ class IncrementalCompressor:
         self.compressor = DAGCompressor(
             db, 
             fresh_tail_count=fresh_tail_count,
-            leaf_chunk_tokens=leaf_chunk_tokens
+            leaf_chunk_tokens=leaf_chunk_tokens,
+            llm_client=llm_client  # v3.1.0: 传递 LLM 客户端
         )
         self.context_threshold = context_threshold
         self.max_context_tokens = max_context_tokens  # 缺陷 3 修复：可配置的上下文上限
