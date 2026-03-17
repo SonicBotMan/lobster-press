@@ -52,6 +52,9 @@ def lobster_grep(db: LobsterDatabase,
     # v2.5.0: 初始化 TF-IDF 评分器
     scorer = TFIDFScorer() if use_tfidf_rerank else None
     
+    # 缺陷 2 修复：计算查询的 TF 向量
+    query_tokens = scorer.tokenize(query) if scorer else []
+    
     # 搜索消息
     if search_messages:
         messages = db.search_messages(query, limit * 2)  # 多获取一些，然后过滤
@@ -60,10 +63,24 @@ def lobster_grep(db: LobsterDatabase,
         if conversation_id:
             messages = [m for m in messages if m.get('conversation_id') == conversation_id]
         
-        for msg in messages[:limit]:
-            # v2.5.0: 获取 TF-IDF 分数
-            tfidf_score = msg.get('tfidf_score', 0.0)
-            relevance = 1.0 + (tfidf_score / 100.0)  # 结合 FTS5 rank 和 TF-IDF
+        for rank_pos, msg in enumerate(messages[:limit], 1):
+            # 缺陷 2 修复：实际计算查询与结果的余弦相似度
+            query_relevance = 0.0
+            if scorer and query_tokens:
+                content_tokens = scorer.tokenize(msg['content'])
+                if content_tokens:
+                    query_relevance = scorer._cosine_similarity(query_tokens, content_tokens)
+            
+            # v2.5.0: 结合 FTS5 rank、存储的 tfidf_score 和查询相关性
+            # combined_score = 0.6 * tfidf_score + 0.4 * (1.0 / rank_position)
+            # 缺陷 2 修复：增加查询相关性的权重
+            stored_tfidf = msg.get('tfidf_score', 0.0)
+            rank_score = 1.0 / rank_position
+            
+            if use_tfidf_rerank:
+                relevance = 0.4 * (stored_tfidf / 100.0) + 0.3 * rank_score + 0.3 * query_relevance
+            else:
+                relevance = rank_score
             
             results.append({
                 'type': 'message',
@@ -72,8 +89,9 @@ def lobster_grep(db: LobsterDatabase,
                 'role': msg.get('role', 'unknown'),
                 'content': msg['content'][:200] + ('...' if len(msg['content']) > 200 else ''),
                 'timestamp': msg.get('created_at', ''),
-                'relevance': round(relevance, 2),
-                'tfidf_score': round(tfidf_score, 2),
+                'relevance': round(relevance, 3),
+                'tfidf_score': round(stored_tfidf, 2),
+                'query_relevance': round(query_relevance, 3),
                 'msg_type': msg.get('msg_type', 'unknown')
             })
     
@@ -85,7 +103,17 @@ def lobster_grep(db: LobsterDatabase,
         if conversation_id:
             summaries = [s for s in summaries if s.get('conversation_id') == conversation_id]
         
-        for summary in summaries[:limit]:
+        for rank_pos, summary in enumerate(summaries[:limit], 1):
+            # 缺陷 2 修复：计算查询与摘要的余弦相似度
+            query_relevance = 0.0
+            if scorer and query_tokens:
+                content_tokens = scorer.tokenize(summary['content'])
+                if content_tokens:
+                    query_relevance = scorer._cosine_similarity(query_tokens, content_tokens)
+            
+            rank_score = 1.0 / rank_pos
+            relevance = (0.7 * rank_score + 0.3 * query_relevance) if use_tfidf_rerank else rank_score
+            
             results.append({
                 'type': 'summary',
                 'id': summary['summary_id'],
@@ -94,8 +122,9 @@ def lobster_grep(db: LobsterDatabase,
                 'depth': summary['depth'],
                 'content': summary['content'][:200] + ('...' if len(summary['content']) > 200 else ''),
                 'descendant_count': summary.get('descendant_count', 0),
-                'relevance': 1.0,
+                'relevance': round(relevance, 3),
                 'tfidf_score': 0.0,
+                'query_relevance': round(query_relevance, 3),
                 'msg_type': 'summary'
             })
     

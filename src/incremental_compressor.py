@@ -5,7 +5,7 @@ LobsterPress 增量压缩管理器
 借鉴 lossless-claw 的增量压缩机制
 
 Author: LobsterPress Team
-Version: v2.0.0-alpha
+Version: v2.5.0
 """
 
 import sys
@@ -35,7 +35,8 @@ class IncrementalCompressor:
                  db: LobsterDatabase,
                  context_threshold: float = 0.75,
                  fresh_tail_count: int = 32,
-                 leaf_chunk_tokens: int = 20000):
+                 leaf_chunk_tokens: int = 20000,
+                 max_context_tokens: int = 128_000):
         """初始化增量压缩管理器
         
         Args:
@@ -43,6 +44,7 @@ class IncrementalCompressor:
             context_threshold: 上下文使用率阈值（默认 75%）
             fresh_tail_count: Fresh tail 消息数（默认 32）
             leaf_chunk_tokens: 叶子压缩 token 阈值（默认 20000）
+            max_context_tokens: 最大上下文 token 数（默认 128K，Claude 用户可设置为 200_000，Gemini 用户可设置为 1_000_000）
         """
         self.db = db
         self.compressor = DAGCompressor(
@@ -51,6 +53,7 @@ class IncrementalCompressor:
             leaf_chunk_tokens=leaf_chunk_tokens
         )
         self.context_threshold = context_threshold
+        self.max_context_tokens = max_context_tokens  # 缺陷 3 修复：可配置的上下文上限
         
         # v2.5.0: 初始化 pipeline 模块
         self.tfidf_scorer = TFIDFScorer()
@@ -63,30 +66,6 @@ class IncrementalCompressor:
             'total_tokens_saved': 0,
             'last_compression': None
         }
-    
-    def _add_to_context(self, conversation_id: str, message_id: str):
-        """添加消息到上下文
-        
-        Args:
-            conversation_id: 对话 ID
-            message_id: 消息 ID
-        """
-        # 获取当前最大的 ordinal
-        self.db.cursor.execute("""
-            SELECT MAX(ordinal) FROM context_items
-            WHERE conversation_id = ?
-        """, (conversation_id,))
-        
-        result = self.db.cursor.fetchone()
-        max_ordinal = result[0] if result and result[0] is not None else 0
-        
-        # 添加新消息到上下文
-        self.db.cursor.execute("""
-            INSERT INTO context_items (conversation_id, ordinal, item_type, item_id)
-            VALUES (?, ?, ?, ?)
-        """, (conversation_id, max_ordinal + 1, 'message', message_id))
-        
-        self.db.conn.commit()
     
     def on_new_message(self, 
                        conversation_id: str,
@@ -178,21 +157,32 @@ class IncrementalCompressor:
             scored_list = self.tfidf_scorer.score_and_tag(messages)
             
             # 去重
-            kept, removed = self.deduplicator.deduplicate(scored_list)
+            kept, removed_ids = self.deduplicator.deduplicate(scored_list)
             
-            if removed:
-                print(f"🔄 去重: 删除 {len(removed)} 条重复消息")
-                stats['messages_compressed'] = len(removed)
-                stats['removed_ids'] = removed
-                
-                # TODO: 实际删除消息（需要更新数据库）
+            if removed_ids:
+                # Bug 3 修复：实际从上下文中移除（消息本体保留，符合无损原则）
+                actual_removed = self.db.remove_messages_from_context(
+                    conversation_id, removed_ids
+                )
+                print(f"🔄 light 去重: 从上下文移除 {actual_removed} 条重复消息（原文永久保留）")
+                stats['messages_compressed'] = actual_removed
+                stats['removed_ids'] = removed_ids
+            else:
+                print("✅ 无重复消息，上下文已是最优")
             
             return stats
         
         else:
             # >75% DAG 压缩
-            # 执行完整压缩
-            dag_stats = self.compressor.full_compact(conversation_id)
+            # Bug 6 修复：查询所有 compression_exempt=1 的消息
+            self.db.cursor.execute("""
+                SELECT message_id FROM messages 
+                WHERE conversation_id = ? AND compression_exempt = 1
+            """, (conversation_id,))
+            exempt_ids = [row[0] for row in self.db.cursor.fetchall()]
+            
+            # 执行完整压缩（跳过 exempt 消息）
+            dag_stats = self.compressor.full_compact(conversation_id, skip_message_ids=exempt_ids)
             
             # 更新统计
             self.stats['total_compressions'] += 1
@@ -264,10 +254,8 @@ class IncrementalCompressor:
             elif item['type'] == 'summary':
                 total_tokens += item.get('token_count', 0)
         
-        # 假设最大上下文为 128K tokens
-        max_tokens = 128 * 1024
-        
-        return min(total_tokens / max_tokens, 1.0)
+        # 缺陷 3 修复：使用配置的上下文上限（支持 Claude 200K / Gemini 1M）
+        return min(total_tokens / self.max_context_tokens, 1.0)
     
     def _add_to_context(self, conversation_id: str, message_id: str):
         """添加消息到上下文
