@@ -1,0 +1,353 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+LobsterPress 增量压缩管理器
+借鉴 lossless-claw 的增量压缩机制
+
+Author: LobsterPress Team
+Version: v2.0.0-alpha
+"""
+
+import sys
+from pathlib import Path
+from typing import Dict, Optional
+from datetime import datetime
+
+# 添加 database 模块
+sys.path.insert(0, str(Path(__file__).parent))
+from database import LobsterDatabase
+from dag_compressor import DAGCompressor
+
+
+class IncrementalCompressor:
+    """增量压缩管理器
+    
+    借鉴 lossless-claw 的增量压缩机制：
+    - 自动监控上下文使用率
+    - 智能触发压缩（75% 阈值）
+    - 只压缩新增内容
+    - 支持多对话管理
+    """
+    
+    def __init__(self, 
+                 db: LobsterDatabase,
+                 context_threshold: float = 0.75,
+                 fresh_tail_count: int = 32,
+                 leaf_chunk_tokens: int = 20000):
+        """初始化增量压缩管理器
+        
+        Args:
+            db: LobsterDatabase 实例
+            context_threshold: 上下文使用率阈值（默认 75%）
+            fresh_tail_count: Fresh tail 消息数（默认 32）
+            leaf_chunk_tokens: 叶子压缩 token 阈值（默认 20000）
+        """
+        self.db = db
+        self.compressor = DAGCompressor(
+            db, 
+            fresh_tail_count=fresh_tail_count,
+            leaf_chunk_tokens=leaf_chunk_tokens
+        )
+        self.context_threshold = context_threshold
+        
+        # 压缩统计
+        self.stats = {
+            'total_compressions': 0,
+            'total_messages_compressed': 0,
+            'total_tokens_saved': 0,
+            'last_compression': None
+        }
+    
+    def _add_to_context(self, conversation_id: str, message_id: str):
+        """添加消息到上下文
+        
+        Args:
+            conversation_id: 对话 ID
+            message_id: 消息 ID
+        """
+        # 获取当前最大的 ordinal
+        self.db.cursor.execute("""
+            SELECT MAX(ordinal) FROM context_items
+            WHERE conversation_id = ?
+        """, (conversation_id,))
+        
+        result = self.db.cursor.fetchone()
+        max_ordinal = result[0] if result and result[0] is not None else 0
+        
+        # 添加新消息到上下文
+        self.db.cursor.execute("""
+            INSERT INTO context_items (conversation_id, ordinal, item_type, item_id)
+            VALUES (?, ?, ?, ?)
+        """, (conversation_id, max_ordinal + 1, 'message', message_id))
+        
+        self.db.conn.commit()
+    
+    def on_new_message(self, 
+                       conversation_id: str,
+                       message: Dict,
+                       auto_compress: bool = True) -> Optional[Dict]:
+        """新消息到达时的处理
+        
+        这是增量压缩的核心入口：
+        1. 保存新消息
+        2. 更新上下文
+        3. 检查是否需要压缩
+        4. 如果需要，执行压缩
+        
+        Args:
+            conversation_id: 对话 ID
+            message: 新消息
+            auto_compress: 是否自动压缩
+        
+        Returns:
+            压缩统计（如果触发了压缩），否则返回 None
+        """
+        # 1. 保存消息
+        self.db.save_message(message)
+        
+        # 2. 更新上下文（支持 id 或 message_id 字段）
+        msg_id = message.get('message_id') or message.get('id')
+        if msg_id:
+            self._add_to_context(conversation_id, msg_id)
+        
+        # 3. 检查是否需要压缩
+        if auto_compress and self._should_compress(conversation_id):
+            return self.compress(conversation_id)
+        
+        return None
+    
+    def compress(self, conversation_id: str) -> Dict:
+        """执行压缩
+        
+        执行完整的压缩流程：
+        1. 叶子压缩（压缩老消息）
+        2. 压缩摘要（合并摘要）
+        3. 更新统计
+        
+        Args:
+            conversation_id: 对话 ID
+        
+        Returns:
+            压缩统计
+        """
+        print(f"\n{'=' * 60}")
+        print(f"  🦞 增量压缩: {conversation_id}")
+        print(f"{'=' * 60}\n")
+        
+        # 执行完整压缩
+        stats = self.compressor.full_compact(conversation_id)
+        
+        # 更新全局统计
+        self.stats['total_compressions'] += 1
+        self.stats['total_messages_compressed'] += stats['messages_compressed']
+        self.stats['total_tokens_saved'] += stats.get('tokens_saved', 0)
+        self.stats['last_compression'] = datetime.utcnow().isoformat()
+        
+        return stats
+    
+    def _should_compress(self, conversation_id: str) -> bool:
+        """检查是否需要压缩
+        
+        借鉴 lossless-claw 的智能触发机制：
+        - 计算上下文使用率
+        - 如果超过阈值，返回 True
+        - 否则返回 False
+        
+        Args:
+            conversation_id: 对话 ID
+        
+        Returns:
+            是否需要压缩
+        """
+        # 获取上下文使用率
+        usage_ratio = self._get_context_usage(conversation_id)
+        
+        if usage_ratio >= self.context_threshold:
+            print(f"\n⚡ 触发压缩: 上下文使用率 {usage_ratio:.1%} >= {self.context_threshold:.0%}")
+            return True
+        
+        return False
+    
+    def _get_context_usage(self, conversation_id: str) -> float:
+        """计算上下文使用率
+        
+        Args:
+            conversation_id: 对话 ID
+        
+        Returns:
+            上下文使用率（0.0 - 1.0）
+        """
+        # 获取上下文项
+        context_items = self.compressor.get_context_items(conversation_id)
+        
+        if not context_items:
+            return 0.0
+        
+        # 计算总 tokens
+        total_tokens = 0
+        for item in context_items:
+            if item['type'] == 'message':
+                total_tokens += item.get('token_count', 0)
+            elif item['type'] == 'summary':
+                total_tokens += item.get('token_count', 0)
+        
+        # 假设最大上下文为 128K tokens
+        max_tokens = 128 * 1024
+        
+        return min(total_tokens / max_tokens, 1.0)
+    
+    def _add_to_context(self, conversation_id: str, message_id: str):
+        """添加消息到上下文
+        
+        Args:
+            conversation_id: 对话 ID
+            message_id: 消息 ID
+        """
+        # 获取当前最大的 ordinal
+        self.db.cursor.execute("""
+            SELECT MAX(ordinal) FROM context_items
+            WHERE conversation_id = ?
+        """, (conversation_id,))
+        
+        result = self.db.cursor.fetchone()
+        max_ordinal = result[0] if result and result[0] is not None else 0
+        
+        # 添加新消息到上下文
+        self.db.cursor.execute("""
+            INSERT INTO context_items (conversation_id, ordinal, item_type, item_id)
+            VALUES (?, ?, ?, ?)
+        """, (conversation_id, max_ordinal + 1, 'message', message_id))
+        
+        self.db.conn.commit()
+    
+    def get_stats(self) -> Dict:
+        """获取压缩统计
+        
+        Returns:
+            压缩统计
+        """
+        return {
+            **self.stats,
+            'context_threshold': self.context_threshold,
+            'fresh_tail_count': self.compressor.fresh_tail_count,
+            'leaf_chunk_tokens': self.compressor.leaf_chunk_tokens
+        }
+    
+    def monitor(self, conversation_id: str) -> Dict:
+        """监控对话状态
+        
+        Args:
+            conversation_id: 对话 ID
+        
+        Returns:
+            对话状态
+        """
+        # 获取消息统计
+        messages = self.db.get_messages(conversation_id)
+        
+        # 获取摘要统计
+        summaries = self.db.get_summaries(conversation_id)
+        
+        # 获取上下文使用率
+        usage_ratio = self._get_context_usage(conversation_id)
+        
+        # 按 depth 分组摘要
+        by_depth = {}
+        for summary in summaries:
+            depth = summary['depth']
+            if depth not in by_depth:
+                by_depth[depth] = 0
+            by_depth[depth] += 1
+        
+        return {
+            'conversation_id': conversation_id,
+            'total_messages': len(messages),
+            'total_summaries': len(summaries),
+            'context_usage': usage_ratio,
+            'context_threshold': self.context_threshold,
+            'needs_compression': usage_ratio >= self.context_threshold,
+            'summaries_by_depth': by_depth
+        }
+
+
+# ==================== 测试代码 ====================
+
+if __name__ == "__main__":
+    # 强制删除旧的测试数据库
+    import os
+    if os.path.exists("test_incremental.db"):
+        os.remove("test_incremental.db")
+        print("🗑️ 删除旧的测试数据库\n")
+    
+    # 初始化
+    db = LobsterDatabase("test_incremental.db")
+    manager = IncrementalCompressor(
+        db,
+        context_threshold=0.001,  # 测试用，设置很低的阈值
+        fresh_tail_count=5,
+        leaf_chunk_tokens=500
+    )
+    
+    print("=" * 60)
+    print("  🧪 增量压缩测试")
+    print("=" * 60)
+    
+    # 创建测试对话
+    conversation_id = "conv_incremental"
+    
+    # 测试 1: 逐步添加消息，观察自动压缩
+    print("\n📝 测试 1: 逐步添加消息（自动压缩）\n")
+    
+    for i in range(1, 31):
+        content = f'这是第 {i} 条消息，讨论了技术话题 {i % 10}。'
+        msg = {
+            'id': f'msg_{i:03d}',
+            'conversationId': conversation_id,
+            'seq': i,
+            'role': 'user' if i % 2 == 0 else 'assistant',
+            'content': content * 5,
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        # 添加消息（自动压缩）
+        result = manager.on_new_message(conversation_id, msg, auto_compress=True)
+        
+        if result:
+            print(f"\n✅ 消息 {i}: 触发压缩")
+            print(f"   - 叶子摘要: {result['leaf_summaries']} 个")
+            print(f"   - 压缩消息: {result['messages_compressed']} 条")
+        else:
+            if i % 10 == 0:
+                print(f"   消息 {i}: 上下文正常")
+    
+    # 测试 2: 查看监控状态
+    print("\n" + "=" * 60)
+    print("  📊 监控状态")
+    print("=" * 60)
+    
+    status = manager.monitor(conversation_id)
+    print(f"\n对话 ID: {status['conversation_id']}")
+    print(f"总消息数: {status['total_messages']}")
+    print(f"总摘要数: {status['total_summaries']}")
+    print(f"上下文使用率: {status['context_usage']:.2%}")
+    print(f"上下文阈值: {status['context_threshold']:.0%}")
+    print(f"需要压缩: {'是' if status['needs_compression'] else '否'}")
+    print(f"\n摘要分布:")
+    for depth, count in sorted(status['summaries_by_depth'].items()):
+        print(f"  Depth {depth}: {count} 个")
+    
+    # 测试 3: 查看压缩统计
+    print("\n" + "=" * 60)
+    print("  📈 压缩统计")
+    print("=" * 60)
+    
+    stats = manager.get_stats()
+    print(f"\n总压缩次数: {stats['total_compressions']}")
+    print(f"总压缩消息: {stats['total_messages_compressed']} 条")
+    print(f"最后压缩时间: {stats['last_compression']}")
+    
+    # 清理
+    db.close()
+    os.remove("test_incremental.db")
+    print(f"\n🗑️ 清理测试数据库")
+    print(f"\n✅ 测试完成")
