@@ -1,6 +1,9 @@
 <div align="center">
 
+<!-- 
+TODO: 添加项目 banner 图片
 <img src="https://raw.githubusercontent.com/SonicBotMan/lobster-press/master/docs/images/banner.jpg" alt="LobsterPress - 无损记忆系统" width="800">
+-->
 
 </div>
 
