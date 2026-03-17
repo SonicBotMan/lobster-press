@@ -745,6 +745,85 @@ class LobsterDatabase:
         
         return result
     
+    # ==================== 辅助方法（用于测试） ====================
+    
+    def create_conversation(self, metadata: Dict = None) -> str:
+        """创建新对话
+        
+        Args:
+            metadata: 可选的对话元数据
+        
+        Returns:
+            conversation_id
+        """
+        conversation_id = self._generate_id('conv')
+        created_at = datetime.utcnow().isoformat()
+        
+        # 插入对话记录
+        self.cursor.execute("""
+            INSERT OR IGNORE INTO conversations (conversation_id, created_at, updated_at, metadata)
+            VALUES (?, ?, ?, ?)
+        """, (conversation_id, created_at, created_at, json.dumps(metadata or {})))
+        
+        return conversation_id
+    
+    def add_message(self, conversation_id: str, role: str, content: str) -> str:
+        """添加消息到对话
+        
+        Args:
+            conversation_id: 对话 ID
+            role: 角色 (user/assistant)
+            content: 消息内容
+        
+        Returns:
+            message_id
+        """
+        message_id = self._generate_id('msg')
+        
+        # 使用 save_message 方法
+        message = {
+            'id': message_id,
+            'conversationId': conversation_id,
+            'role': role,
+            'content': content,
+            'seq': self._get_next_seq(conversation_id)
+        }
+        
+        self.save_message(message)
+        return message_id
+    
+    def _get_next_seq(self, conversation_id: str) -> int:
+        """获取对话的下一个序号"""
+        self.cursor.execute(
+            "SELECT COALESCE(MAX(seq), 0) + 1 FROM messages WHERE conversation_id = ?",
+            (conversation_id,)
+        )
+        result = self.cursor.fetchone()
+        return result[0] if result else 0
+    
+    def get_conversation_stats(self, conversation_id: str) -> Optional[Dict]:
+        """获取对话统计信息
+        
+        Args:
+            conversation_id: 对话 ID
+        
+        Returns:
+            包含 message_count, total_tokens 的字典
+        """
+        self.cursor.execute(
+            "SELECT COUNT(*) as message_count, SUM(token_count) as total_tokens "
+            "FROM messages WHERE conversation_id = ?",
+            (conversation_id,)
+        )
+        result = self.cursor.fetchone()
+        
+        if result:
+            return {
+                "message_count": result[0],
+                "total_tokens": result[1] or 0
+            }
+        return None
+    
     def close(self):
         """关闭数据库连接"""
         if self.conn:
