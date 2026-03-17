@@ -1,18 +1,18 @@
 <div align="center">
 
-# 🧠 LobsterPress v3.2
+# 🧠 LobsterPress v1.0
 
 **Cognitive Memory System for AI Agents**  
 *基于认知科学的 LLM 永久记忆引擎*
 
-[![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press/releases)
+[![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![GitHub stars](https://img.shields.io/github/stars/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![GitHub license](https://img.shields.io/github/license/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v3.2.1](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.2.1) · [更新日志](CHANGELOG.md)
+**最新版本**: v1.0.0 · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -30,7 +30,7 @@
 
 ## 💡 Our Solution: 认知记忆系统
 
-LobsterPress v3.0 是**首个基于认知科学论文实现的开源 LLM 记忆系统**，融合三大前沿研究：
+LobsterPress v3.0 是基于认知科学论文实现的 LLM 记忆系统，融合三大前沿研究：
 
 ### 📚 学术基础
 
@@ -186,7 +186,7 @@ CREATE TABLE notes (
   - 基于否定词 + 关键词共现
   - 模式: `不(用|要|采用)`, `改(用|为|成)`, `放弃|弃用|替换`
 
-**学术意义**: 首次将**记忆重巩固**理论应用于 LLM 记忆管理，实现知识的动态演进。
+**学术意义**: 将**记忆重巩固**理论应用于 LLM 记忆管理，实现知识的动态演进。
 
 ---
 
@@ -235,17 +235,19 @@ CREATE TABLE notes (
 
 | 维度 | LangChain Memory | Mem0 | Letta | LobsterPress v3.0 |
 |------|------------------|------|-------|-------------------|
-| 无损压缩 | ❌ | ❌ | ✅ | ✅ |
-| 遗忘曲线 | ❌ | ❌ | ❌ | ✅ Ebbinghaus |
-| 事件分割 | ❌ | ❌ | ❌ | ✅ EM-LLM ICLR 2025 |
-| 语义记忆 | ❌ | ❌ | ❌ | ✅ |
-| 矛盾检测 | ❌ | ❌ | ❌ | ✅ NLI + Memory Reconsolidation |
-| 动态评分 | ❌ | ❌ | ❌ | ✅ Time-decay scoring |
+| 无损压缩 | 滑动窗口 | 滑动窗口 | DAG 压缩 | DAG 压缩 |
+| 遗忘曲线 | 无 | 无 | 无 | Ebbinghaus 动态衰减 |
+| 事件分割 | 无 | 无 | 无 | EM-LLM ICLR 2025 |
+| 语义记忆 | 无 | 向量检索 | 向量检索 | 结构化 notes 表 |
+| 矛盾检测 | 无 | 无 | 无 | NLI + Memory Reconsolidation |
+| 动态评分 | 无 | 无 | 无 | Time-decay scoring |
+
+> 注：以上对比基于各项目文档（截至 2026-03），如有更新请提 Issue 纠正。
 
 **学术贡献**:
-1. **首次**将 Ebbinghaus 遗忘曲线应用于 LLM 记忆管理
-2. **首次**实现基于 EM-LLM 论文的事件分割机制
-3. **首次**将 Memory Reconsolidation 理论应用于知识更新
+1. 将 Ebbinghaus 遗忘曲线应用于 LLM 记忆管理
+2. 实现基于 EM-LLM 论文的事件分割机制
+3. 将 Memory Reconsolidation 理论应用于知识更新
 
 ---
 
@@ -492,10 +494,25 @@ src/
 
 | 版本 | 日期 | 学术基础 | 核心特性 |
 |------|------|----------|----------|
-| **v3.0.0** ⭐ | 2026-03-17 | Memory Reconsolidation, NLI | 语义记忆层 + 矛盾检测 |
-| v2.6.0 | 2026-03-17 | EM-LLM ICLR 2025, Ebbinghaus | 遗忘曲线 + 事件分割 |
-| v2.5.0 | 2026-03-17 | TF-IDF, Semantic Dedup | 三层压缩 + BatchImporter |
-| v2.0.0-alpha | 2026-03-15 | DAG Compression | 无损架构 + FTS5 搜索 |
+| **v1.0.0** ⭐ | 2026-03-17 | 初始发布 | DAG 压缩 + TF-IDF + 事件分割 + 语义记忆 |
+
+<details>
+<summary>查看历史版本详情</summary>
+
+### v1.0.0 (2026-03-17)
+- ✅ DAG 无损压缩架构
+- ✅ TF-IDF 评分 + 消息类型分类
+- ✅ 三层压缩策略（none/light/aggressive）
+- ✅ FTS5 全文搜索
+- ✅ 事件分割（EM-LLM）
+- ✅ 遗忘曲线动态评分
+- ✅ 语义记忆层（notes 表）
+- ✅ 矛盾检测与记忆重巩固
+
+### 开发历程
+项目从 2026-03-15 开始开发，经过多次迭代完成当前功能集。
+
+</details>
 
 ---
 
