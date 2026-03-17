@@ -35,7 +35,7 @@ adaptive-learning/
 
 # 测试文件
 test/
-tests/
+# tests/  # Allow integration tests
 *.test.sh
 
 # 文档生成

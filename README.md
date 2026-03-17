@@ -25,7 +25,7 @@ TODO: 添加项目 banner 图片
 
 *从龙虾般膨胀的上下文，到可追溯的 DAG 记忆*
 
-**最新版本**: [v2.0.0-alpha](https://github.com/SonicBotMan/lobster-press/releases/tag/v2.0.0-alpha) - 2026-03-17
+**最新版本**: [v2.5.0](https://github.com/SonicBotMan/lobster-press/releases) - 2026-03-17
 **更新内容**: [RELEASE_NOTES.md](RELEASE_NOTES.md)
 
 </div>
