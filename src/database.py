@@ -11,6 +11,7 @@ Version: v2.5.0
 import sqlite3
 import json
 import hashlib
+import uuid
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime
@@ -300,6 +301,21 @@ class LobsterDatabase:
         self.conn.commit()
         return removed_count
     
+    def get_exempt_message_ids(self, conversation_id: str) -> List[str]:
+        """获取对话中所有 compression_exempt=1 的消息 ID
+        
+        Args:
+            conversation_id: 对话 ID
+        
+        Returns:
+            exempt 消息 ID 列表
+        """
+        self.cursor.execute(
+            "SELECT message_id FROM messages WHERE conversation_id = ? AND compression_exempt = 1",
+            (conversation_id,)
+        )
+        return [row[0] for row in self.cursor.fetchall()]
+    
     # ==================== 摘要操作 ====================
     
     def save_summary(self, summary: Dict) -> str:
@@ -522,7 +538,6 @@ class LobsterDatabase:
             唯一 ID
         """
         # Bug 4 修复：使用 uuid4 避免批量调用时的碰撞
-        import uuid
         return f"{prefix}_{uuid.uuid4().hex[:16]}"
     
     def _extract_content(self, message: Dict) -> str:

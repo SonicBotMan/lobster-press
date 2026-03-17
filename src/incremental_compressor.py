@@ -174,12 +174,8 @@ class IncrementalCompressor:
         
         else:
             # >75% DAG 压缩
-            # Bug 6 修复：查询所有 compression_exempt=1 的消息
-            self.db.cursor.execute("""
-                SELECT message_id FROM messages 
-                WHERE conversation_id = ? AND compression_exempt = 1
-            """, (conversation_id,))
-            exempt_ids = [row[0] for row in self.db.cursor.fetchall()]
+            # Bug 6 修复 + 设计改进：使用封装方法查询 exempt 消息
+            exempt_ids = self.db.get_exempt_message_ids(conversation_id)
             
             # 执行完整压缩（跳过 exempt 消息）
             dag_stats = self.compressor.full_compact(conversation_id, skip_message_ids=exempt_ids)

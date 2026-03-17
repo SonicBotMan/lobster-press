@@ -75,7 +75,7 @@ def lobster_grep(db: LobsterDatabase,
             # combined_score = 0.6 * tfidf_score + 0.4 * (1.0 / rank_position)
             # 缺陷 2 修复：增加查询相关性的权重
             stored_tfidf = msg.get('tfidf_score', 0.0)
-            rank_score = 1.0 / rank_position
+            rank_score = 1.0 / rank_pos  # 审查修复：使用 rank_pos 而非 rank_position
             
             if use_tfidf_rerank:
                 relevance = 0.4 * (stored_tfidf / 100.0) + 0.3 * rank_score + 0.3 * query_relevance
