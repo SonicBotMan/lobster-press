@@ -132,9 +132,11 @@ Action:
 - **NLI Model Detection** (Recommended): `cross-encoder/nli-deberta-v3-small`
   - High precision (conflict threshold 0.85)
   - Requires GPU or substantial memory
+  - Install: `pip install sentence-transformers`
 - **Rule-based Fallback Detection** (Backup): Zero dependency
   - Based on negation words + keyword co-occurrence
   - Patterns: `not (using|want|adopt)`, `switch (to|from)`, `abandon|deprecate|replace`
+  - Automatically falls back when `sentence-transformers` is not installed
 
 **Academic Significance**: Application of **Memory Reconsolidation** theory to LLM memory management, achieving dynamic knowledge evolution.
 

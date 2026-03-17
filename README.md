@@ -184,9 +184,11 @@ CREATE TABLE notes (
 - **NLI 模型检测**（推荐）: `cross-encoder/nli-deberta-v3-small`
   - 精度高（冲突阈值 0.85）
   - 需要 GPU 或大量内存
+  - 安装: `pip install sentence-transformers`
 - **规则降级检测**（备选）: 零依赖
   - 基于否定词 + 关键词共现
   - 模式: `不(用|要|采用)`, `改(用|为|成)`, `放弃|弃用|替换`
+  - 未安装 `sentence-transformers` 时自动降级
 
 **学术意义**: 将**记忆重巩固**理论应用于 LLM 记忆管理，实现知识的动态演进。
 
