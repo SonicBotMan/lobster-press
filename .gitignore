@@ -78,3 +78,4 @@ build/
 *.egg-info/
 *.egg
 .eggs/
+.venv/
