@@ -35,21 +35,25 @@ class DAGCompressor:
                  db: LobsterDatabase,
                  fresh_tail_count: int = 32,
                  leaf_chunk_tokens: int = 20000,
-                 condensed_min_fanout: int = 4):
+                 condensed_min_fanout: int = 4,
+                 llm_client=None):  # v3.1.0: LLM 客户端
         """初始化 DAG 压缩器
         
         v2.6.0 更新：添加 EventSegmenter 用于情节边界分割
+        v3.1.0 更新：添加 llm_client 支持真正的 LLM 摘要
         
         Args:
             db: LobsterDatabase 实例
             fresh_tail_count: 最近 N 条消息不压缩（默认 32）
             leaf_chunk_tokens: 叶子压缩的 token 阈值（默认 20000）
             condensed_min_fanout: 压缩摘要的最小子节点数（默认 4）
+            llm_client: LLM 客户端（可选，用于高质量摘要生成）
         """
         self.db = db
         self.fresh_tail_count = fresh_tail_count
         self.leaf_chunk_tokens = leaf_chunk_tokens
         self.condensed_min_fanout = condensed_min_fanout
+        self.llm_client = llm_client  # v3.1.0
         
         # v2.6.0: 初始化情节分割器
         self.segmenter = EventSegmenter(
@@ -161,10 +165,9 @@ class DAGCompressor:
     def _generate_leaf_summary(self, messages: List[Dict]) -> str:
         """生成叶子摘要
         
-        使用现有的压缩技术：
-        - TF-IDF 评分
-        - Embedding 去重
-        - 提取式摘要
+        v3.1.0 更新：支持真正的 LLM 摘要生成
+        - 有 LLM: 调用 LLM 生成高质量摘要
+        - 无 LLM: 降级为提取式摘要
         
         Args:
             messages: 消息列表
@@ -172,9 +175,67 @@ class DAGCompressor:
         Returns:
             摘要内容
         """
-        # 简化版：提取关键信息
-        # TODO: 集成现有的 lobster_press_v155.py 压缩逻辑
+        # v3.1.0: 优先使用 LLM 生成摘要
+        if self.llm_client:
+            return self._generate_llm_leaf_summary(messages)
+        else:
+            return self._generate_extractive_leaf_summary(messages)
+    
+    def _generate_llm_leaf_summary(self, messages: List[Dict]) -> str:
+        """使用 LLM 生成高质量叶子摘要
         
+        Args:
+            messages: 消息列表
+        
+        Returns:
+            LLM 生成的摘要
+        """
+        # 构建对话文本
+        conversation_text = '\n\n'.join([
+            f"[{m.get('role', 'unknown')}]: {m.get('content', '')}"
+            for m in messages
+        ])
+        
+        # 构建 prompt
+        prompt = f"""请总结以下对话的核心内容，要求：
+1. 提取关键决策、结论和行动项
+2. 保留重要的技术细节和参数
+3. 简洁明了，不超过300字
+
+对话内容：
+{conversation_text}
+
+摘要："""
+
+        try:
+            # 调用 LLM
+            summary = self.llm_client.generate(prompt)
+            
+            # 添加元数据
+            summary_parts = []
+            summary_parts.append(f"## 对话摘要 ({len(messages)} 条消息)")
+            summary_parts.append(f"- 用户消息: {sum(1 for m in messages if m.get('role') == 'user')} 条")
+            summary_parts.append(f"- 助手消息: {sum(1 for m in messages if m.get('role') == 'assistant')} 条")
+            summary_parts.append("")
+            summary_parts.append("### 核心内容:")
+            summary_parts.append(summary)
+            
+            return '\n'.join(summary_parts)
+        except Exception as e:
+            print(f"⚠️ LLM 摘要生成失败: {e}，降级为提取式摘要")
+            return self._generate_extractive_leaf_summary(messages)
+    
+    def _generate_extractive_leaf_summary(self, messages: List[Dict]) -> str:
+        """提取式叶子摘要（降级方案）
+        
+        使用 TF-IDF 评分和结构化信号提取关键内容
+        
+        Args:
+            messages: 消息列表
+        
+        Returns:
+            提取式摘要
+        """
         # 按角色分组
         user_messages = [m for m in messages if m.get('role') == 'user']
         assistant_messages = [m for m in messages if m.get('role') == 'assistant']
@@ -279,6 +340,10 @@ class DAGCompressor:
     def _generate_condensed_summary(self, combined_content: str, depth: int) -> str:
         """生成压缩摘要
         
+        v3.1.0 更新：支持真正的 LLM 摘要生成
+        - 有 LLM: 调用 LLM 生成高质量摘要
+        - 无 LLM: 降级为截断式摘要
+        
         Args:
             combined_content: 合并的内容
             depth: 当前深度
@@ -286,13 +351,69 @@ class DAGCompressor:
         Returns:
             摘要内容
         """
-        # 简化版：提取关键信息
-        # TODO: 集成更智能的摘要生成逻辑
+        # v3.1.0: 优先使用 LLM 生成摘要
+        if self.llm_client:
+            return self._generate_llm_condensed_summary(combined_content, depth)
+        else:
+            return self._generate_extractive_condensed_summary(combined_content, depth)
+    
+    def _generate_llm_condensed_summary(self, combined_content: str, depth: int) -> str:
+        """使用 LLM 生成高质量压缩摘要
         
+        Args:
+            combined_content: 合并的内容
+            depth: 当前深度
+        
+        Returns:
+            LLM 生成的摘要
+        """
+        # 构建 prompt
+        prompt = f"""请总结以下内容的核心要点，要求：
+1. 提取最重要的信息和结论
+2. 保留关键技术细节
+3. 简洁明了，不超过200字
+4. 这是第 {depth + 1} 层压缩摘要
+
+内容：
+{combined_content[:2000]}
+
+摘要："""
+
+        try:
+            # 调用 LLM
+            summary = self.llm_client.generate(prompt)
+            
+            # 添加元数据
+            summary_parts = []
+            summary_parts.append(f"## 压缩摘要 (Depth {depth + 1})")
+            summary_parts.append(f"- 原始长度: {len(combined_content)} 字符")
+            summary_parts.append(f"- 摘要长度: {len(summary)} 字符")
+            summary_parts.append("")
+            summary_parts.append("### 核心要点:")
+            summary_parts.append(summary)
+            
+            return '\n'.join(summary_parts)
+        except Exception as e:
+            print(f"⚠️ LLM 压缩摘要生成失败: {e}，降级为截断式摘要")
+            return self._generate_extractive_condensed_summary(combined_content, depth)
+    
+    def _generate_extractive_condensed_summary(self, combined_content: str, depth: int) -> str:
+        """截断式压缩摘要（降级方案）
+        
+        Args:
+            combined_content: 合并的内容
+            depth: 当前深度
+        
+        Returns:
+            截断式摘要
+        """
         summary_parts = []
         summary_parts.append(f"## 压缩摘要 (Depth {depth + 1})")
         summary_parts.append("")
-        summary_parts.append(combined_content[:500])  # 限制长度
+        
+        # 根据深度调整截断长度
+        max_length = max(500, 1000 - depth * 200)
+        summary_parts.append(combined_content[:max_length])
         
         return '\n'.join(summary_parts)
     

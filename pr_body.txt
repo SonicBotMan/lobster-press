@@ -1,0 +1,34 @@
+## 修复内容
+
+### #101: migrate_v26() 未调用
+- 修复: database.py 的 _init_database() 自动调用 migrate_v26()
+- 影响: 升级用户数据库缺少 last_accessed_at, access_count, stability 字段
+
+### #102: _row_to_dict() 列表过时
+- 修复: database.py 的 _row_to_dict() 改用 cursor.description 动态获取列名
+- 补全了 v2.6.0 的3个字段: last_accessed_at, access_count, stability
+- 影响: 遗忘曲线功能静默失效
+
+### #103: reconcile() 硬编码 category='decision'
+- 修复: conflict_detector.py 的 ConflictResult 添加 old_category 字段
+- reconcile() 方法继承 conflict.old_category
+
+### #104: reconcile() 生成低质量 notes
+- 修复: conflict_detector.py 的 reconcile() 方法添加 llm_client 参数
+- 有 LLM: 调用 extract_and_store() 高质量提炼
+- 无 LLM: 降级为直接截取消息内容
+
+### 测试
+- test_migrate_v26() (验证升级场景)
+- test_row_to_dict() (验证字段完整性)
+- test_conflict_result_category() (验证 old_category 字段)
+- test_reconcile_inherits_category() (验证 category 继承)
+
+### 改动文件
+- src/database.py (+2行)
+- src/pipeline/conflict_detector.py (+30行)
+- src/incremental_compressor.py (+1行)
+
+**所有测试通过**
+
+Fixes: #101, #102, #103, #104
