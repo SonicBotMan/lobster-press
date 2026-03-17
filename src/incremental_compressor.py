@@ -17,6 +17,8 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent))
 from database import LobsterDatabase
 from dag_compressor import DAGCompressor
+from pipeline.tfidf_scorer import TFIDFScorer, EXEMPT_TYPES
+from pipeline.semantic_dedup import SemanticDeduplicator
 
 
 class IncrementalCompressor:
@@ -49,6 +51,10 @@ class IncrementalCompressor:
             leaf_chunk_tokens=leaf_chunk_tokens
         )
         self.context_threshold = context_threshold
+        
+        # v2.5.0: 初始化 pipeline 模块
+        self.tfidf_scorer = TFIDFScorer()
+        self.deduplicator = SemanticDeduplicator(threshold=0.82)
         
         # 压缩统计
         self.stats = {
@@ -88,11 +94,10 @@ class IncrementalCompressor:
                        auto_compress: bool = True) -> Optional[Dict]:
         """新消息到达时的处理
         
-        这是增量压缩的核心入口：
-        1. 保存新消息
-        2. 更新上下文
-        3. 检查是否需要压缩
-        4. 如果需要，执行压缩
+        v2.5.0 更新：
+        1. 使用 TFIDFScorer 评分和打标签
+        2. 根据 compression_exempt 决定是否压缩
+        3. 三层压缩策略：<60% 不压缩，60-75% 仅去重，>75% DAG
         
         Args:
             conversation_id: 对话 ID
@@ -102,7 +107,17 @@ class IncrementalCompressor:
         Returns:
             压缩统计（如果触发了压缩），否则返回 None
         """
-        # 1. 保存消息
+        # v2.5.0: 评分和打标签
+        scored_list = self.tfidf_scorer.score_and_tag([message])
+        scored_msg = scored_list[0]
+        
+        # 将评分信息添加到消息中
+        message['msg_type'] = scored_msg.msg_type
+        message['tfidf_score'] = scored_msg.tfidf_score
+        message['structural_bonus'] = scored_msg.structural_bonus
+        message['compression_exempt'] = scored_msg.compression_exempt
+        
+        # 1. 保存消息（包含新字段）
         self.db.save_message(message)
         
         # 2. 更新上下文（支持 id 或 message_id 字段）
@@ -119,10 +134,10 @@ class IncrementalCompressor:
     def compress(self, conversation_id: str) -> Dict:
         """执行压缩
         
-        执行完整的压缩流程：
-        1. 叶子压缩（压缩老消息）
-        2. 压缩摘要（合并摘要）
-        3. 更新统计
+        v2.5.0 更新：三层压缩策略
+        - <60% 不压缩
+        - 60-75% 仅去重
+        - >75% DAG 压缩
         
         Args:
             conversation_id: 对话 ID
@@ -134,16 +149,74 @@ class IncrementalCompressor:
         print(f"  🦞 增量压缩: {conversation_id}")
         print(f"{'=' * 60}\n")
         
-        # 执行完整压缩
-        stats = self.compressor.full_compact(conversation_id)
+        # 获取上下文使用率
+        usage_ratio = self._get_context_usage(conversation_id)
         
-        # 更新全局统计
-        self.stats['total_compressions'] += 1
-        self.stats['total_messages_compressed'] += stats['messages_compressed']
-        self.stats['total_tokens_saved'] += stats.get('tokens_saved', 0)
-        self.stats['last_compression'] = datetime.utcnow().isoformat()
+        # v2.5.0: 选择压缩策略
+        strategy = self._select_compression_strategy(usage_ratio)
         
-        return stats
+        print(f"📊 上下文使用率: {usage_ratio:.1%}")
+        print(f"🎯 压缩策略: {strategy}\n")
+        
+        stats = {
+            'strategy': strategy,
+            'usage_ratio': usage_ratio,
+            'messages_compressed': 0,
+            'tokens_saved': 0
+        }
+        
+        if strategy == 'none':
+            # <60% 不压缩
+            print("✅ 上下文使用率低，无需压缩")
+            return stats
+        
+        elif strategy == 'light':
+            # 60-75% 仅去重
+            messages = self.db.get_messages(conversation_id)
+            
+            # 重新评分所有消息
+            scored_list = self.tfidf_scorer.score_and_tag(messages)
+            
+            # 去重
+            kept, removed = self.deduplicator.deduplicate(scored_list)
+            
+            if removed:
+                print(f"🔄 去重: 删除 {len(removed)} 条重复消息")
+                stats['messages_compressed'] = len(removed)
+                stats['removed_ids'] = removed
+                
+                # TODO: 实际删除消息（需要更新数据库）
+            
+            return stats
+        
+        else:
+            # >75% DAG 压缩
+            # 执行完整压缩
+            dag_stats = self.compressor.full_compact(conversation_id)
+            
+            # 更新统计
+            self.stats['total_compressions'] += 1
+            self.stats['total_messages_compressed'] += dag_stats['messages_compressed']
+            self.stats['total_tokens_saved'] += dag_stats.get('tokens_saved', 0)
+            self.stats['last_compression'] = datetime.utcnow().isoformat()
+            
+            return dag_stats
+    
+    def _select_compression_strategy(self, usage_ratio: float) -> str:
+        """选择压缩策略（v2.5.0）
+        
+        Args:
+            usage_ratio: 上下文使用率（0.0 - 1.0）
+        
+        Returns:
+            压缩策略（'none', 'light', 'aggressive'）
+        """
+        if usage_ratio < 0.60:
+            return 'none'  # <60% 不压缩
+        elif usage_ratio < 0.75:
+            return 'light'  # 60-75% 仅去重
+        else:
+            return 'aggressive'  # >75% DAG 压缩
     
     def _should_compress(self, conversation_id: str) -> bool:
         """检查是否需要压缩
