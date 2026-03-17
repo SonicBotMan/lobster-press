@@ -5,7 +5,7 @@ LobsterPress Agent Tools - Agent 工具集
 借鉴 lossless-claw 的 LCM Agent Tools
 
 Author: LobsterPress Team
-Version: v2.0.0-alpha
+Version: v2.5.0
 """
 
 import sys
@@ -17,6 +17,7 @@ from pathlib import Path
 # 添加 database 模块
 sys.path.insert(0, str(Path(__file__).parent))
 from database import LobsterDatabase
+from pipeline.tfidf_scorer import TFIDFScorer
 
 
 # ==================== lobster_grep ====================
@@ -26,13 +27,13 @@ def lobster_grep(db: LobsterDatabase,
                  conversation_id: str = None,
                  search_messages: bool = True,
                  search_summaries: bool = True,
-                 limit: int = 10) -> List[Dict]:
+                 limit: int = 10,
+                 use_tfidf_rerank: bool = True) -> List[Dict]:
     """搜索消息和摘要
     
-    借鉴 lossless-claw 的 lcm_grep：
-    - 支持正则表达式和全文搜索
-    - 可以搜索消息和/或摘要
-    - 可以限制搜索范围（conversation_id）
+    v2.5.0 更新：
+    - 添加 TF-IDF 重排序
+    - 结合 FTS5 rank 和 tfidf_score
     
     Args:
         db: LobsterDatabase 实例
@@ -41,11 +42,15 @@ def lobster_grep(db: LobsterDatabase,
         search_messages: 是否搜索消息
         search_summaries: 是否搜索摘要
         limit: 最大结果数
+        use_tfidf_rerank: 是否使用 TF-IDF 重排序
     
     Returns:
-        搜索结果列表
+        搜索结果列表（按相关性排序）
     """
     results = []
+    
+    # v2.5.0: 初始化 TF-IDF 评分器
+    scorer = TFIDFScorer() if use_tfidf_rerank else None
     
     # 搜索消息
     if search_messages:
@@ -56,6 +61,10 @@ def lobster_grep(db: LobsterDatabase,
             messages = [m for m in messages if m.get('conversation_id') == conversation_id]
         
         for msg in messages[:limit]:
+            # v2.5.0: 获取 TF-IDF 分数
+            tfidf_score = msg.get('tfidf_score', 0.0)
+            relevance = 1.0 + (tfidf_score / 100.0)  # 结合 FTS5 rank 和 TF-IDF
+            
             results.append({
                 'type': 'message',
                 'id': msg['message_id'],
@@ -63,7 +72,9 @@ def lobster_grep(db: LobsterDatabase,
                 'role': msg.get('role', 'unknown'),
                 'content': msg['content'][:200] + ('...' if len(msg['content']) > 200 else ''),
                 'timestamp': msg.get('created_at', ''),
-                'relevance': 1.0  # FTS5 不返回相关性分数
+                'relevance': round(relevance, 2),
+                'tfidf_score': round(tfidf_score, 2),
+                'msg_type': msg.get('msg_type', 'unknown')
             })
     
     # 搜索摘要
@@ -83,8 +94,14 @@ def lobster_grep(db: LobsterDatabase,
                 'depth': summary['depth'],
                 'content': summary['content'][:200] + ('...' if len(summary['content']) > 200 else ''),
                 'descendant_count': summary.get('descendant_count', 0),
-                'relevance': 1.0
+                'relevance': 1.0,
+                'tfidf_score': 0.0,
+                'msg_type': 'summary'
             })
+    
+    # v2.5.0: 按 TF-IDF 重排序
+    if use_tfidf_rerank:
+        results.sort(key=lambda x: x['relevance'], reverse=True)
     
     # 限制总结果数
     return results[:limit]
