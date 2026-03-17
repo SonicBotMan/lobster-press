@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+LobsterPress LLM Client - 统一 LLM 客户端接口
+
+支持的提供商：
+- 国际：OpenAI, Anthropic, Google Gemini, Mistral
+- 国内：DeepSeek, 智谱 GLM, 百度文心, 阿里通义千问
+
+Author: LobsterPress Team
+Version: v3.2.0
+"""
+
+import os
+from abc import ABC, abstractmethod
+from typing import Optional, Dict, Any
+
+
+class BaseLLMClient(ABC):
+    """LLM 客户端基类"""
+    
+    @abstractmethod
+    def generate(self, prompt: str, **kwargs) -> str:
+        """生成文本
+        
+        Args:
+            prompt: 输入提示词
+            **kwargs: 额外参数（temperature, max_tokens等）
+        
+        Returns:
+            生成的文本
+        """
+        pass
+    
+    @abstractmethod
+    def is_available(self) -> bool:
+        """检查客户端是否可用"""
+        pass
+
+
+class MockLLMClient(BaseLLMClient):
+    """模拟 LLM 客户端（用于测试）"""
+    
+    def __init__(self, response: str = "这是一个模拟摘要。"):
+        self.response = response
+    
+    def generate(self, prompt: str, **kwargs) -> str:
+        return self.response
+    
+    def is_available(self) -> bool:
+        return True
+
+
+def create_llm_client(
+    provider: Optional[str] = None,
+    api_key: Optional[str] = None,
+    model: Optional[str] = None,
+    **kwargs
+) -> BaseLLMClient:
+    """创建 LLM 客户端（工厂函数）
+    
+    Args:
+        provider: 提供商名称（不指定时从环境变量 LOBSTER_LLM_PROVIDER 读取）
+        api_key: API 密钥（不指定时从环境变量读取）
+        model: 模型名称（不指定时使用默认模型）
+        **kwargs: 额外配置参数
+    
+    Returns:
+        LLM 客户端实例
+    
+    环境变量：
+        LOBSTER_LLM_PROVIDER: 提供商名称
+        LOBSTER_LLM_API_KEY: API 密钥
+        LOBSTER_LLM_MODEL: 模型名称
+    
+    支持的提供商：
+        - openai: OpenAI GPT 系列
+        - anthropic: Anthropic Claude 系列
+        - gemini: Google Gemini 系列
+        - mistral: Mistral AI
+        - deepseek: DeepSeek
+        - zhipu: 智谱 GLM 系列
+        - baidu: 百度文心系列
+        - alibaba: 阿里通义千问系列
+        - mock: 模拟客户端（用于测试）
+    
+    Examples:
+        # 使用环境变量配置
+        client = create_llm_client()
+        
+        # 指定提供商
+        client = create_llm_client(provider='openai', api_key='sk-xxx')
+        
+        # 使用 DeepSeek
+        client = create_llm_client(
+            provider='deepseek',
+            api_key='sk-xxx',
+            model='deepseek-chat'
+        )
+    """
+    # 从环境变量读取配置
+    provider = provider or os.getenv('LOBSTER_LLM_PROVIDER', 'mock')
+    
+    # 根据提供商创建客户端
+    if provider == 'mock':
+        return MockLLMClient()
+    
+    # 尝试导入提供商适配器
+    try:
+        from .llm_providers import get_provider_client
+        return get_provider_client(provider, api_key, model, **kwargs)
+    except ImportError as e:
+        print(f"⚠️ 无法加载 LLM 提供商 {provider}: {e}")
+        print(f"   降级为 Mock 客户端")
+        return MockLLMClient()
+    except Exception as e:
+        print(f"⚠️ 创建 LLM 客户端失败: {e}")
+        print(f"   降级为 Mock 客户端")
+        return MockLLMClient()
+
+
+# 便捷函数
+def get_llm_client() -> BaseLLMClient:
+    """获取 LLM 客户端（使用环境变量配置）
+    
+    这是最简单的使用方式，只需配置环境变量：
+        export LOBSTER_LLM_PROVIDER=openai
+        export LOBSTER_LLM_API_KEY=sk-xxx
+        export LOBSTER_LLM_MODEL=gpt-4
+    
+    然后在代码中：
+        client = get_llm_client()
+        summary = client.generate("总结这段文本...")
+    """
+    return create_llm_client()
