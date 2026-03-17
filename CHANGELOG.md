@@ -5,6 +5,104 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.0.0] - 2026-03-17
+
+### 🎯 版本定位
+
+**认知记忆系统完整版**
+
+实现语义记忆层和矛盾检测，完成认知科学驱动的记忆系统核心功能
+
+### ✨ 新增功能
+
+**Feature 3: 语义记忆层 (Semantic Memory Layer)**
+- 独立于 DAG 的稳定知识库
+- `notes` 表存储持久性语义知识:
+  - note_id: 唯一标识
+  - conversation_id: 对话 ID
+  - category: 类别（preference/decision/constraint/fact）
+  - content: 语义内容
+  - confidence: 置信度（默认 1.0）
+  - source_msg_ids: 源消息 ID 列表
+  - created_at/updated_at: 时间戳
+  - superseded_by: 被取代的 note_id（保留溯源链）
+- LLM 提取语义知识:
+  - `extract_and_store()`: 从对话中提取 notes
+  - NOTE_EXTRACTION_PROMPT: 结构化提示词
+  - 支持 4 种类别: preference, decision, constraint, fact
+- 上下文组装注入:
+  - `get_active_notes()`: 获取生效的 notes
+  - `format_for_context()`: 格式化为上下文注入（始终在头部）
+  - 限制 < 500 tokens
+- 去重机制:
+  - 基于 content 哈希
+  - 相同内容不重复插入
+
+**Feature 4: 矛盾检测与记忆重巩固 (Conflict Detection & Reconsolidation)**
+- NLI 模型检测（优先）:
+  - 推荐 `cross-encoder/nli-deberta-v3-small`
+  - 精度高，需要 GPU/大量内存
+  - 冲突阈值: 0.85
+- 规则降级检测（备选）:
+  - 零依赖，无需额外模型
+  - 基于否定词 + 关键词共现
+  - 模式: `不(用|要|采用|使用|选择)`, `改(用|为|成)`, `放弃|弃用|替换|迁移到`
+- 记忆重巩固:
+  - `detect()`: 检测新消息与已有 notes 的矛盾
+  - `reconcile()`: 执行记忆重巩固
+  - 标记旧 note 为 `superseded_by` 新 note
+  - 保留完整溯源链（不删除旧 note）
+
+### 🔧 集成改动
+
+**IncrementalCompressor**
+- 添加 `llm_client` 参数（可选）
+- 初始化 SemanticMemory 和 ConflictDetector
+- 压缩后触发 note 提取（DAG 压缩时）
+- 新消息触发矛盾检测
+
+### 📊 代码统计
+
+```
+4 files changed, 637 insertions(+), 1 deletion(-)
+新增文件:
+- src/semantic_memory.py (244 lines)
+- src/pipeline/conflict_detector.py (198 lines)
+- tests/test_v300.py (159 lines)
+```
+
+### ✅ 测试结果
+
+**v3.0.0 验收测试** (4/4 通过):
+- ✅ test_notes_extraction: notes 提取
+- ✅ test_notes_injection: notes 注入上下文
+- ✅ test_conflict_api: 矛盾检测 API
+- ✅ test_notes_dedup: note 去重
+
+### 📌 技术细节
+
+**Prompt 模板占位符转义**
+- Python `str.format()` 需要转义 `{` 和 `}`
+- 使用 `{{` 和 `}}` 表示字面大括号
+
+**Schema 设计**
+- notes 表独立于 messages 表
+- superseded_by 保留溯源链
+- 去重基于 content 哈希
+
+**矛盾检测策略**
+- 优先使用 NLI 模型（高精度）
+- 自动降级到规则检测（零依赖）
+- ConflictResult 包含冲突分数和证据
+
+### 🔄 向后兼容
+
+- v2.6.0 schema 完全兼容
+- llm_client 参数可选
+- 不影响现有功能
+
+---
+
 ## [2.6.0] - 2026-03-17
 
 ### 🎯 版本定位
