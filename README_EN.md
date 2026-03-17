@@ -1,18 +1,18 @@
 <div align="center">
 
-# 🧠 LobsterPress v3.0
+# 🧠 LobsterPress v1.0
 
 **Cognitive Memory System for AI Agents**  
 *LLM Persistent Memory Engine Based on Cognitive Science*
 
-[![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press/releases)
+[![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![GitHub stars](https://img.shields.io/github/stars/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![GitHub license](https://img.shields.io/github/license/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
 
 [中文](README.md) | **English**
 
-**Latest**: [v3.0.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.0.0) · [Changelog](CHANGELOG.md)
+**Latest**: v1.0.0 · [Changelog](CHANGELOG.md)
 
 </div>
 
@@ -30,7 +30,7 @@ This isn't just an engineering problem — it's a **cognitive science problem**:
 
 ## 💡 Our Solution: Cognitive Memory System
 
-LobsterPress v3.0 is the **first open-source LLM memory system based on cognitive science research**, integrating three cutting-edge studies:
+LobsterPress v3.0 is an open-source LLM memory system based on cognitive science research, integrating three cutting-edge studies:
 
 ### 📚 Academic Foundation
 
@@ -134,7 +134,7 @@ Action:
   - Based on negation words + keyword co-occurrence
   - Patterns: `not (using|want|adopt)`, `switch (to|from)`, `abandon|deprecate|replace`
 
-**Academic Significance**: First application of **Memory Reconsolidation** theory to LLM memory management, achieving dynamic knowledge evolution.
+**Academic Significance**: Application of **Memory Reconsolidation** theory to LLM memory management, achieving dynamic knowledge evolution.
 
 ---
 
@@ -183,17 +183,19 @@ Raw messages seq 1..N
 
 | Dimension | LangChain Memory | Mem0 | Letta | LobsterPress v3.0 |
 |-----------|------------------|------|-------|-------------------|
-| Lossless Compression | ❌ | ❌ | ✅ | ✅ |
-| Forgetting Curve | ❌ | ❌ | ❌ | ✅ Ebbinghaus |
-| Event Segmentation | ❌ | ❌ | ❌ | ✅ EM-LLM ICLR 2025 |
-| Semantic Memory | ❌ | ❌ | ❌ | ✅ |
-| Conflict Detection | ❌ | ❌ | ❌ | ✅ NLI + Memory Reconsolidation |
-| Dynamic Scoring | ❌ | ❌ | ❌ | ✅ Time-decay scoring |
+| Lossless Compression | Sliding window | Sliding window | DAG compression | DAG compression |
+| Forgetting Curve | None | None | None | Ebbinghaus dynamic decay |
+| Event Segmentation | None | None | None | EM-LLM ICLR 2025 |
+| Semantic Memory | None | Vector search | Vector search | Structured notes table |
+| Conflict Detection | None | None | None | NLI + Memory Reconsolidation |
+| Dynamic Scoring | None | None | None | Time-decay scoring |
+
+> Note: Comparison based on project documentation as of 2026-03. Please submit an Issue if outdated.
 
 **Academic Contributions**:
-1. **First** application of Ebbinghaus forgetting curve to LLM memory management
-2. **First** implementation of event segmentation based on EM-LLM paper
-3. **First** application of Memory Reconsolidation theory to knowledge updates
+1. Application of Ebbinghaus forgetting curve to LLM memory management
+2. Implementation of event segmentation based on EM-LLM paper
+3. Application of Memory Reconsolidation theory to knowledge updates
 
 ---
 
@@ -344,10 +346,25 @@ src/
 
 | Version | Date | Academic Foundation | Core Features |
 |---------|------|---------------------|---------------|
-| **v3.0.0** ⭐ | 2026-03-17 | Memory Reconsolidation, NLI | Semantic Memory Layer + Conflict Detection |
-| v2.6.0 | 2026-03-17 | EM-LLM ICLR 2025, Ebbinghaus | Forgetting Curve + Event Segmentation |
-| v2.5.0 | 2026-03-17 | TF-IDF, Semantic Dedup | Three-tier Compression + BatchImporter |
-| v2.0.0-alpha | 2026-03-15 | DAG Compression | Lossless Architecture + FTS5 Search |
+| **v1.0.0** ⭐ | 2026-03-17 | Initial Release | DAG Compression + TF-IDF + Event Segmentation + Semantic Memory |
+
+<details>
+<summary>View Version Details</summary>
+
+### v1.0.0 (2026-03-17)
+- ✅ DAG lossless compression architecture
+- ✅ TF-IDF scoring + message type classification
+- ✅ Three-tier compression strategy (none/light/aggressive)
+- ✅ FTS5 full-text search
+- ✅ Event segmentation (EM-LLM)
+- ✅ Forgetting curve dynamic scoring
+- ✅ Semantic memory layer (notes table)
+- ✅ Conflict detection & memory reconsolidation
+
+### Development History
+Project started on 2026-03-15, completed current feature set through multiple iterations.
+
+</details>
 
 ---
 
