@@ -5,6 +5,95 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.0.1] - 2026-03-17
+
+### 🎯 版本定位
+
+**v3.0.0 关键 bug 修复**
+
+修复升级用户遇到的4个关键问题，确保认知记忆系统稳定运行
+
+### 🐛 Bug 修复
+
+**#101: migrate_v26() 未调用** - P0 严重
+- **问题**: `_init_database()` 未调用 `migrate_v26()`，导致升级用户数据库缺少 v2.6.0 字段
+- **影响**: 遗忘曲线功能完全不可用（缺少 last_accessed_at, access_count, stability）
+- **修复**: 在 `_init_database()` 末尾添加 `self.migrate_v26()` 调用
+- **文件**: src/database.py (+2行)
+
+**#102: _row_to_dict() 列表过时** - P0 严重
+- **问题**: 硬编码列名列表缺少 v2.6.0 的3个字段
+- **影响**: `get_messages()` 返回的消息丢失 stability 等字段，遗忘曲线功能静默失效
+- **修复**: 改用 `cursor.description` 动态获取列名，补全 fallback 列表
+- **文件**: src/database.py (+30行)
+
+**#103: reconcile() 硬编码 category='decision'** - P1 高
+- **问题**: 矛盾检测时新 note 的 category 被错误设置为 'decision'
+- **影响**: 分类查询结果错误，无法正确过滤特定类别的 notes
+- **修复**: 
+  - ConflictResult 添加 old_category 字段
+  - detect() 记录 old_category
+  - reconcile() 继承 conflict.old_category
+- **文件**: src/pipeline/conflict_detector.py (+5行)
+
+**#104: reconcile() 生成低质量 notes** - P2 中
+- **问题**: 直接截取消息内容生成 note，绕过 LLM 提炼管道
+- **影响**: 语义记忆质量降低，包含噪音和冗余信息
+- **修复**:
+  - reconcile() 添加 llm_client 参数
+  - 有 LLM: 调用 extract_and_store() 高质量提炼
+  - 无 LLM: 降级为截取消息内容（confidence 0.7）
+- **文件**: 
+  - src/pipeline/conflict_detector.py (+25行)
+  - src/incremental_compressor.py (+1行)
+
+### ✅ 测试结果
+
+**v3.0.1 修复验证** (4/4 通过):
+- ✅ test_migrate_v26() - 验证 v2.6.0 字段自动添加
+- ✅ test_row_to_dict() - 验证字段完整性
+- ✅ test_conflict_result_category() - 验证 old_category 字段
+- ✅ test_reconcile_inherits_category() - 验证 category 继承
+
+### 📊 代码统计
+
+```
+4 files changed, 208 insertions(+), 29 deletions(-)
+修改文件:
+- src/database.py (+32行)
+- src/pipeline/conflict_detector.py (+30行)
+- src/incremental_compressor.py (+1行)
+新增文件:
+- test_fixes.py (161行) - 修复验证测试
+```
+
+### 🔄 向后兼容
+
+- v3.0.0 schema 完全兼容
+- v2.6.0 数据库自动升级
+- 无破坏性改动
+
+### 📌 技术亮点
+
+**健壮的迁移架构**
+- 使用 cursor.description 动态获取列名
+- 避免未来每次 schema 变更都要手动维护列表
+
+**智能降级方案**
+- LLM 可用时高质量提炼
+- LLM 不可用时降级为截取消息内容
+- 自动调整 confidence 值
+
+**完整的溯源链**
+- ConflictResult.old_category 保留原始类别
+- superseded_by 保留历史记录
+
+### 🙏 致谢
+
+感谢 @sonicman0261 在测试和代码审查中发现这些问题！
+
+---
+
 ## [3.0.0] - 2026-03-17
 
 ### 🎯 版本定位
