@@ -5,6 +5,167 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.2.0] - 2026-03-17
+
+### 🎯 版本定位
+
+**多 LLM 提供商支持**
+
+支持国内外 8 个主流 LLM 服务，提供统一接口和配置方式
+
+### ✨ 新增功能
+
+**多 LLM 提供商支持** - P0 核心
+- **国际提供商（4个）**: OpenAI, Anthropic, Google Gemini, Mistral
+- **国内提供商（4个）**: DeepSeek, 智谱 GLM, 百度文心, 阿里通义千问
+- **统一接口**: BaseLLMClient 抽象类
+- **工厂函数**: create_llm_client()
+- **环境变量配置**: LOBSTER_LLM_PROVIDER, LOBSTER_LLM_API_KEY, LOBSTER_LLM_MODEL
+- **优雅降级**: 自动降级到 Mock 客户端
+- **延迟加载**: 只在调用时加载 SDK
+
+**核心文件**:
+- src/llm_client.py (147 lines) - 统一 LLM 客户端接口
+- src/llm_providers.py (415 lines) - 8 个提供商适配器
+- examples/llm_config.py (216 lines) - 配置示例和使用指南
+- test_llm_providers.py (280 lines) - 完整测试套件
+
+### 🔧 技术实现
+
+**统一接口设计**:
+```python
+from src.llm_client import BaseLLMClient
+
+class MyLLMClient(BaseLLMClient):
+    def generate(self, prompt: str, **kwargs) -> str:
+        # 实现你的逻辑
+        pass
+    
+    def is_available(self) -> bool:
+        return True
+```
+
+**工厂模式**:
+```python
+from src.llm_client import create_llm_client
+
+# 方式1: 使用环境变量（推荐）
+client = create_llm_client()
+
+# 方式2: 显式配置
+client = create_llm_client(
+    provider='deepseek',
+    api_key='sk-xxx',
+    model='deepseek-chat'
+)
+```
+
+**环境变量配置**:
+```bash
+export LOBSTER_LLM_PROVIDER=deepseek
+export LOBSTER_LLM_API_KEY=sk-xxx
+export LOBSTER_LLM_MODEL=deepseek-chat
+```
+
+**OpenAI 兼容接口**:
+- DeepSeek 和阿里通义千问使用 OpenAI 兼容接口
+- 无需额外 SDK，只需 `pip install openai`
+
+### 📊 提供商详情
+
+| 提供商 | 模型 | SDK | 推荐场景 |
+|--------|------|-----|----------|
+| **DeepSeek** | deepseek-chat | openai | 国内用户，性价比高 ⭐ |
+| **智谱 GLM** | glm-4-flash | zhipuai | 国内用户，免费额度大 ⭐ |
+| **OpenAI** | gpt-4o-mini | openai | 国际用户，性价比高 |
+| **Anthropic** | claude-3-5-sonnet | anthropic | 国际用户，质量最高 |
+| **Google Gemini** | gemini-pro | google-generativeai | 国际用户，免费额度大 |
+| **Mistral** | mistral-small-latest | mistralai | 欧洲用户 |
+| **百度文心** | ernie-speed-8k | urllib | 国内企业用户 |
+| **阿里通义** | qwen-turbo | openai | 国内用户，中文能力强 |
+
+### ✅ 测试结果
+
+**v3.2.0 提供商测试** (12/12 通过):
+- ✅ test_mock_client - Mock 客户端
+- ✅ test_openai_client - OpenAI 初始化
+- ✅ test_deepseek_client - DeepSeek 初始化
+- ✅ test_zhipu_client - 智谱 GLM 初始化
+- ✅ test_alibaba_client - 阿里通义初始化
+- ✅ test_anthropic_client - Anthropic 初始化
+- ✅ test_gemini_client - Google Gemini 初始化
+- ✅ test_mistral_client - Mistral 初始化
+- ✅ test_baidu_client - 百度文心初始化
+- ✅ test_factory_function - 工厂函数
+- ✅ test_environment_variable - 环境变量
+- ✅ test_graceful_fallback - 优雅降级
+
+### 📝 安装依赖
+
+**国际提供商**:
+```bash
+# OpenAI / DeepSeek / 阿里通义
+pip install openai
+
+# Anthropic
+pip install anthropic
+
+# Google Gemini
+pip install google-generativeai
+
+# Mistral
+pip install mistralai
+```
+
+**国内提供商**:
+```bash
+# DeepSeek / 阿里通义（使用 OpenAI 兼容接口）
+pip install openai
+
+# 智谱 GLM
+pip install zhipuai
+
+# 百度文心（无需额外安装，使用标准库）
+```
+
+### 🔄 向后兼容
+
+- ✅ 完全向后兼容 v3.1.0
+- ✅ DAGCompressor.llm_client 参数可选
+- ✅ 不配置时自动降级为提取式摘要
+
+### 🎯 推荐配置
+
+**国内用户**:
+- DeepSeek - 便宜，质量高（推荐）
+- 智谱 GLM - 免费额度大，适合测试
+
+**国际用户**:
+- OpenAI GPT-4o-mini - 性价比高
+- Anthropic Claude 3.5 Sonnet - 质量最高
+- Google Gemini Pro - 免费额度大
+
+### 📦 代码统计
+
+```
+8 files changed, 1392 insertions(+), 11 deletions(-)
+新增文件:
+- src/llm_client.py (147 lines)
+- src/llm_providers.py (415 lines)
+- examples/llm_config.py (216 lines)
+- test_llm_providers.py (280 lines)
+- test_llm_summary.py (167 lines)
+修改文件:
+- src/dag_compressor.py (+141 lines)
+- src/incremental_compressor.py (+3 lines)
+```
+
+### 🙏 致谢
+
+感谢罡哥的建议！这次实现了国内外主流 LLM 提供商的完整支持。
+
+---
+
 ## [3.0.1] - 2026-03-17
 
 ### 🎯 版本定位
