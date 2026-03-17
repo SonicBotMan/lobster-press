@@ -5,7 +5,7 @@ LobsterPress 增量压缩管理器
 借鉴 lossless-claw 的增量压缩机制
 
 Author: LobsterPress Team
-Version: v2.5.0
+Version: v3.0.0
 """
 
 import sys
@@ -20,6 +20,14 @@ from dag_compressor import DAGCompressor
 from pipeline.tfidf_scorer import TFIDFScorer, EXEMPT_TYPES
 from pipeline.semantic_dedup import SemanticDeduplicator
 
+# v3.0.0: 语义记忆和矛盾检测
+try:
+    from semantic_memory import SemanticMemory
+    from pipeline.conflict_detector import ConflictDetector
+    SEMANTIC_MEMORY_AVAILABLE = True
+except ImportError:
+    SEMANTIC_MEMORY_AVAILABLE = False
+
 
 class IncrementalCompressor:
     """增量压缩管理器
@@ -33,6 +41,7 @@ class IncrementalCompressor:
     
     def __init__(self, 
                  db: LobsterDatabase,
+                 llm_client=None,  # v3.0.0: 可选的 LLM 客户端（用于 note 提取）
                  context_threshold: float = 0.75,
                  fresh_tail_count: int = 32,
                  leaf_chunk_tokens: int = 20000,
@@ -47,6 +56,7 @@ class IncrementalCompressor:
             max_context_tokens: 最大上下文 token 数（默认 128K，Claude 用户可设置为 200_000，Gemini 用户可设置为 1_000_000）
         """
         self.db = db
+        self.llm_client = llm_client  # v3.0.0: LLM 客户端
         self.compressor = DAGCompressor(
             db, 
             fresh_tail_count=fresh_tail_count,
@@ -58,6 +68,15 @@ class IncrementalCompressor:
         # v2.5.0: 初始化 pipeline 模块
         self.tfidf_scorer = TFIDFScorer()
         self.deduplicator = SemanticDeduplicator(threshold=0.82)
+        
+        # v3.0.0: 初始化语义记忆和矛盾检测
+        if SEMANTIC_MEMORY_AVAILABLE:
+            self.semantic_memory = SemanticMemory(db)
+            self.conflict_detector = ConflictDetector(use_nli=True)
+            print('✅ 语义记忆层已启用（v3.0.0）')
+        else:
+            self.semantic_memory = None
+            self.conflict_detector = None
         
         # 压缩统计
         self.stats = {
@@ -103,6 +122,16 @@ class IncrementalCompressor:
         msg_id = message.get('message_id') or message.get('id')
         if msg_id:
             self._add_to_context(conversation_id, msg_id)
+        
+        # v3.0.0: 矛盾检测（仅在语义记忆层启用时）
+        if self.semantic_memory and self.conflict_detector:
+            active_notes = self.semantic_memory.get_active_notes(conversation_id)
+            if active_notes:
+                conflicts = self.conflict_detector.detect(message, active_notes)
+                if conflicts:
+                    self.conflict_detector.reconcile(
+                        self.semantic_memory, conflicts, message, conversation_id
+                    )
         
         # 3. 检查是否需要压缩
         if auto_compress and self._should_compress(conversation_id):
@@ -185,6 +214,22 @@ class IncrementalCompressor:
             self.stats['total_messages_compressed'] += dag_stats['messages_compressed']
             self.stats['total_tokens_saved'] += dag_stats.get('tokens_saved', 0)
             self.stats['last_compression'] = datetime.utcnow().isoformat()
+            
+            # v3.0.0: 提取语义知识（仅在 DAG 压缩后且启用语义记忆时）
+            if self.semantic_memory and self.llm_client:
+                messages = self.db.get_messages(conversation_id)
+                source_msg_ids = [m.get('message_id') or m.get('id') for m in messages]
+                
+                note_ids = self.semantic_memory.extract_and_store(
+                    conversation_id=conversation_id,
+                    messages=messages,
+                    llm_client=self.llm_client,
+                    source_msg_ids=source_msg_ids
+                )
+                
+                if note_ids:
+                    dag_stats['notes_extracted'] = len(note_ids)
+                    print(f"📝 语义知识提取: {len(note_ids)} 条 notes")
             
             return dag_stats
     
