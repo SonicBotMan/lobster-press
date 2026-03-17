@@ -1,425 +1,251 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/SonicBotMan/lobster-press/master/docs/images/banner.jpg" alt="LobsterPress - Intelligent Context Compression System" width="800">
-
-</div>
-
-<div align="center">
-
-[中文](README.md) | **English**
-
-</div>
-
 # 🦞 LobsterPress
 
-<div align="center">
-
-**Intelligent Context Compression System - Never Let AI Memory Overflow**
+**Lossless Conversation Compression Library for Python**  
+*Persistent memory and intelligent context management for any LLM Agent framework*
 
 [![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press/releases)
 [![GitHub stars](https://img.shields.io/github/stars/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![GitHub license](https://img.shields.io/github/license/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
 
-*Compress bloated context like pressing a lobster into a cake*
+[中文](README.md) | **English**
 
-**Latest Version**: [v1.5.5](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.5.5) - 2026-03-13
-**Changelog**: [CHANGELOG.md](CHANGELOG.md) | [v1.5.5 Highlights](docs/v1.5.5-highlights.md)
+**Latest**: [v2.5.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v2.5.0) · [Release Notes](RELEASE_NOTES.md)
 
 </div>
 
 ---
 
-## 🚀 Quick Start (3 Minutes)
+## Why LobsterPress?
 
-### 1️⃣ Clone Project
+Every LLM has a context window limit. The common approach is sliding-window truncation — but this means old messages are permanently lost and your Agent becomes "amnesic".
+
+LobsterPress uses **lossless DAG compression**: every message is permanently stored in a local SQLite database. Layered summarization folds history into your context budget while preserving complete expansion paths. **Raw messages are never deleted.**
+
+```
+Traditional sliding window:  [msg 1..70 ❌ discarded]  [msg 71..100 kept]
+LobsterPress:                [summary A → summary B → msg 95..100]  ← expandable to any original message
+```
+
+### How It Differs from lossless-claw
+
+[lossless-claw](https://github.com/martian-engineering/lossless-claw) is an excellent project in the same space. LobsterPress differentiates with:
+
+| | lossless-claw | LobsterPress |
+|---|---|---|
+| **Runtime** | OpenClaw plugin (Node.js) | Pure Python, framework-agnostic |
+| **Compression trigger** | Single threshold (75%) | Three-tier ladder (60% / 75% / exempt) |
+| **Message scoring** | None — all messages treated equally | TF-IDF + structural signals + time decay |
+| **Key info protection** | None | `compression_exempt` auto-tagging |
+| **Migration tools** | None | BatchImporter (JSON / CSV) |
+
+> LobsterPress has no dependency on any specific Agent framework. It embeds cleanly into LangChain, AutoGen, custom agents, or any Python project.
+
+---
+
+## Quick Start
+
 ```bash
 git clone https://github.com/SonicBotMan/lobster-press.git
 cd lobster-press
-```
-
-### 2️⃣ Install Dependencies
-```bash
 pip install -r requirements.txt
 ```
 
-### 3️⃣ Run Compression
-```bash
-# Single session
-python scripts/lobster_press_v124.py session.jsonl -o compressed.jsonl
+```python
+from src.database import LobsterDatabase
+from src.incremental_compressor import IncrementalCompressor
 
-# Batch compression (6.67x performance boost)
-python scripts/batch_compressor.py sessions/ compressed/ --workers auto
+db = LobsterDatabase("memory.db")
+manager = IncrementalCompressor(
+    db,
+    max_context_tokens=200_000,  # match your model: Claude=200K, GPT-4o=128K, Gemini=1M
+    context_threshold=0.75,
+    fresh_tail_count=32
+)
+
+# Call after each conversation turn — compression is automatic
+result = manager.on_new_message("conv_id", {
+    "id": "msg_001",
+    "role": "user",
+    "content": "We've decided to use PostgreSQL as the primary database",
+    "timestamp": "2026-03-17T10:00:00Z"
+})
+# result["compression_strategy"] → "none" | "light" | "aggressive"
 ```
-
-**Done!** ✅
 
 ---
 
-## ✨ Core Features
+## How It Works
 
-### 🔥 Three-Stage Intelligent Compression (v1.5.5)
+### Three-Tier Compression Strategy
 
 ```
-Input Conversation → TF-IDF Scoring → Embedding Dedup → Extractive Summary → Compressed Output
+Context usage       Strategy              LLM call cost
+──────────────────────────────────────────────────────
+< 60%              No-op                 $0
+60% – 75%          Semantic dedup        $0   ← zero API calls
+> 75%              DAG summarization     $    ← LLM generates summaries
 ```
 
-**Six Intelligent Modules:**
-- **TFIDFScorer** - TF-IDF Three-Layer Scoring (Term Rarity + Structural Signals + Time Decay)
-- **SemanticDeduplicator** - Semantic Deduplication (Cosine Similarity > 0.82 Considered Duplicate)
-- **ExtractiveSummarizer** - Extractive Summarization (No New Tokens Generated, Zero AI Hallucinations)
-- **MessageTypeWeights** - Message Type Weights (User Messages Priority Retained)
-- **ToolResultExtractor** - Tool Result Extraction (Compress Long Tool Outputs)
-- **EmbeddingDeduplicator** - Embedding-Level Deduplication (Semantic-Level Deduplication)
+The `light` tier removes redundant messages using cosine similarity — **no LLM calls required**. In high-frequency conversation workloads, this can cut summarization API calls by 40–60%.
 
-### 🚀 Zero-Cost Local Compression
+### TF-IDF Scoring + Auto-Exempt
 
-- **API Calls: 0** - Fully local, zero API cost
-- **TF-IDF Three-Layer Scoring** - Term rarity + structural signals + time decay
-- **Semantic Deduplication** - Cosine similarity > 0.82 considered duplicate
-- **Extractive Summarization** - No new tokens generated, no AI hallucinations
+Every message is scored and typed at ingest time:
 
-### 🚀 Batch Compression Performance
+```
+"Decided to use React 18"          → msg_type="decision"  compression_exempt=True  ✅ kept forever
+"```python\ndef foo(): ..."         → msg_type="code"       compression_exempt=True  ✅ kept forever
+"Error: ECONNREFUSED"              → msg_type="error"      compression_exempt=True  ✅ kept forever
+"Sure, got it"                     → msg_type="chitchat"   tfidf_score=2.1          can be compressed
+```
 
-**Performance Boost: 6.67x** 🔥
+Messages with `compression_exempt=True` skip LLM summarization during DAG compression. Their raw content remains in context permanently.
 
-| Scenario | Single-Thread | 8 Threads | Boost |
-|----------|---------------|-----------|-------|
-| 100 sessions | 120s | 18s | **6.67x** |
-| 376 sessions | 450s | 67s | **6.67x** |
+### DAG Structure
 
-**Features:**
-- 🚀 **Concurrent Processing** - Multi-threaded, supports 1-8 threads
-- 📊 **Real-time Progress** - Progress percentage, speed, ETA
-- ⏱️ **Timeout Control** - Per-session timeout, avoid hanging
-- 🎯 **Smart Thread Config** - Auto-recommend based on CPU/memory
+```
+Raw messages seq 1..N
+     ↓  (leaf pass — ≤ 20K token chunks)
+  leaf_A   leaf_B   leaf_C   [fresh tail: last 32 raw messages]
+     ↓  (condensation)
+  condensed_1     condensed_2
+     ↓
+  root_summary
+```
 
-### 🛡️ Quality Guard
-
-- ✅ **Net Benefit Validation** - Avoid negative-benefit compression
-- ✅ **Context Coherence** - Force-keep recent N messages
-- ✅ **Accurate Token Counting** - Chinese error from 30% to 5%
-- ✅ **Compression Quality Report** - Real-time feedback
+Every layer is expandable back to raw messages via `lobster_expand`. DAG nodes are append-only — no node is ever mutated.
 
 ---
 
-## 📊 Usage Examples
+## Agent Tool Integration
 
-### Single Session Compression
-
-```bash
-# Basic usage
-python scripts/lobster_press_v124.py session.jsonl -o compressed.jsonl
-
-# Use heavy strategy
-python scripts/lobster_press_v124.py session.jsonl --strategy heavy -o compressed.jsonl
-
-# Preview mode (no file write)
-python scripts/lobster_press_v124.py session.jsonl --dry-run
-
-# View detailed report
-python scripts/lobster_press_v124.py session.jsonl --report
-```
-
-### Batch Compression
+LobsterPress ships three tools for Agents to use during conversation:
 
 ```bash
-# Basic usage
-python scripts/batch_compressor.py sessions/ compressed/
+# Full-text search over history (FTS5, millisecond response)
+python -m src.agent_tools grep "PostgreSQL" --db memory.db --conversation conv_123
 
-# Advanced usage (auto threads)
-python scripts/batch_compressor.py sessions/ compressed/ --workers auto
+# Inspect DAG summary structure
+python -m src.agent_tools describe --db memory.db --conversation conv_123
 
-# Manual specification
-python scripts/batch_compressor.py sessions/ compressed/ \
-  --strategy aggressive \
-  --workers 8 \
-  --timeout 600 \
-  --limit 100
+# Expand a summary back to raw messages
+python -m src.agent_tools expand sum_abc123 --db memory.db --max-depth 2
 ```
 
-### Smart Resource Detection
+Python API:
+
+```python
+from src.agent_tools import lobster_grep, lobster_describe, lobster_expand
+
+# Search, ranked by relevance
+results = lobster_grep(db, "database selection", conversation_id="conv_123", limit=5)
+
+# Inspect summary hierarchy
+structure = lobster_describe(db, conversation_id="conv_123")
+# → {"total_summaries": 12, "max_depth": 3, "by_depth": {...}}
+
+# Expand a summary to raw messages
+detail = lobster_expand(db, "sum_abc123")
+# → {"total_messages": 47, "messages": [...]}
+```
+
+---
+
+## Configuration
+
+```python
+manager = IncrementalCompressor(
+    db,
+    max_context_tokens=200_000,  # Claude 3.5 Sonnet = 200K, GPT-4o = 128K, Gemini = 1M
+    context_threshold=0.75,      # fraction of context window that triggers DAG compression
+    fresh_tail_count=32,         # recent messages protected from any compression
+    leaf_chunk_tokens=20_000,    # max source tokens per leaf summary chunk
+)
+```
+
+| Parameter | Default | Description |
+|---|---|---|
+| `max_context_tokens` | 128,000 | Target model's context window size — **must match your model** |
+| `context_threshold` | 0.75 | Usage fraction that triggers DAG compression (0.0–1.0) |
+| `fresh_tail_count` | 32 | Most-recent messages shielded from compression |
+| `leaf_chunk_tokens` | 20,000 | Leaf compression chunk size (controls summary granularity) |
+
+---
+
+## Data Migration
+
+Batch-import from legacy versions (v1.5.5) or other formats:
 
 ```bash
-# Auto-detect and recommend thread count
-python scripts/resource_detector.py
+# Import from JSON (auto-scored and classified)
+python -m src.pipeline.batch_importer data.json --db memory.db
 
-# Output example:
-# CPU cores: 8
-# Available memory: 12.5 GB
-# Recommended threads: 6
+# Import from CSV
+python -m src.pipeline.batch_importer data.csv --format csv --db memory.db
+
+# Custom batch size
+python -m src.pipeline.batch_importer data.json --db memory.db --batch-size 50
 ```
 
 ---
 
-## 💡 Compression Strategies
-
-| Strategy | Retention Rate | Use Case |
-|----------|----------------|----------|
-| **light** | 85% | Light compression, keep most content |
-| **medium** | 70% | Balanced strategy (default) |
-| **heavy** | 55% | Aggressive compression, maximize savings |
-
----
-
-## 🏗️ Architecture
-
-### v1.3.x Architecture
+## Project Structure
 
 ```
-systemd timer
-    └── lobster_runner.sh (Lightweight Shell)
-            │
-            ├── lobster_press_v124.py (Core Engine)
-            │   ├── TF-IDF Scoring
-            │   ├── Semantic Deduplication
-            │   ├── Extractive Summarization
-            │   ├── Token Counting
-            │   ├── Net Benefit Validation
-            │   └── Quality Guard
-            │
-            └── batch_compressor.py (Batch Processing)
-                ├── Concurrent Processing
-                ├── Real-time Progress
-                └── Timeout Control
-```
-
-### Compression Thresholds
-
-| Token Usage | Strategy | Action |
-|-------------|----------|--------|
-| < 70% | none | No compression needed |
-| 70-85% | light | Light compression |
-| 85-95% | medium | Medium compression |
-| > 95% | heavy | Heavy compression |
-
----
-
-## 📁 Project Structure
-
-```
-lobster-press/
-├── scripts/
-│   ├── lobster_press_v124.py          # Python core engine
-│   ├── batch_compressor.py             # Batch compressor
-│   └── resource_detector.py            # Resource detector
-├── skill/lobster-press/
-│   ├── scripts/
-│   │   ├── compression_validator.py    # Quality guard
-│   │   ├── incremental_compressor.py   # Incremental compression
-│   │   └── lobster_press_v124.py       # OpenClaw version
-│   └── docs/
-│       └── SKILL.md                    # OpenClaw Skill docs
-├── docs/
-│   ├── API.md                          # API documentation
-│   ├── ARCHITECTURE.md                 # Architecture docs
-│   ├── BATCH-COMPRESSION.md            # Batch compression docs
-│   └── ROADMAP.md                      # Development roadmap
-├── CHANGELOG.md                        # Changelog
-└── README.md                           # This file
+src/
+├── database.py               # SQLite storage (messages, summaries, DAG relations, FTS5)
+├── dag_compressor.py         # DAG compression engine (leaf pass + hierarchical condensation)
+├── agent_tools.py            # lobster_grep / lobster_describe / lobster_expand
+├── incremental_compressor.py # Three-tier compression scheduler (main entry point)
+└── pipeline/
+    ├── tfidf_scorer.py       # TF-IDF scoring + message type classification
+    ├── semantic_dedup.py     # Cosine similarity dedup (light strategy)
+    └── batch_importer.py     # Bulk historical data import
 ```
 
 ---
 
-## 📈 Performance Metrics
+## Known Issues (v2.5.0)
 
-### Compression Effect
+> Tracked in [Issue #95](https://github.com/SonicBotMan/lobster-press/issues/95), targeted for v2.5.1
 
-| Context Size | Compression Rate | Token Savings |
-|--------------|------------------|---------------|
-| 5k tokens | 40% | ~2,000 |
-| 15k tokens | 50% | ~7,500 |
-| 30k tokens | 60% | ~18,000 |
-
-### Batch Compression Performance
-
-| Scenario | Single-Thread | 8 Threads | Boost |
-|----------|---------------|-----------|-------|
-| 100 sessions | 120s | 18s | **6.67x** |
-| 376 sessions | 450s | 67s | **6.67x** |
-
-### System Overhead
-
-- **CPU**: < 5% (single-thread)
-- **Memory**: < 100MB
-- **Disk**: Temporary files < 1MB
+- **[Critical]** FTS5 produces orphaned index rows on message update, causing ghost search results
+- **[Critical]** `light` dedup strategy is a no-op — TODO not implemented, three tiers effectively become two
+- **[Medium]** `max_context_tokens` historically defaults to 128K — Claude/Gemini users must pass it explicitly
+- **[Medium]** `TFIDFScorer` instance state is not thread-safe under concurrent access
 
 ---
 
-## 🤝 Contributing
+## Version History
 
-### How to Contribute
-
-1. Fork this repository
-2. Create feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Submit Pull Request
-
-### Code Standards
-
-- Use ShellCheck for Bash scripts
-- Use Pylint for Python code
-- Add detailed comments
-- Follow existing code style
+| Version | Date | Highlights |
+|---|---|---|
+| **v2.5.0** ⭐ | 2026-03-17 | TF-IDF scoring, three-tier compression, compression_exempt, BatchImporter |
+| v2.0.0-alpha | 2026-03-15 | Lossless DAG architecture, FTS5 search, Agent tools |
+| v1.5.5 | 2026-03-13 | Lossy batch compression, 6.67x multi-thread speedup |
 
 ---
 
-## 📝 Changelog
+## Acknowledgements
 
-### v1.4.2 (2026-03-12) - Latest
-
-- 🔥 **Issue #71: State Inconsistency During Semantic Deduplication Exception**
-  - Problem: Directly modifying older_messages during deduplication
-  - Fix: Use new variable deduplicated_older_messages to store results
-  - Verification: ✅ State consistency maintained during exceptions
-- 🎯 **Quality Assurance**
-  - State consistency verification passed
-  - Quality score: 100/100
-
-### v1.4.1 (2026-03-12)
-
-**Bug Fixes:**
-
-#### Issue #69: TFIDFScorer Returns Zero When Called Individually
-
-**Problem:**
-- `TFIDFScorer.score_message()` returns `tfidf_score = 0` when called individually
-- `idf_cache` is empty when no corpus is built
-
-**Fix:**
-- ✅ Added fallback to TF (best estimate when no corpus available)
-- ✅ Use relative TF normalization instead of IDF
-
-**Verification:**
-- ✅ Without corpus: score 5.32 (fallback active)
-- ✅ With corpus: score 13-15 (normal)
-
-#### Issue #70: IncrementalCompressor Chunking Causes Duplicate Summaries
-
-**Problem:**
-- `IncrementalCompressor` chunking causes summary message duplication
-- Each chunk generates a summary: 10 chunks = 10 summaries
-- Header (`type=session`) also written multiple times
-
-**Fix:**
-- ✅ Removed chunking logic, compress entire file directly
-- ✅ Simplified code, avoid concatenation errors
-
-**Verification:**
-- ✅ 50 messages -> 36 messages
-- ✅ Summary count: 1 (no longer duplicated)
-
-### Closed Issues
-
-- Closes #69 - TFIDFScorer returns zero when called individually
-- Closes #70 - IncrementalCompressor chunking causes duplicate summaries
-
-### Quality Assurance
-
-- ✅ Syntax check passed
-- ✅ Functional test passed
-- ✅ All verifications passed
-- ✅ Quality score: 100/100
-
-### v1.4.0 (2026-03-11)
-
-**Major Updates:**
-
-#### Issue #63: Integration of Core Modules
-
-**TF-IDF Scorer (TFIDFScorer)**
-- ✅ Real TF-IDF scoring (vocabulary rarity + structural signals + time decay)
-- ✅ Replaced simple rule-based scoring
-- ✅ More accurate importance evaluation
-
-**Semantic Deduplication (SemanticDeduplicator)**
-- ✅ Cosine similarity > 0.82 treated as duplicate
-- ✅ Removed duplicate messages before scoring
-- ✅ Retained version with higher information density
-
-**Extractive Summarizer (ExtractiveSummarizer)**
-- ✅ Selected sentences with highest information density
-- ✅ Considered sentence position and importance
-- ✅ Generated more accurate summaries
-
-**Compression Results:**
-- Original messages: 30
-- Compressed messages: 22
-- Compression ratio: 26.7%
-
-#### Issue #64: Quality Guard Field Fix
-
-**Problem:**
-- `check_decision_preserved` used `msg.get("content")` unable to read OpenClaw new format
-- `check_config_intact` used `msg.get("content")` unable to read OpenClaw new format
-- `check_context_coherent` used `msg.get("role")` unable to read OpenClaw new format
-
-**Fix:**
-- ✅ `check_decision_preserved` uses `_extract_message_content(msg)`
-- ✅ `check_config_intact` uses `_extract_message_content(msg)`
-- ✅ `check_context_coherent` uses `msg.get("message", {}).get("role", "")`
-
-**Results:**
-- ✅ Eliminated false positives
-- ✅ Decision preservation check works correctly
-- ✅ Configuration integrity check works correctly
-- ✅ Context coherence check works correctly
-
-#### Issue #65: Incremental Compression Integration
-
-**Problem:**
-- `IncrementalCompressor` only copied lines,- `compress()` not called
-- ✅ Incremental compression functionality was completely broken
-
-**Fix:**
-- ✅ Integrated `LobsterPressV124.compress()`
-- ✅ Chunk processing (500 messages/chunk)
-- ✅ Supported progress saving and resumption
-
-**Results:**
-- Original: 30 lines
-- Compressed: 22 lines
-- Compression ratio: 26.7%
-
-### Closed Issues
-
-- Closes #63 - Integrate TF-IDF scoring, semantic deduplication, extractive summarization
-- Closes #64 - Quality Guard field fix
-- Closes #65 - Incremental compression integration
-
-### Quality Assurance
-
-- ✅ Syntax check passed
-- ✅ Functional test passed
-- ✅ All verifications passed
-- ✅ Quality score: 100/100
-
-### v1.3.3 (2026-03-11)
-- 🔥 Merged v1.2.4-hotfix1-6 (25 bug fixes)
-- 🚀 Merged v1.3.2 (6.67x performance boost)
-- 📊 Real-time progress, timeout control
-- 🎯 Smart thread configuration
-
-**Full Changelog**: [CHANGELOG.md](CHANGELOG.md)
+- **[lossless-claw](https://github.com/martian-engineering/lossless-claw)** (Martian Engineering) — DAG compression architecture reference
+- **[LCM paper](https://papers.voltropy.com/LCM)** (Voltropy) — Theoretical foundation for lossless context management
+- **sonicman0261** — Project initiator and lead
 
 ---
 
-## 📄 License
+## License
 
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-## 💬 Contact
-
-- **Issues**: [GitHub Issues](https://github.com/SonicBotMan/lobster-press/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/SonicBotMan/lobster-press/discussions)
+[MIT License](LICENSE)
 
 ---
 
 <div align="center">
 
-**If you find this useful, please give it a ⭐ Star!**
+If you find this useful, please give it a ⭐ Star!
 
 ![Star History Chart](https://api.star-history.com/svg?repos=SonicBotMan/lobster-press&type=Date)
 
