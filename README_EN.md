@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/lobster-press-banner.png" alt="LobsterPress - Transform AI conversations from 'ephemeral phantoms' into 'permanent nutrients in the digital hippocampus'" width="100%">
+
 # 🧠 LobsterPress v3.2.2
 
 **Cognitive Memory System for AI Agents**

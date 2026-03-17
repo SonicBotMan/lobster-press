@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
+
 # 🧠 LobsterPress v3.2.2
 
 **Cognitive Memory System for AI Agents**
