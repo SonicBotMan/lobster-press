@@ -510,7 +510,7 @@ class DAGCompressor:
         print("-" * 60)
         
         while True:
-            leaf = self.leaf_compact(conversation_id, skip_message_ids)
+            leaf = self.leaf_compact(conversation_id, skip_message_ids=skip_message_ids)
             
             if not leaf:
                 break
