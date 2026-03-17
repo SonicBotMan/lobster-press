@@ -5,6 +5,64 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.2.2] - 2026-03-17
+
+### 🎯 版本定位
+
+**工程规范整改** (Issue #108)
+
+回应 Claude Sonnet 4.6 同行评审，建立工程可信度：代码结构 × 测试覆盖 × 真实提交历史
+
+### ✨ 新增
+
+**CI/CD 工作流**
+- `.github/workflows/test.yml` - 自动化测试
+- pytest + coverage 集成
+
+**测试结构重组**
+- `tests/unit/` - 单元测试
+- `tests/integration/` - 集成测试
+- `tests/conftest.py` - 公共 fixtures
+
+**新增单元测试**
+- `test_tfidf_scorer.py` - TF-IDF 评分器
+- `test_event_segmenter.py` - 事件分割器
+- `test_conflict_detector.py` - 矛盾检测器
+- `test_semantic_memory.py` - 语义记忆
+
+**GitHub 模板**
+- `.github/PULL_REQUEST_TEMPLATE.md`
+- `.github/ISSUE_TEMPLATE/bug_report.md`
+- `.github/ISSUE_TEMPLATE/feature_request.md`
+
+### 🐛 Bug 修复
+
+- **导入路径**: 8 处 `from xxx` → `from src.xxx`
+- **full_compact**: 参数传递错误（位置参数 → 关键字参数）
+- **CI 路径**: conftest.py 添加 sys.path 设置
+
+### 🗑️ 删除
+
+- `RELEASES.md` - 重复文档
+- `RELEASE_NOTES.md` - 重复文档
+- `RELEASE_SUCCESS.md` - 私人备忘录
+- `PUSH_TO_GITHUB.md` - 私人备忘录
+- `pr_body.txt` - 临时文件
+- `lobster-press.zip` - 二进制产物
+
+### 📝 文档
+
+- **README 诚实化**: 移除无佐证"首次"声明
+- **版本历史修正**: 列出真实版本演进
+- **竞品对比客观化**: ✅/❌ → 客观描述
+
+### 📊 测试结果
+
+- 47 tests passed
+- Coverage: 42% (目标 20%)
+
+---
+
 ## [3.2.1] - 2026-03-17
 
 ### 🎯 版本定位

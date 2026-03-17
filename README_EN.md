@@ -1,18 +1,18 @@
 <div align="center">
 
-# 🧠 LobsterPress v1.0
+# 🧠 LobsterPress v3.2.2
 
-**Cognitive Memory System for AI Agents**  
+**Cognitive Memory System for AI Agents**
 *LLM Persistent Memory Engine Based on Cognitive Science*
 
-[![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
+[![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press/releases)
 [![GitHub stars](https://img.shields.io/github/stars/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![GitHub license](https://img.shields.io/github/license/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
 
 [中文](README.md) | **English**
 
-**Latest**: v1.0.0 · [Changelog](CHANGELOG.md)
+**Latest**: [v3.2.2](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.2.2) · [Changelog](CHANGELOG.md)
 
 </div>
 
@@ -344,25 +344,39 @@ src/
 
 ## 📜 Version History
 
-| Version | Date | Academic Foundation | Core Features |
-|---------|------|---------------------|---------------|
-| **v1.0.0** ⭐ | 2026-03-17 | Initial Release | DAG Compression + TF-IDF + Event Segmentation + Semantic Memory |
+| Version | Date | Notes |
+|---------|------|-------|
+| v1.0.0 ~ v1.5.5 | 2026-03-13~17 | Early iterations: DAG compression foundation |
+| v2.5.0 ~ v2.6.0 | 2026-03-17 | Cognitive science refactor: EM-LLM + Forgetting Curve |
+| v3.0.0 ~ v3.2.1 | 2026-03-17 | LLM integration: Multi-provider + Prompt optimization |
+| **v3.2.2** ⭐ | 2026-03-17 | Engineering standards: CI/CD + Test restructure |
 
 <details>
-<summary>View Version Details</summary>
+<summary>View Full Version Details</summary>
 
-### v1.0.0 (2026-03-17)
+### v3.2.2 (2026-03-17) - Engineering Standards
+- ✅ Added CI/CD workflow (.github/workflows/test.yml)
+- ✅ Test structure reorganized (unit/integration separation)
+- ✅ Added core module unit tests
+- ✅ Fixed import paths and source bugs
+- ✅ Removed虚假 files (RELEASES.md, etc.)
+- ✅ README honesty improvements
+
+### v3.2.1 (2026-03-17) - LLM Integration & Prompt Optimization
+- ✅ Centralized prompt template management
+- ✅ Optimized leaf summary, condensed summary, note extraction
+- ✅ Support for 8 major LLM providers
+
+### v2.6.0 (2026-03-17) - Cognitive Science Driven
+- ✅ EM-LLM event segmentation
+- ✅ Ebbinghaus forgetting curve
+- ✅ Semantic memory layer (notes table)
+- ✅ Conflict detection & reconsolidation
+
+### v1.0.0 (2026-03-13) - Initial Release
 - ✅ DAG lossless compression architecture
 - ✅ TF-IDF scoring + message type classification
-- ✅ Three-tier compression strategy (none/light/aggressive)
-- ✅ FTS5 full-text search
-- ✅ Event segmentation (EM-LLM)
-- ✅ Forgetting curve dynamic scoring
-- ✅ Semantic memory layer (notes table)
-- ✅ Conflict detection & memory reconsolidation
-
-### Development History
-Project started on 2026-03-15, completed current feature set through multiple iterations.
+- ✅ Three-tier compression strategy
 
 </details>
 

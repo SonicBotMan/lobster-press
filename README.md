@@ -1,18 +1,18 @@
 <div align="center">
 
-# 🧠 LobsterPress v1.0
+# 🧠 LobsterPress v3.2.2
 
-**Cognitive Memory System for AI Agents**  
+**Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
 
-[![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
+[![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press/releases)
 [![GitHub stars](https://img.shields.io/github/stars/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![GitHub license](https://img.shields.io/github/license/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: v1.0.0 · [更新日志](CHANGELOG.md)
+**最新版本**: [v3.2.2](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.2.2) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -492,25 +492,39 @@ src/
 
 ## 📜 版本历史
 
-| 版本 | 日期 | 学术基础 | 核心特性 |
-|------|------|----------|----------|
-| **v1.0.0** ⭐ | 2026-03-17 | 初始发布 | DAG 压缩 + TF-IDF + 事件分割 + 语义记忆 |
+| 版本 | 日期 | 说明 |
+|------|------|------|
+| v1.0.0 ~ v1.5.5 | 2026-03-13~17 | 早期迭代：DAG 压缩基础 |
+| v2.5.0 ~ v2.6.0 | 2026-03-17 | 认知科学重构：EM-LLM + 遗忘曲线 |
+| v3.0.0 ~ v3.2.1 | 2026-03-17 | LLM 集成：多提供商 + Prompt 优化 |
+| **v3.2.2** ⭐ | 2026-03-17 | 工程规范整改：CI/CD + 测试重组 |
 
 <details>
-<summary>查看历史版本详情</summary>
+<summary>查看完整版本详情</summary>
 
-### v1.0.0 (2026-03-17)
+### v3.2.2 (2026-03-17) - 工程规范整改
+- ✅ 添加 CI/CD 工作流 (.github/workflows/test.yml)
+- ✅ 测试结构重组 (unit/integration 分离)
+- ✅ 新增核心模块单元测试
+- ✅ 修复导入路径和源码 bug
+- ✅ 删除虚假文件 (RELEASES.md 等)
+- ✅ README 诚实化改造
+
+### v3.2.1 (2026-03-17) - LLM 集成与 Prompt 优化
+- ✅ 集中管理 Prompt 模板
+- ✅ 优化叶子摘要、压缩摘要、Note 提取
+- ✅ 支持国内外 8 个主流 LLM 提供商
+
+### v2.6.0 (2026-03-17) - 认知科学驱动
+- ✅ EM-LLM 事件分割
+- ✅ Ebbinghaus 遗忘曲线
+- ✅ 语义记忆层 (notes 表)
+- ✅ 矛盾检测与重巩固
+
+### v1.0.0 (2026-03-13) - 初始发布
 - ✅ DAG 无损压缩架构
 - ✅ TF-IDF 评分 + 消息类型分类
-- ✅ 三层压缩策略（none/light/aggressive）
-- ✅ FTS5 全文搜索
-- ✅ 事件分割（EM-LLM）
-- ✅ 遗忘曲线动态评分
-- ✅ 语义记忆层（notes 表）
-- ✅ 矛盾检测与记忆重巩固
-
-### 开发历程
-项目从 2026-03-15 开始开发，经过多次迭代完成当前功能集。
+- ✅ 三层压缩策略
 
 </details>
 
