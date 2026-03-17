@@ -23,7 +23,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
 from src.database import LobsterDatabase
-from incremental_compressor import IncrementalCompressor
+from src.incremental_compressor import IncrementalCompressor
 from src.agent_tools import lobster_grep
 from pipeline.tfidf_scorer import EXEMPT_TYPES
 
