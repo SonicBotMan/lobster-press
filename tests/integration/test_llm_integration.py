@@ -13,14 +13,14 @@ import sys
 import os
 sys.path.insert(0, '/tmp/lobster-press/src')
 
-from prompts import (
+from src.prompts import (
     build_leaf_summary_prompt,
     build_condensed_summary_prompt,
     build_note_extraction_prompt,
     estimate_tokens,
     truncate_messages
 )
-from llm_client import create_llm_client
+from src.llm_client import create_llm_client
 
 
 # 测试数据

@@ -22,9 +22,9 @@ from datetime import datetime
 # 添加 src 模块
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
 
-from database import LobsterDatabase
-from incremental_compressor import IncrementalCompressor
-from agent_tools import lobster_grep
+from src.database import LobsterDatabase
+from src.incremental_compressor import IncrementalCompressor
+from src.agent_tools import lobster_grep
 from pipeline.tfidf_scorer import EXEMPT_TYPES
 
 
