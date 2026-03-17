@@ -7,11 +7,12 @@
 ### 报告 Bug
 
 如果你发现了 Bug，请：
-1. 在 [GitHub Issues](https://github.com/SonicBotMan/lobster-press/issues) 中搜索，确保没有重复
+1. 在 [GitHub Issues](https://github.com/SonicBotMan/lobster-press/issues) 中搜索，确认没有被报告过
 2. 创建新的 Issue，包含：
-   - 清晰的标题和描述
+   - 清晰的标题
+   - 详细的问题描述
    - 复现步骤
-   - 预期行为 vs 实际行为
+   - 预期行为和实际行为
    - 环境信息（Python 版本、操作系统等）
 
 ### 提出新功能
@@ -27,6 +28,7 @@
 
 ```bash
 # 在 GitHub 上 Fork 仓库
+# 然后克隆到本地
 git clone https://github.com/YOUR_USERNAME/lobster-press.git
 cd lobster-press
 ```
@@ -34,42 +36,31 @@ cd lobster-press
 #### 2. 创建分支
 
 ```bash
-git checkout -b feature/AmazingFeature
+# 创建新分支
+git checkout -b feature/your-feature-name
 ```
 
 #### 3. 编写代码
 
 - 遵循现有的代码风格
-- 添加详细的注释
+- 添加必要的注释
 - 编写测试（如果适用）
+- 更新文档（如果需要）
 
 #### 4. 提交更改
 
 ```bash
+# 添加更改
 git add .
-git commit -m "feat: add AmazingFeature
 
-- 详细说明 1
-- 详细说明 2
+# 提交（使用清晰的提交信息）
+git commit -m "feat: add your feature description"
 
-Closes #123"
+# 推送到你的 Fork
+git push origin feature/your-feature-name
 ```
 
-**提交信息格式**：
-- `feat:` - 新功能
-- `fix:` - Bug 修复
-- `docs:` - 文档更新
-- `refactor:` - 代码重构
-- `test:` - 测试相关
-- `chore:` - 其他改动
-
-#### 5. 推送到 GitHub
-
-```bash
-git push origin feature/AmazingFeature
-```
-
-#### 6. 创建 Pull Request
+#### 5. 创建 Pull Request
 
 1. 在 GitHub 上创建 Pull Request
 2. 填写 PR 模板（如果有的话）
@@ -79,22 +70,22 @@ git push origin feature/AmazingFeature
 
 ### Python 代码
 
-- 使用 Pylint 检查代码质量
-- 遵循 PEP 8 编码规范
-- 添加类型提示（Type Hints）
-- 编写 docstring
+- 使用 Pylint 检查代码
+- 遵循 PEP 8 风格指南
+- 添加类型提示（如果可能）
+- 编写 docstrings
 
 ### Shell 脚本
 
 - 使用 ShellCheck 检查脚本
 - 添加详细的注释
-- 处理错误情况
+- 使用 `set -e` 确保错误时退出
 
 ### 文档
 
-- 使用 Markdown 格式
-- 保持简洁清晰
-- 添加示例代码
+- 使用清晰的 Markdown 格式
+- 添加代码示例
+- 更新相关的文档文件
 
 ## 🧪 测试
 
@@ -104,25 +95,35 @@ git push origin feature/AmazingFeature
 # 运行测试（如果有）
 python -m pytest tests/
 
-# 检查代码质量
+# 检查代码风格
 pylint src/
 
 # 检查 Shell 脚本
 shellcheck scripts/*.sh
 ```
 
-## 📋 行为准则
+## 📋 Pull Request 检查清单
 
-- 尊重所有贡献者
-- 保持建设性的讨论
-- 欢迎不同的观点和经验
+在提交 PR 之前，请确认：
 
-## ❓ 有问题？
+- [ ] 代码遵循项目的代码规范
+- [ ] 添加了必要的测试
+- [ ] 所有测试都通过
+- [ ] 更新了相关文档
+- [ ] 提交信息清晰明了
+- [ ] PR 标题清晰描述更改内容
+
+## 💬 获取帮助
 
 如果你有任何问题，可以：
+
 - 在 [GitHub Discussions](https://github.com/SonicBotMan/lobster-press/discussions) 中提问
-- 发送邮件到项目维护者
+- 在 [GitHub Issues](https://github.com/SonicBotMan/lobster-press/issues) 中报告问题
+
+## 🙏 感谢
+
+感谢所有为 LobsterPress 做出贡献的人！
 
 ---
 
-再次感谢你的贡献！🙏
+**LobsterPress** - *从有损到无损的跨越* 🦞✨
