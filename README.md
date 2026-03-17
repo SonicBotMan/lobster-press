@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/SonicBotMan/lobster-press/master/docs/images/banner.jpg" alt="LobsterPress - 智能上下文压缩系统" width="800">
+<img src="https://raw.githubusercontent.com/SonicBotMan/lobster-press/master/docs/images/banner.jpg" alt="LobsterPress - 无损记忆系统" width="800">
 
 </div>
 
@@ -14,209 +14,336 @@
 
 <div align="center">
 
-**智能上下文压缩系统 - 让 AI 记忆永不溢出**
+**无损记忆系统 - 让 AI Agent 拥有永久记忆**
 
 [![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press/releases)
 [![GitHub stars](https://img.shields.io/github/stars/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 [![GitHub license](https://img.shields.io/github/license/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
 
-*把龙虾般膨胀的上下文，压成一张薄饼*
+*从龙虾般膨胀的上下文，到可追溯的 DAG 记忆*
 
-**最新版本**: [v1.5.5](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.5.5) - 2026-03-13
-**更新内容**: [CHANGELOG.md](CHANGELOG.md) | [v1.5.5 亮点](docs/v1.5.5-highlights.md)
+**最新版本**: [v2.0.0-alpha](https://github.com/SonicBotMan/lobster-press/releases/tag/v2.0.0-alpha) - 2026-03-17
+**更新内容**: [RELEASE_NOTES.md](RELEASE_NOTES.md)
 
 </div>
 
 ---
 
-## 🚀 快速开始（3 分钟）
+## 📦 版本选择指南
 
-### 1️⃣ 克隆项目
+### 🎯 两个版本，两种场景
+
+| 版本 | 定位 | 适用场景 | 下载 |
+|------|------|----------|------|
+| **v1.5.5** | 批量压缩工具 | 一次性处理大量历史数据，高性能并发 | [下载 v1.5.5](https://github.com/SonicBotMan/lobster-press/releases/tag/v1.5.5) |
+| **v2.0.0-alpha** | 无损记忆系统 | AI Agent 长期记忆，实时增量处理，可追溯 | [下载 v2.0.0-alpha](https://github.com/SonicBotMan/lobster-press/releases/tag/v2.0.0-alpha) |
+
+### ✅ 如何选择？
+
+**选择 v1.5.5（有损压缩）**：
+- ✅ 一次性处理大量历史数据
+- ✅ 对历史信息要求不高
+- ✅ 存储空间受限
+- ✅ 需要批量并发处理（6.67x 性能）
+
+**选择 v2.0.0-alpha（无损压缩）**：
+- ✅ AI Agent 需要长期记忆
+- ✅ 需要追溯原始对话内容
+- ✅ 需要搜索历史消息
+- ✅ 需要实时增量处理
+
+### 🔄 共存策略
+
+```
+历史数据 → v1.5.5 批量压缩 → 节省空间
+新数据   → v2.0.0-alpha 实时处理 → 长期保存
+```
+
+**最佳实践**: 两个版本可以同时使用，各有分工
+
+---
+
+## 🚀 快速开始（v2.0.0-alpha）
+
+### 1️⃣ 安装
+
 ```bash
 git clone https://github.com/SonicBotMan/lobster-press.git
 cd lobster-press
-```
-
-### 2️⃣ 安装依赖
-```bash
+git checkout v2.0.0-alpha
 pip install -r requirements.txt
 ```
 
-### 3️⃣ 运行压缩
-```bash
-# 单个会话
-python scripts/lobster_press_v124.py session.jsonl -o compressed.jsonl
+### 2️⃣ 初始化
 
-# 批量压缩（6.67x 性能提升）
-python scripts/batch_compressor.py sessions/ compressed/ --workers auto
+```python
+from src.database import LobsterDatabase
+from src.incremental_compressor import IncrementalCompressor
+
+# 创建数据库
+db = LobsterDatabase("lobster.db")
+
+# 创建压缩管理器
+manager = IncrementalCompressor(
+    db,
+    context_threshold=0.75,  # 75% 阈值
+    fresh_tail_count=32      # 保护最后 32 条
+)
+```
+
+### 3️⃣ 使用
+
+```python
+# 添加消息（自动压缩）
+message = {
+    'id': 'msg_001',
+    'conversationId': 'conv_123',
+    'role': 'user',
+    'content': '讨论 Python 编程...',
+    'timestamp': '2026-03-17T00:00:00Z'
+}
+result = manager.on_new_message('conv_123', message)
+
+# 查看状态
+status = manager.monitor('conv_123')
+print(f"上下文使用率: {status['context_usage']:.1%}")
 ```
 
 **完成！** ✅
 
 ---
 
-## ✨ 核心特性
+## ✨ 核心特性（v2.0.0-alpha）
 
-### 🔥 三阶段智能压缩（v1.5.5）
+### 🔥 无损存储层（Phase 1）
 
+**SQLite + FTS5 架构**
+- ✅ 永久保存所有消息（永不丢失）
+- ✅ FTS5 全文搜索（毫秒级响应）
+- ✅ DAG 层次结构（可追溯）
+- ✅ 关系映射（消息 ↔ 摘要）
+
+### 🚀 DAG 压缩逻辑（Phase 2）
+
+**层次化压缩引擎**
 ```
-输入对话 → TF-IDF 评分 → Embedding 去重 → 提取式摘要 → 压缩输出
+原始消息 → SQLite 保存 → 叶子摘要 → 压缩摘要
+    ↓           ↓            ↓           ↓
+ 100 条    永久保留      22 个       1 个
+ 416 tokens → 134 tokens (67.8% 压缩)
 ```
 
-**六大智能模块：**
-- **TFIDFScorer** - TF-IDF 三层评分（词汇稀有度 + 结构信号 + 时间衰减）
-- **SemanticDeduplicator** - 语义去重（余弦相似度 > 0.82 视为重复）
-- **ExtractiveSummarizer** - 提取式摘要（不生成新 token，零 AI 幻觉）
-- **MessageTypeWeights** - 消息类型权重（用户消息优先保留）
-- **ToolResultExtractor** - 工具结果提取（压缩长工具输出）
-- **EmbeddingDeduplicator** - Embedding 去重（语义级别去重）
+**压缩性能**:
+- **67.8% 压缩率** (416 → 134 tokens)
+- **无损追溯** - 可展开到原始消息
+- **DAG 结构** - 按深度分层
+- **Fresh tail 保护** - 最后 32 条消息不压缩
 
-### 🚀 零 API 成本
+### 🤖 Agent 工具集成（Phase 3）
 
-- **API 调用: 0** - 完全本地化，零 API 成本
-- **无 AI 幻觉** - 不生成新 token，100% 可解释
-- **100% 可追溯** - 每步压缩都可解释
-
-### 🚀 批量压缩性能优化
-
-**性能提升：6.67x** 🔥
-
-| 场景 | 单线程 | 8 线程 | 提升 |
-|------|--------|--------|------|
-| 100 sessions | 120s | 18s | **6.67x** |
-| 376 sessions | 450s | 67s | **6.67x** |
-
-**功能：**
-- 🚀 **并发处理** - 多线程并发，支持 1-8 线程
-- 📊 **实时进度** - 进度百分比、速度、预计剩余时间
-- ⏱️ **超时控制** - 单会话超时，避免卡死
-- 🎯 **智能线程配置** - 根据 CPU/内存自动推荐
-
-### 🛡️ 质量守卫（Quality Guard）
-
-- ✅ **净收益校验** - 避免负收益压缩
-- ✅ **上下文连贯性** - 强制保留最近 N 条消息
-- ✅ **Token 精确计量** - 中文误差从 30% 降至 5%
-- ✅ **压缩质量报告** - 实时反馈压缩效果
-
----
-
-## 📊 使用示例
-
-### 单个会话压缩
+**三个智能工具**
 
 ```bash
-# 基础用法
-python scripts/lobster_press_v124.py session.jsonl -o compressed.jsonl
+# 1. 搜索 - 全文搜索消息和摘要
+lobster_grep "Python" --conversation conv_123
 
-# 使用 heavy 策略
-python scripts/lobster_press_v124.py session.jsonl --strategy heavy -o compressed.jsonl
+# 2. 查看 - 检查摘要结构和统计
+lobster_describe --conversation conv_123
 
-# 预览模式（不写入文件）
-python scripts/lobster_press_v124.py session.jsonl --dry-run
-
-# 查看详细报告
-python scripts/lobster_press_v124.py session.jsonl --report
+# 3. 展开 - 展开摘要到原始消息
+lobster_expand sum_abc --max-depth 2
 ```
 
-### 批量压缩
+### ⚡ 增量压缩（Phase 4）
 
-```bash
-# 基础用法
-python scripts/batch_compressor.py sessions/ compressed/
+**自动触发压缩系统**
+- ✅ 新消息到达时自动检查
+- ✅ 智能触发（75% 上下文阈值）
+- ✅ 实时监控和统计
+- ✅ 多对话支持
 
-# 高级用法（自动线程）
-python scripts/batch_compressor.py sessions/ compressed/ --workers auto
+---
 
-# 手动指定
-python scripts/batch_compressor.py sessions/ compressed/ \
-  --strategy aggressive \
-  --workers 8 \
-  --timeout 600 \
-  --limit 100
+## 📊 架构对比
+
+### v1.5.5 架构（有损压缩）
+
+```
+输入对话 (100 条)
+    ↓
+TF-IDF 评分 + 提取式摘要
+    ↓
+压缩输出 (30 条)
+    ↓
+丢弃 70 条消息 ❌
 ```
 
-### 智能资源检测
+**特点**:
+- ✅ 零 API 成本
+- ✅ 高压缩率 (~70%)
+- ❌ **丢失 70% 消息**
+- ❌ **无法追溯**
 
-```bash
-# 自动检测并推荐线程数
-python scripts/resource_detector.py
+### v2.0.0-alpha 架构（无损压缩）
 
-# 输出示例：
-# CPU 核心数: 8
-# 可用内存: 12.5 GB
-# 推荐线程数: 6
+```
+┌─────────────────────────────────────────────────────┐
+│                 LobsterPress v2.0.0                 │
+├─────────────────────────────────────────────────────┤
+│  IncrementalCompressor (自动触发)                   │
+│           ↓                                          │
+│  DAGCompressor (层次压缩)                           │
+│           ↓                                          │
+│  LobsterDatabase (SQLite + FTS5)                    │
+│           ↓                                          │
+│  Agent Tools (搜索/查看/展开)                       │
+└─────────────────────────────────────────────────────┘
+
+输入对话 (100 条)
+    ↓
+SQLite 永久保存 ✅
+    ↓
+叶子摘要 (22 个) + Fresh tail (6 条)
+    ↓
+压缩摘要 (1 个)
+    ↓
+所有原始消息完整保留 ✅
+可随时展开查看 ✅
+```
+
+**特点**:
+- ✅ **永不丢失任何消息**
+- ✅ **可追溯原始内容**
+- ✅ **FTS5 全文搜索**
+- ✅ **Agent 工具集成**
+
+---
+
+## 💡 使用示例（v2.0.0-alpha）
+
+### 智能记忆管理
+
+```python
+from src.database import LobsterDatabase
+from src.incremental_compressor import IncrementalCompressor
+
+# 初始化
+db = LobsterDatabase("lobster.db")
+manager = IncrementalCompressor(db, context_threshold=0.75)
+
+# 添加消息（自动压缩）
+for i in range(100):
+    message = {
+        'id': f'msg_{i:03d}',
+        'conversationId': 'conv_123',
+        'role': 'user' if i % 2 == 0 else 'assistant',
+        'content': f'这是第 {i} 条消息',
+        'timestamp': f'2026-03-17T{i:02d}:00:00Z'
+    }
+    manager.on_new_message('conv_123', message)
+
+# 监控状态
+status = manager.monitor('conv_123')
+print(f"总消息数: {status['total_messages']}")
+print(f"总摘要数: {status['total_summaries']}")
+print(f"上下文使用率: {status['context_usage']:.1%}")
+```
+
+### 搜索历史消息
+
+```python
+from src.agent_tools import lobster_grep
+
+# 搜索包含 "Python" 的消息
+results = lobster_grep(db, "Python", conversation_id="conv_123", limit=10)
+
+for result in results:
+    print(f"[{result['type']}] {result['id']}")
+    print(f"  内容: {result['content'][:60]}...")
+    print(f"  相关度: {result['score']:.2f}")
+```
+
+### 展开摘要查看原始内容
+
+```python
+from src.agent_tools import lobster_describe, lobster_expand
+
+# 查看对话结构
+structure = lobster_describe(db, conversation_id="conv_123")
+print(f"摘要分布:")
+for depth, count in structure['by_depth'].items():
+    print(f"  Depth {depth}: {count} 个")
+
+# 展开特定摘要
+if structure['total_summaries'] > 0:
+    summary_id = structure['by_depth'][0][0]['summary_id']
+    expanded = lobster_expand(db, summary_id)
+    print(f"\n展开 {expanded['total_messages']} 条原始消息:")
+    for msg in expanded['messages'][:5]:
+        print(f"  [{msg['role']}] {msg['content'][:60]}...")
 ```
 
 ---
 
-## 💡 压缩策略
+## 📈 性能指标
 
-| 策略 | 保留率 | 使用场景 | 压缩强度 |
-|------|--------|----------|----------|
-| **light** | 85% | 轻度压缩，保留大部分内容 | ⭐ |
-| **medium** | 70% | 平衡策略（默认） | ⭐⭐ |
-| **heavy** | 55% | 激进压缩，最大化节省 | ⭐⭐⭐ |
+### 压缩性能（v2.0.0-alpha）
+
+| 指标 | 数值 |
+|------|------|
+| **压缩率** | 67.8% (416 → 134 tokens) |
+| **压缩速度** | ~2 秒 / 30 条消息 |
+| **内存效率** | 70.8% 减少 |
+| **搜索速度** | 毫秒级 (FTS5) |
+
+### 测试数据
+
+```
+测试场景: 30 条消息
+- 叶子摘要: 6 个
+- 压缩摘要: 1 个
+- 压缩消息: 24 条 (80%)
+- Fresh tail: 6 条 (20%)
+- 数据库大小: ~120 KB
+```
+
+### 版本对比
+
+| 功能 | v1.5.5 | v2.0.0-alpha |
+|------|--------|--------------|
+| **压缩率** | ~70% | 67.8% |
+| **无损存储** | ❌ | ✅ |
+| **全文搜索** | ❌ | ✅ |
+| **DAG 结构** | ❌ | ✅ |
+| **Agent 工具** | ❌ | ✅ |
+| **增量压缩** | ❌ | ✅ |
+| **追溯能力** | ❌ | ✅ |
+| **批量并发** | ✅ | ❌ (暂无) |
 
 ---
 
-## 🏗️ 架构说明
+## 🏗️ 项目结构
 
-### v1.5.x 三阶段压缩架构
-
-```
-输入 JSONL → OpenClawSessionParser
-    │
-    ├─ Stage 1: TF-IDF 评分
-    │   ├─ TFIDFScorer（三层评分）
-    │   └─ MessageTypeWeights（类型权重）
-    │
-    ├─ Stage 2: Embedding 去重
-    │   ├─ EmbeddingDeduplicator（语义去重）
-    │   └─ SemanticDeduplicator（相似度计算）
-    │
-    └─ Stage 3: 提取式摘要
-        ├─ ExtractiveSummarizer（关键句提取）
-        └─ ToolResultExtractor（工具结果压缩）
-    │
-    └─ 输出 JSONL（保留完整元数据）
-```
-
-**关键特点：**
-- ✅ **零 API 调用** - 完全本地化
-- ✅ **零 AI 幻觉** - 不生成新 token
-- ✅ **100% 可解释** - 每步都可追溯
-
-### v1.3.x 批量处理架构
+### v2.0.0-alpha 结构
 
 ```
-systemd timer
-    └── lobster_runner.sh（轻量 Shell）
-            │
-            ├── lobster_press_v155.py（核心引擎）
-            │   ├── 三阶段压缩
-            │   ├── Token 计数
-            │   ├── 净收益校验
-            │   └── 质量守卫
-            │
-            └── batch_compressor.py（批量处理）
-                ├── 并发处理（6.67x 性能提升）
-                ├── 实时进度
-                └── 超时控制
+lobster-press/
+├── src/
+│   ├── database.py (18 KB) ✅ Phase 1
+│   ├── dag_compressor.py (17.5 KB) ✅ Phase 2
+│   ├── agent_tools.py (14.3 KB) ✅ Phase 3
+│   └── incremental_compressor.py (9.1 KB) ✅ Phase 4
+├── docs/
+│   ├── OPTIMIZATION-PROPOSAL.md (12 KB)
+│   └── OPTIMIZATION-SUMMARY.md (4 KB)
+├── test_agent_tools.py (5.9 KB)
+├── RELEASE_NOTES.md (9 KB)
+└── README.md
+
+总代码量: 3,500+ 行
 ```
 
-### 压缩阈值
-
-| Token 使用率 | 策略 | 操作 |
-|--------------|------|------|
-| < 70% | none | 无需压缩 |
-| 70-85% | light | 轻度压缩 |
-| 85-95% | medium | 中度压缩 |
-| > 95% | heavy | 重度压缩 |
-
----
-
-## 📁 项目结构
+### v1.5.5 结构
 
 ```
 lobster-press/
@@ -242,108 +369,63 @@ lobster-press/
 
 ---
 
-## 📈 性能指标
+## 🗺️ 路线图
 
-### 压缩效果
+### v2.1.0 (计划中)
 
-| 上下文大小 | 压缩率 | Token 节省 |
-|------------|--------|------------|
-| 5k tokens | 40% | ~2,000 |
-| 15k tokens | 50% | ~7,500 |
-| 30k tokens | 60% | ~18,000 |
+- [ ] Web UI 可视化
+- [ ] 批量导入工具（v1.5.5 → v2.0.0）
+- [ ] 并发处理支持
+- [ ] 性能优化
 
-### 批量压缩性能
+### v2.2.0 (未来)
 
-| 场景 | 单线程 | 8 线程 | 提升 |
-|------|--------|--------|------|
-| 100 sessions | 120s | 18s | **6.67x** |
-| 376 sessions | 450s | 67s | **6.67x** |
+- [ ] 云存储后端
+- [ ] 多语言支持
+- [ ] 高级分析
+- [ ] 插件系统
 
-### 系统开销
+---
 
-- **CPU**: < 5%（单线程）
-- **内存**: < 100MB
-- **磁盘**: 临时文件 < 1MB
+## 📚 文档
+
+### v2.0.0-alpha 文档
+
+- **[Release Notes](RELEASE_NOTES.md)** - v2.0.0-alpha 发布说明
+- **[Optimization Proposal](docs/OPTIMIZATION-PROPOSAL.md)** - 优化提案
+- **[Optimization Summary](docs/OPTIMIZATION-SUMMARY.md)** - 实施总结
+
+### v1.5.5 文档
+
+- **[Changelog](CHANGELOG.md)** - v1.5.5 更新日志
+- **[API 文档](docs/API.md)** - API 文档
+- **[架构文档](docs/ARCHITECTURE.md)** - 架构文档
+- **[批量压缩文档](docs/BATCH-COMPRESSION.md)** - 批量压缩文档
 
 ---
 
 ## 🤝 贡献指南
 
-### 贡献方式
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 提交 Pull Request
-
-### 代码规范
-
-- 使用 ShellCheck 检查 Bash 脚本
-- 使用 Pylint 检查 Python 代码
-- 添加详细注释
-- 遵循现有代码风格
+欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
-## 📝 更新日志
-
-### v1.4.2 (2026-03-12) - Latest
-
-- 🔥 **Issue #71: 语义去重异常时状态不一致**
-  - 问题: 去重时直接修改 older_messages，异常时状态不一致
-  - 修复: 使用新变量 deduplicated_older_messages 存储去重结果
-  - 验证: ✅ 异常时保持原始列表
-- 🎯 **质量保证**
-  - 状态一致性验证通过
-  - 质量评分: 100/100
-
-### v1.4.1 (2026-03-12)
-
-- 🔥 **Issue #69: TFIDFScorer 单独调用时评分恒为 0**
-  - 问题: score_message() 单独调用时 idf_cache 为空
-  - 修复: 添加 fallback 到 TF (无语料库时的最佳估算)
-  - 验证: ✅ 无语料库时评分 5.32 (fallback 生效)
-- 🔥 **Issue #70: IncrementalCompressor 分块压缩导致 summary 重复**
-  - 问题: 每个 chunk 生成一个 summary，10 个 chunk = 10 条 summary
-  - 修复: 移除分块逻辑，直接压缩整个文件
-  - 验证: ✅ 50 条消息 -> 36 条消息，summary 消息数 1
-- 🎯 **质量保证**
-  - 所有测试通过
-  - 质量评分: 100/100
-
-### v1.4.0 (2026-03-11)
-
-- 🔥 **Issue #63: 集成三个核心模块**
-  - TF-IDF 评分器 (真正的 TF-IDF 评分)
-  - 语义去重 (余弦相似度 > 0.82)
-  - 提取式摘要 (选择信息密度最高的句子)
-- 🔥 **Issue #64: Quality Guard 字段修复**
-  - 消除假阳性
-  - 决策保留率检查正常
-  - 配置完整性检查正常
-  - 上下文连贯性检查正常
-- 🔥 **Issue #65: 增量压缩集成真实引擎**
-  - 集成 LobsterPressV124.compress()
-  - 分块处理 (500条/块)
-  - 支持进度保存和恢复
-- 🎯 **质量保证**
-  - 所有测试通过
-  - 质量评分: 100/100
-
-### v1.3.3 (2026-03-11)
-- 🔥 合并 v1.2.4-hotfix1-6 (25 个 Bug 修复)
-- 🚀 合并 v1.3.2 (6.67x 性能提升)
-- 📊 实时进度、超时控制
-- 🎯 智能线程配置
-
-**详细更新**: [CHANGELOG.md](CHANGELOG.md)
-
----
-
-## 📄 许可证
+## 📜 许可证
 
 本项目采用 [MIT 许可证](LICENSE)。
+
+---
+
+## 🙏 致谢
+
+**灵感来源**:
+- **lossless-claw** (Martian Engineering) - LCM 插件架构
+- **OpenClaw** - Agent 框架
+- **LCM** (Lossless Context Management) - 核心概念
+
+**特别感谢**:
+- 罡哥 (sonicman0261) - 项目发起人和指导
+- OpenClaw 社区 - 支持和反馈
 
 ---
 
@@ -361,5 +443,7 @@ lobster-press/
 ![Star History Chart](https://api.star-history.com/svg?repos=SonicBotMan/lobster-press&type=Date)
 
 Made with 💕 by SonicBotMan
+
+**LobsterPress** - *从有损到无损的跨越* 🦞✨
 
 </div>
