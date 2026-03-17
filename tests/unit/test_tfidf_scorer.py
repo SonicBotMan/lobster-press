@@ -29,8 +29,8 @@ class TestTFIDFScorer:
         result = scorer.score_and_tag(messages)
         assert isinstance(result, list)
 
-    def test_score_messages_returns_dict(self):
-        """score_messages should return a dict mapping id to score."""
+    def test_score_messages_returns_list(self):
+        """score_messages should return a list of ScoredMessage."""
         from src.pipeline.tfidf_scorer import TFIDFScorer
         scorer = TFIDFScorer()
         messages = [
@@ -38,7 +38,7 @@ class TestTFIDFScorer:
             {"id": "2", "content": "system setup"},
         ]
         result = scorer.score_messages(messages)
-        assert isinstance(result, dict)
+        assert isinstance(result, list)
 
     def test_tokenize_returns_list(self):
         """tokenize should return a list of tokens."""

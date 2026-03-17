@@ -13,7 +13,7 @@ Version: v3.2.0
 
 import os
 from typing import Optional, Dict, Any
-from llm_client import BaseLLMClient
+from src.llm_client import BaseLLMClient
 
 
 # ==================== 国际提供商 ====================
