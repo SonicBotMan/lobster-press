@@ -12,7 +12,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v3.0.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.0.0) · [更新日志](CHANGELOG.md)
+**最新版本**: [v3.2.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.2.0) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -227,6 +227,102 @@ result = manager.on_new_message("conv_id", {
 # result["compression_strategy"] → "none" | "light" | "aggressive"
 # result["notes_extracted"] → [{"category": "decision", "content": "..."}]
 ```
+
+---
+
+## 🤖 LLM 提供商配置 ⭐ v3.2.0
+
+LobsterPress v3.2.0 支持国内外 8 个主流 LLM 提供商，用于高质量摘要生成。
+
+### 支持的提供商
+
+**国际提供商（4个）**：
+- ✅ **OpenAI** - GPT-4o, GPT-4o-mini
+- ✅ **Anthropic** - Claude 3.5 Sonnet
+- ✅ **Google** - Gemini Pro
+- ✅ **Mistral** - Mistral Small/Medium
+
+**国内提供商（4个）**：
+- ✅ **DeepSeek** - DeepSeek Chat（推荐 ⭐）
+- ✅ **智谱 GLM** - GLM-4-Flash（推荐 ⭐）
+- ✅ **百度文心** - ERNIE Speed
+- ✅ **阿里通义** - Qwen Turbo
+
+### 快速配置
+
+**方式1: 环境变量（推荐）**
+
+```bash
+# DeepSeek（国内推荐）
+export LOBSTER_LLM_PROVIDER=deepseek
+export LOBSTER_LLM_API_KEY=sk-xxx
+export LOBSTER_LLM_MODEL=deepseek-chat
+
+# 智谱 GLM（免费额度大）
+export LOBSTER_LLM_PROVIDER=zhipu
+export LOBSTER_LLM_API_KEY=xxx.xxx
+export LOBSTER_LLM_MODEL=glm-4-flash
+
+# OpenAI（国际推荐）
+export LOBSTER_LLM_PROVIDER=openai
+export LOBSTER_LLM_API_KEY=sk-xxx
+export LOBSTER_LLM_MODEL=gpt-4o-mini
+```
+
+**方式2: 代码配置**
+
+```python
+from src.llm_client import create_llm_client
+from src.dag_compressor import DAGCompressor
+
+# 创建 LLM 客户端
+llm_client = create_llm_client(
+    provider='deepseek',
+    api_key='sk-xxx',
+    model='deepseek-chat'
+)
+
+# 传入 DAGCompressor
+compressor = DAGCompressor(db, llm_client=llm_client)
+```
+
+### 安装依赖
+
+```bash
+# DeepSeek / 阿里通义 / OpenAI（OpenAI 兼容接口）
+pip install openai
+
+# 智谱 GLM
+pip install zhipuai
+
+# Anthropic
+pip install anthropic
+
+# Google Gemini
+pip install google-generativeai
+
+# Mistral
+pip install mistralai
+```
+
+### 推荐配置
+
+| 场景 | 推荐提供商 | 原因 |
+|------|-----------|------|
+| **国内用户，性价比** | DeepSeek | 便宜，质量高 ⭐ |
+| **国内用户，免费测试** | 智谱 GLM | 免费额度大 ⭐ |
+| **国际用户，性价比** | OpenAI GPT-4o-mini | 便宜，稳定 |
+| **国际用户，高质量** | Anthropic Claude 3.5 Sonnet | 质量最高 |
+
+### 优雅降级
+
+- **无 LLM 配置**: 自动使用提取式摘要（无 API 成本）
+- **LLM 调用失败**: 自动降级为提取式摘要
+- **提供商不可用**: 自动降级为 Mock 客户端
+
+### 更多配置
+
+详见 `examples/llm_config.py`，包含所有提供商的详细配置示例。
 
 ---
 
