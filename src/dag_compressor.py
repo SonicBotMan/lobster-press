@@ -5,7 +5,7 @@ LobsterPress DAG Compressor - DAG 压缩器
 借鉴 lossless-claw 的压缩策略
 
 Author: LobsterPress Team
-Version: v2.5.0
+Version: v2.6.0
 """
 
 import sys
@@ -17,6 +17,7 @@ from pathlib import Path
 # 添加 database 模块
 sys.path.insert(0, str(Path(__file__).parent))
 from database import LobsterDatabase
+from pipeline.event_segmenter import EventSegmenter
 
 
 class DAGCompressor:
@@ -27,6 +28,7 @@ class DAGCompressor:
     2. 压缩摘要：summaries → condensed summaries
     3. Fresh tail 保护：最近 N 条消息不压缩
     4. 智能触发：达到阈值时自动压缩
+    5. v2.6.0 新增：情节边界分割（EventSegmenter）
     """
     
     def __init__(self, 
@@ -35,6 +37,8 @@ class DAGCompressor:
                  leaf_chunk_tokens: int = 20000,
                  condensed_min_fanout: int = 4):
         """初始化 DAG 压缩器
+        
+        v2.6.0 更新：添加 EventSegmenter 用于情节边界分割
         
         Args:
             db: LobsterDatabase 实例
@@ -46,6 +50,11 @@ class DAGCompressor:
         self.fresh_tail_count = fresh_tail_count
         self.leaf_chunk_tokens = leaf_chunk_tokens
         self.condensed_min_fanout = condensed_min_fanout
+        
+        # v2.6.0: 初始化情节分割器
+        self.segmenter = EventSegmenter(
+            max_episode_tokens=leaf_chunk_tokens
+        )
     
     # ==================== 叶子压缩 ====================
     
@@ -104,46 +113,51 @@ class DAGCompressor:
             print(f"⚠️ 未压缩消息 tokens ({uncompressed_tokens}) < {max_tokens}，无需压缩")
             return None
         
-        # 6. 选择消息块（限制 token 数）
-        chunk = self._select_chunk(uncompressed_messages, max_tokens)
+        # 6. v2.6.0: 使用 EventSegmenter 分割为情节
+        episodes = self.segmenter.segment(uncompressed_messages)
         
-        if not chunk:
+        if not episodes:
             return None
         
-        # 7. 生成摘要内容（使用现有的 TF-IDF + Embedding + 提取式摘要）
-        summary_content = self._generate_leaf_summary(chunk)
+        # 7. 为每个情节生成叶子摘要
+        last_summary = None
+        for episode in episodes:
+            # 生成摘要内容
+            summary_content = self._generate_leaf_summary(episode)
+            
+            # 创建摘要对象
+            summary = {
+                'conversation_id': conversation_id,
+                'kind': 'leaf',
+                'depth': 0,
+                'content': summary_content,
+                'source_messages': [m['message_id'] for m in episode],
+                'earliest_at': episode[0].get('created_at'),
+                'latest_at': episode[-1].get('created_at'),
+                'descendant_count': len(episode)
+            }
+            
+            # 保存摘要
+            summary_id = self.db.save_summary(summary)
+            summary['summary_id'] = summary_id
+            
+            # 更新上下文
+            self._update_context_after_compression(
+                conversation_id, 
+                compressed_message_ids=[m['message_id'] for m in episode],
+                new_summary_id=summary_id
+            )
+            
+            print(f"✅ 创建叶子摘要: {summary_id}")
+            print(f"   - 消息数: {len(episode)}")
+            print(f"   - Tokens: {sum(m.get('token_count', 0) for m in episode)} → {self.db._estimate_tokens(summary_content)}")
+            
+            last_summary = summary
         
-        # 8. 创建摘要对象
-        summary = {
-            'conversation_id': conversation_id,
-            'kind': 'leaf',
-            'depth': 0,
-            'content': summary_content,
-            'source_messages': [m['message_id'] for m in chunk],
-            'earliest_at': chunk[0].get('created_at'),
-            'latest_at': chunk[-1].get('created_at'),
-            'descendant_count': len(chunk)
-        }
-        
-        # 9. 保存摘要
-        summary_id = self.db.save_summary(summary)
-        summary['summary_id'] = summary_id
-        
-        # 10. 更新上下文（关键修复：避免重复压缩）
-        self._update_context_after_compression(
-            conversation_id, 
-            compressed_message_ids=[m['message_id'] for m in chunk],
-            new_summary_id=summary_id
-        )
-        
-        print(f"✅ 创建叶子摘要: {summary_id}")
-        print(f"   - 消息数: {len(chunk)}")
-        print(f"   - Tokens: {sum(m.get('token_count', 0) for m in chunk)} → {self.db._estimate_tokens(summary_content)}")
-        
-        return summary
+        return last_summary
     
     def _select_chunk(self, messages: List[Dict], max_tokens: int) -> List[Dict]:
-        """选择消息块（限制 token 数）
+        """v2.6.0: 改用动态分数排序（低分数优先压缩）
         
         Args:
             messages: 消息列表
@@ -152,10 +166,17 @@ class DAGCompressor:
         Returns:
             选中的消息块
         """
+        # v2.6.0: 按动态分数排序（低分数优先压缩）
+        messages_with_score = self.db.get_messages_with_dynamic_score(
+            messages[0].get('conversation_id')
+        )
+        # 按动态分数升序排序（分数最低的优先压缩）
+        messages_with_score.sort(key=lambda m: m.get('dynamic_score', 0.0))
+        
         chunk = []
         total_tokens = 0
         
-        for msg in messages:
+        for msg in messages_with_score:
             msg_tokens = msg.get('token_count', 0)
             
             if total_tokens + msg_tokens > max_tokens:

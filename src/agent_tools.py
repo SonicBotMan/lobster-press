@@ -132,6 +132,12 @@ def lobster_grep(db: LobsterDatabase,
     if use_tfidf_rerank:
         results.sort(key=lambda x: x['relevance'], reverse=True)
     
+    # v2.6.0: 触发记忆巩固（命中的消息重置衰减计数器）
+    if results:
+        for r in results:
+            if r['type'] == 'message':
+                    db.touch_message(r['id'])
+    
     # 限制总结果数
     return results[:limit]
 
