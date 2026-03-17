@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from database import LobsterDatabase
 from pipeline.event_segmenter import EventSegmenter
+from prompts import build_leaf_summary_prompt, build_condensed_summary_prompt
 
 
 class DAGCompressor:
@@ -184,38 +185,27 @@ class DAGCompressor:
     def _generate_llm_leaf_summary(self, messages: List[Dict]) -> str:
         """使用 LLM 生成高质量叶子摘要
         
+        v3.2.1: 使用优化的 prompt 模板
+        
         Args:
             messages: 消息列表
         
         Returns:
             LLM 生成的摘要
         """
-        # 构建对话文本
-        conversation_text = '\n\n'.join([
-            f"[{m.get('role', 'unknown')}]: {m.get('content', '')}"
-            for m in messages
-        ])
-        
-        # 构建 prompt
-        prompt = f"""请总结以下对话的核心内容，要求：
-1. 提取关键决策、结论和行动项
-2. 保留重要的技术细节和参数
-3. 简洁明了，不超过300字
-
-对话内容：
-{conversation_text}
-
-摘要："""
-
         try:
+            # 使用优化的 prompt 模板
+            prompt = build_leaf_summary_prompt(messages)
+            
             # 调用 LLM
-            summary = self.llm_client.generate(prompt)
+            summary = self.llm_client.generate(prompt, temperature=0.7, max_tokens=500)
             
             # 添加元数据
             summary_parts = []
             summary_parts.append(f"## 对话摘要 ({len(messages)} 条消息)")
             summary_parts.append(f"- 用户消息: {sum(1 for m in messages if m.get('role') == 'user')} 条")
             summary_parts.append(f"- 助手消息: {sum(1 for m in messages if m.get('role') == 'assistant')} 条")
+            summary_parts.append(f"- 生成方式: LLM (v3.2.1)")
             summary_parts.append("")
             summary_parts.append("### 核心内容:")
             summary_parts.append(summary)
@@ -360,6 +350,8 @@ class DAGCompressor:
     def _generate_llm_condensed_summary(self, combined_content: str, depth: int) -> str:
         """使用 LLM 生成高质量压缩摘要
         
+        v3.2.1: 使用优化的 prompt 模板
+        
         Args:
             combined_content: 合并的内容
             depth: 当前深度
@@ -367,27 +359,19 @@ class DAGCompressor:
         Returns:
             LLM 生成的摘要
         """
-        # 构建 prompt
-        prompt = f"""请总结以下内容的核心要点，要求：
-1. 提取最重要的信息和结论
-2. 保留关键技术细节
-3. 简洁明了，不超过200字
-4. 这是第 {depth + 1} 层压缩摘要
-
-内容：
-{combined_content[:2000]}
-
-摘要："""
-
         try:
+            # 使用优化的 prompt 模板
+            prompt = build_condensed_summary_prompt(combined_content[:3000], depth + 1)
+            
             # 调用 LLM
-            summary = self.llm_client.generate(prompt)
+            summary = self.llm_client.generate(prompt, temperature=0.6, max_tokens=400)
             
             # 添加元数据
             summary_parts = []
             summary_parts.append(f"## 压缩摘要 (Depth {depth + 1})")
             summary_parts.append(f"- 原始长度: {len(combined_content)} 字符")
             summary_parts.append(f"- 摘要长度: {len(summary)} 字符")
+            summary_parts.append(f"- 生成方式: LLM (v3.2.1)")
             summary_parts.append("")
             summary_parts.append("### 核心要点:")
             summary_parts.append(summary)

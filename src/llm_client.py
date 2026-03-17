@@ -39,13 +39,33 @@ class BaseLLMClient(ABC):
 
 
 class MockLLMClient(BaseLLMClient):
-    """模拟 LLM 客户端（用于测试）"""
+    """模拟 LLM 客户端（用于测试）
     
-    def __init__(self, response: str = "这是一个模拟摘要。"):
-        self.response = response
+    v3.2.1: 智能响应，根据 prompt 类型返回合适的格式
+    """
+    
+    def __init__(self, response: str = None):
+        self.default_response = response or "这是一个模拟摘要。"
     
     def generate(self, prompt: str, **kwargs) -> str:
-        return self.response
+        """智能生成响应
+        
+        根据 prompt 内容返回合适的格式：
+        - JSON 请求 → 返回 JSON 格式
+        - 摘要请求 → 返回摘要格式
+        - 其他 → 返回默认响应
+        """
+        # 检测是否需要 JSON 响应
+        if "JSON" in prompt or "稳定的语义知识" in prompt or "提取结果" in prompt:
+            # Note 提取场景：返回 JSON 数组
+            return '[]'  # 空数组，避免测试失败
+        
+        # 检测是否需要摘要
+        if "摘要" in prompt or "总结" in prompt:
+            return self.default_response
+        
+        # 默认响应
+        return self.default_response
     
     def is_available(self) -> bool:
         return True
@@ -107,7 +127,7 @@ def create_llm_client(
     
     # 尝试导入提供商适配器
     try:
-        from .llm_providers import get_provider_client
+        from llm_providers import get_provider_client
         return get_provider_client(provider, api_key, model, **kwargs)
     except ImportError as e:
         print(f"⚠️ 无法加载 LLM 提供商 {provider}: {e}")
