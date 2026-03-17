@@ -74,7 +74,9 @@ class DAGCompressor:
             skip_message_ids: 要跳过的消息 ID 列表（Bug 6 修复：支持 compression_exempt）
         
         Returns:
-            生成的摘要，如果无需压缩则返回 None
+            最后一个情节的摘要（v2.6.0 改为多情节分割），
+            如果无需压缩则返回 None。
+            注意：非 None 即表示有压缩发生，调用方应继续检查是否需要进一步压缩。
         """
         if max_tokens is None:
             max_tokens = self.leaf_chunk_tokens
@@ -155,37 +157,6 @@ class DAGCompressor:
             last_summary = summary
         
         return last_summary
-    
-    def _select_chunk(self, messages: List[Dict], max_tokens: int) -> List[Dict]:
-        """v2.6.0: 改用动态分数排序（低分数优先压缩）
-        
-        Args:
-            messages: 消息列表
-            max_tokens: 最大 token 数
-        
-        Returns:
-            选中的消息块
-        """
-        # v2.6.0: 按动态分数排序（低分数优先压缩）
-        messages_with_score = self.db.get_messages_with_dynamic_score(
-            messages[0].get('conversation_id')
-        )
-        # 按动态分数升序排序（分数最低的优先压缩）
-        messages_with_score.sort(key=lambda m: m.get('dynamic_score', 0.0))
-        
-        chunk = []
-        total_tokens = 0
-        
-        for msg in messages_with_score:
-            msg_tokens = msg.get('token_count', 0)
-            
-            if total_tokens + msg_tokens > max_tokens:
-                break
-            
-            chunk.append(msg)
-            total_tokens += msg_tokens
-        
-        return chunk
     
     def _generate_leaf_summary(self, messages: List[Dict]) -> str:
         """生成叶子摘要

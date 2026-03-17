@@ -12,6 +12,7 @@ import sqlite3
 import json
 import hashlib
 import uuid
+import math
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime
@@ -360,8 +361,6 @@ class LobsterDatabase:
         Returns:
             动态保留率（0.0 - base_score）
         """
-        import math
-        
         STABILITY_MAP = {
             'decision': 90.0,
             'config':   120.0,

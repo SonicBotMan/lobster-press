@@ -61,19 +61,33 @@ class EventSegmenter:
         索引 0 始终是边界（第一个情节的开始）。
         """
         boundaries = [0]
+        episode_tokens = 0  # v2.6.0: 累计当前情节的 token 数
         
         for i in range(1, len(messages)):
             prev = messages[i - 1]
             curr = messages[i]
+            curr_tokens = self._estimate_tokens(curr.get('content', ''))
             
-            if self._is_boundary(prev, curr, messages, i):
+            if self._is_boundary(prev, curr, messages, i, episode_tokens + curr_tokens):
                 boundaries.append(i)
+                episode_tokens = 0  # 重置计数器
+            else:
+                episode_tokens += curr_tokens
         
         return boundaries
     
     def _is_boundary(self, prev: Dict, curr: Dict,
-                     messages: List[Dict], idx: int) -> bool:
-        """判断 prev -> curr 之间是否存在情节边界"""
+                     messages: List[Dict], idx: int,
+                     episode_tokens: int) -> bool:
+        """判断 prev -> curr 之间是否存在情节边界
+        
+        Args:
+            prev: 前一条消息
+            curr: 当前消息
+            messages: 完整消息列表
+            idx: 当前消息索引
+            episode_tokens: 从上一个边界到当前的累计 token 数（v2.6.0 优化）
+        """
         
         # 1. 显式边界：system 消息（角色切换、对话重置）
         if curr.get('role') == 'system':
@@ -96,12 +110,8 @@ class EventSegmenter:
                 return True
         
         # 4. 硬上限：当前情节累计 token 超过 max_episode_tokens
-        # 找到最近一个边界，累计该边界到 idx 的 token
-        # （简化：直接检查 idx 附近窗口的 token 总量）
-        window = messages[max(0, idx - 50):idx + 1]
-        window_tokens = sum(self._estimate_tokens(m.get('content', ''))
-                            for m in window)
-        if window_tokens > self.max_episode_tokens:
+        # v2.6.0 优化：使用真实累计 token 而非固定窗口
+        if episode_tokens > self.max_episode_tokens:
             return True
         
         return False
@@ -144,8 +154,8 @@ class EventSegmenter:
         
         return merged
     
-    def _get_time_gap(self, prev: Dict, curr: Dict) -> float:
-        """获取两条消息间的时间差（秒），解析失败返回 0"""
+    def _get_time_gap(self, prev: Dict, curr: Dict) -> float | None:
+        """获取两条消息间的时间差（秒），解析失败返回 None"""
         try:
             t1 = datetime.fromisoformat(
                 prev.get('created_at') or prev.get('timestamp', '')
@@ -155,7 +165,7 @@ class EventSegmenter:
             )
             return abs((t2 - t1).total_seconds())
         except Exception:
-            return 0
+            return None
     
     def _tokenize(self, text: str) -> Counter:
         """简单分词（支持中英文），返回词频 Counter"""

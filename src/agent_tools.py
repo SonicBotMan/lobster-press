@@ -136,7 +136,7 @@ def lobster_grep(db: LobsterDatabase,
     if results:
         for r in results:
             if r['type'] == 'message':
-                    db.touch_message(r['id'])
+                db.touch_message(r['id'])
     
     # 限制总结果数
     return results[:limit]
