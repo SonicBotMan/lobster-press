@@ -173,6 +173,9 @@ class LobsterDatabase:
         
         # v2.5.0 迁移
         self.migrate_v25()
+        
+        # v2.6.0 迁移
+        self.migrate_v26()
     
     def migrate_v25(self):
         """v2.5.0 schema 迁移
@@ -709,29 +712,27 @@ class LobsterDatabase:
         
         Args:
             row: 数据库行
-            table: 表名
+            table: 表名（仅用于 fallback）
         
         Returns:
             字典对象
         """
-        if table == 'messages':
-            columns = ['id', 'message_id', 'conversation_id', 'seq', 'role', 
-                      'content', 'token_count', 'created_at', 'metadata',
-                      'msg_type', 'tfidf_score', 'structural_bonus', 'compression_exempt']
-        elif table == 'summaries':
-            columns = ['id', 'summary_id', 'conversation_id', 'kind', 'depth',
-                      'content', 'token_count', 'earliest_at', 'latest_at',
-                      'descendant_count', 'created_at']
+        # 优先使用 cursor.description 动态获取列名（健壮方案）
+        if hasattr(self.cursor, 'description') and self.cursor.description:
+            columns = [desc[0] for desc in self.cursor.description]
         else:
-            return dict(row)
-        
-        # 处理额外的字段（如 snippet）
-        extra_columns = len(row) - len(columns)
-        if extra_columns > 0:
-            # 获取额外的列名（从 cursor description）
-            if hasattr(self.cursor, 'description'):
-                all_columns = [desc[0] for desc in self.cursor.description]
-                columns = all_columns
+            # Fallback: 使用硬编码列表（仅在特殊情况下）
+            if table == 'messages':
+                columns = ['id', 'message_id', 'conversation_id', 'seq', 'role', 
+                          'content', 'token_count', 'created_at', 'metadata',
+                          'msg_type', 'tfidf_score', 'structural_bonus', 'compression_exempt',
+                          'last_accessed_at', 'access_count', 'stability']
+            elif table == 'summaries':
+                columns = ['id', 'summary_id', 'conversation_id', 'kind', 'depth',
+                          'content', 'token_count', 'earliest_at', 'latest_at',
+                          'descendant_count', 'created_at']
+            else:
+                return dict(row)
         
         result = dict(zip(columns, row))
         
