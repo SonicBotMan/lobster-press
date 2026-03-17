@@ -5,6 +5,91 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [2.6.0] - 2026-03-17
+
+### 🎯 版本定位
+
+**认知科学驱动的记忆系统重构**
+
+基于认知科学研究论文（EM-LLM ICLR 2025, HiMem, FOREVER 等）实现 P0 功能
+
+### ✨ 新增功能
+
+**Feature 1: 遗忘曲线动态评分**
+- Ebbinghaus 遗忘曲线: `R(t) = base_score * e^(-t/stability)`
+- 按 msg_type 分配稳定性:
+  - decision: 90 天（关键决策，长期保留）
+  - config: 120 天（配置信息，最稳定）
+  - code: 60 天（代码相关，技术债务）
+  - error: 30 天（错误日志，问题追踪）
+  - chitchat: 3 天（闲聊内容，快速遗忘）
+  - question: 7 天（问题记录，中期保留）
+  - unknown: 14 天（默认保留期）
+- Schema 扩展:
+  - `last_accessed_at` (TIMESTAMP): 最后访问时间
+  - `access_count` (INTEGER): 访问次数
+  - `stability` (REAL): 稳定性参数
+- Memory consolidation: `lobster_grep` 命中时调用 `touch_message()` 刷新记忆
+- 新增 API:
+  - `migrate_v26()`: v2.5.1 → v2.6.0 schema 迁移
+  - `touch_message(message_id)`: 刷新消息访问时间
+  - `get_messages_with_dynamic_score(conversation_id)`: 动态评分查询
+  - `_compute_retention(msg)`: 计算动态保留率
+
+**Feature 2: 事件分割（EM-LLM ICLR 2025）**
+- 语义边界检测:
+  - TF-IDF 相似度 < 0.25 触发新情节
+  - 话题突变检测（余弦距离）
+- 时间断层检测:
+  - 消息间隔 > 1 小时自动分割
+  - `_get_time_gap()` 精确计算时间差
+- 显式信号检测:
+  - `role=system` 消息触发新情节
+  - 对话重置和角色切换
+- 硬上限保护:
+  - 累计 token > `max_episode_tokens` 强制分割
+  - 使用真实累计 token（优化固定 50 条窗口问题）
+- 小情节合并:
+  - 单消息情节自动合并到相邻情节
+  - 防止过度分割
+- 新增文件:
+  - `src/pipeline/event_segmenter.py` (216 行)
+  - `EventSegmenter` 类，支持 `segment()` 方法
+- DAGCompressor 集成:
+  - `leaf_compact()` 使用 `EventSegmenter` 替代固定 token 分块
+  - 多情节并行压缩
+
+### 🐛 Bug 修复（代码审查）
+
+1. ✅ 修正 `agent_tools.py` `touch_message` 调用缩进（视觉误导）
+2. ✅ 删除 `dag_compressor._select_chunk` 悬空方法（逻辑冲突）
+3. ✅ 修复 `event_segmenter._get_time_gap` 返回值类型（0 → None）
+
+### 🎨 代码质量改进
+
+1. ✅ `database.py`: `import math` 移至文件顶部
+2. ✅ `dag_compressor.py`: `leaf_compact` 返回值注释（多情节分割）
+3. ✅ `event_segmenter.py`: 硬上限检测改用真实累计 token
+
+### 📊 代码变更
+
+- **4 个文件修改**（+388 行，-57 行）
+- **净增加**: 331 行
+- **新增文件**: `src/pipeline/event_segmenter.py`
+
+### ✅ 测试结果
+
+```
+EventSegmenter 单元测试 ... ok
+语法检查 ... ok
+```
+
+### 🔗 关联 Issue
+
+Closes #97
+
+---
+
 ## [2.5.1] - 2026-03-17
 
 ### 🎯 版本定位
