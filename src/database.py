@@ -12,6 +12,7 @@ import sqlite3
 import json
 import hashlib
 import uuid
+import math
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime
@@ -194,6 +195,29 @@ class LobsterDatabase:
         
         self.conn.commit()
     
+    def migrate_v26(self):
+        """v2.6.0 schema 迁移：支持遗忘曲线动态评分
+        
+        新增字段：
+        - last_accessed_at: 最后访问时间（记忆巩固）
+        - access_count: 访问次数
+        - stability: 稳定性参数（半衰期天数）
+        """
+        migrations = [
+            "ALTER TABLE messages ADD COLUMN last_accessed_at TEXT",
+            "ALTER TABLE messages ADD COLUMN access_count INTEGER DEFAULT 0",
+            "ALTER TABLE messages ADD COLUMN stability REAL DEFAULT 14.0",
+        ]
+        
+        for sql in migrations:
+            try:
+                self.cursor.execute(sql)
+            except sqlite3.OperationalError:
+                # 字段已存在，跳过
+                pass
+        
+        self.conn.commit()
+    
     # ==================== 消息操作 ====================
     
     def save_message(self, message: Dict) -> str:
@@ -273,6 +297,99 @@ class LobsterDatabase:
         rows = self.cursor.fetchall()
         
         return [self._row_to_dict(row, 'messages') for row in rows]
+    
+    def get_messages_with_dynamic_score(
+        self, conversation_id: str, current_time: datetime = None
+    ) -> List[Dict]:
+        """
+        v2.6.0：获取消息列表，附带实时计算的动态重要性分数（遗忘曲线）
+        
+        Args:
+            conversation_id: 对话 ID
+            current_time: 当前时间（用于测试）
+        
+        Returns:
+            带 dynamic_score 字段的消息列表
+        """
+        if current_time is None:
+            current_time = datetime.utcnow()
+        
+        messages = self.get_messages(conversation_id)
+        for msg in messages:
+            msg['dynamic_score'] = self._compute_retention(msg, current_time)
+        
+        return messages
+    
+    def touch_message(self, message_id: str):
+        """
+        v2.6.0：更新消息的最后访问时间和访问次数（记忆巩固）
+        
+        每次 lobster_grep 命中时调用，被引用的记忆重置衰减计数器，
+        稳定性提升（间隔重复效应）。
+        
+        Args:
+            message_id: 消息 ID
+        """
+        now = datetime.utcnow().isoformat()
+        self.cursor.execute("""
+            UPDATE messages
+            SET last_accessed_at = ?,
+                access_count = COALESCE(access_count, 0) + 1,
+                stability = COALESCE(stability, 14.0) * 1.3
+            WHERE message_id = ?
+        """, (now, message_id))
+        self.conn.commit()
+    
+    def _compute_retention(self, msg: Dict, current_time: datetime) -> float:
+        """
+        v2.6.0：计算动态保留率（遗忘曲线）
+        
+        R(t) = base_score * e^(-t / stability)
+        
+        stability（半衰期天数）按消息类型设置：
+          decision : 90 天  — 架构决策应该长期记住
+          config   : 120 天 — 配置信息极少变化
+          code     : 60 天  — 代码片段中期保留
+          error    : 30 天  — 错误日志短期高价值
+          chitchat : 3 天   — 闲聊迅速归零
+          unknown  : 14 天  — 默认两周
+        
+        Args:
+            msg: 消息字典
+            current_time: 当前时间
+        
+        Returns:
+            动态保留率（0.0 - base_score）
+        """
+        STABILITY_MAP = {
+            'decision': 90.0,
+            'config':   120.0,
+            'code':     60.0,
+            'error':    30.0,
+            'chitchat': 3.0,
+            'question': 7.0,
+            'unknown':  14.0,
+        }
+        
+        base_score = msg.get('tfidf_score', 1.0) + msg.get('structural_bonus', 0.0)
+        msg_type = msg.get('msg_type', 'unknown')
+        stability = msg.get('stability') or STABILITY_MAP.get(msg_type, 14.0)
+        
+        # 上次访问时间（优先用 last_accessed_at，其次 created_at）
+        ref_time_str = msg.get('last_accessed_at') or msg.get('created_at')
+        try:
+            ref_time = datetime.fromisoformat(ref_time_str)
+            delta_days = (current_time - ref_time).total_seconds() / 86400.0
+        except Exception:
+            delta_days = 0.0
+        
+        retention = math.exp(-max(delta_days, 0) / stability)
+        
+        # compression_exempt 的消息保留率不衰减
+        if msg.get('compression_exempt'):
+            return base_score  # 不乘衰减系数
+        
+        return base_score * retention
     
     def remove_messages_from_context(self, conversation_id: str, message_ids: List[str]) -> int:
         """从 context_items 中移除指定消息（light 去重策略使用）
