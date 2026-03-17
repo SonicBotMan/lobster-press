@@ -60,3 +60,21 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+
+# 压缩包
+*.zip
+*.tar.gz
+*.tar.bz2
+
+# 测试覆盖率
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Python 打包
+dist/
+build/
+*.egg-info/
+*.egg
+.eggs/
