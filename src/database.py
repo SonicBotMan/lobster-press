@@ -47,6 +47,11 @@ class LobsterDatabase:
                 token_count INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL,
                 metadata TEXT,
+                -- v2.5.0 新增字段
+                msg_type TEXT DEFAULT 'unknown',
+                tfidf_score REAL DEFAULT 0.0,
+                structural_bonus REAL DEFAULT 0.0,
+                compression_exempt INTEGER DEFAULT 0,
                 FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id)
             );
         """)
@@ -163,6 +168,30 @@ class LobsterDatabase:
         """)
         
         self.conn.commit()
+        
+        # v2.5.0 迁移
+        self.migrate_v25()
+    
+    def migrate_v25(self):
+        """v2.5.0 schema 迁移
+        
+        为已有数据库添加新字段（向前兼容）
+        """
+        migrations = [
+            "ALTER TABLE messages ADD COLUMN msg_type TEXT DEFAULT 'unknown'",
+            "ALTER TABLE messages ADD COLUMN tfidf_score REAL DEFAULT 0.0",
+            "ALTER TABLE messages ADD COLUMN structural_bonus REAL DEFAULT 0.0",
+            "ALTER TABLE messages ADD COLUMN compression_exempt INTEGER DEFAULT 0",
+        ]
+        
+        for sql in migrations:
+            try:
+                self.cursor.execute(sql)
+            except sqlite3.OperationalError:
+                # 字段已存在，跳过
+                pass
+        
+        self.conn.commit()
     
     # ==================== 消息操作 ====================
     
@@ -170,7 +199,7 @@ class LobsterDatabase:
         """保存消息（永久存储）
         
         Args:
-            message: 消息对象
+            message: 消息对象（v2.5.0 支持 msg_type, tfidf_score, compression_exempt）
         
         Returns:
             message_id
@@ -184,11 +213,19 @@ class LobsterDatabase:
         created_at = message.get('timestamp') or datetime.utcnow().isoformat()
         metadata = json.dumps(message, ensure_ascii=False)
         
+        # v2.5.0 新字段
+        msg_type = message.get('msg_type', 'unknown')
+        tfidf_score = message.get('tfidf_score', 0.0)
+        structural_bonus = message.get('structural_bonus', 0.0)
+        compression_exempt = 1 if message.get('compression_exempt', False) else 0
+        
         self.cursor.execute("""
             INSERT OR REPLACE INTO messages 
-            (message_id, conversation_id, seq, role, content, token_count, created_at, metadata)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (message_id, conversation_id, seq, role, content, token_count, created_at, metadata))
+            (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
+             msg_type, tfidf_score, structural_bonus, compression_exempt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
+              msg_type, tfidf_score, structural_bonus, compression_exempt))
         
         # 更新 FTS 索引
         self.cursor.execute("""
@@ -492,7 +529,8 @@ class LobsterDatabase:
         """
         if table == 'messages':
             columns = ['id', 'message_id', 'conversation_id', 'seq', 'role', 
-                      'content', 'token_count', 'created_at', 'metadata']
+                      'content', 'token_count', 'created_at', 'metadata',
+                      'msg_type', 'tfidf_score', 'structural_bonus', 'compression_exempt']
         elif table == 'summaries':
             columns = ['id', 'summary_id', 'conversation_id', 'kind', 'depth',
                       'content', 'token_count', 'earliest_at', 'latest_at',
