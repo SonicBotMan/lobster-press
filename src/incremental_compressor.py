@@ -130,7 +130,8 @@ class IncrementalCompressor:
                 conflicts = self.conflict_detector.detect(message, active_notes)
                 if conflicts:
                     self.conflict_detector.reconcile(
-                        self.semantic_memory, conflicts, message, conversation_id
+                        self.semantic_memory, conflicts, message, conversation_id,
+                        llm_client=self.llm_client  # 传递 LLM 客户端以支持高质量提炼
                     )
         
         # 3. 检查是否需要压缩

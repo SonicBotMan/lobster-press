@@ -24,6 +24,7 @@ class ConflictResult:
     """矛盾检测结果"""
     old_note_id: str
     old_content: str
+    old_category: str  # 旧 note 的类别，用于继承
     new_claim: str
     conflict_score: float  # 0.0 - 1.0，越高越矛盾
 
@@ -75,6 +76,7 @@ class ConflictDetector:
             conflict = self._check_pair(note['content'], content)
             if conflict and conflict.conflict_score >= self.nli_threshold:
                 conflict.old_note_id = note['note_id']
+                conflict.old_category = note.get('category', 'decision')  # 继承旧 category
                 conflicts.append(conflict)
         
         return conflicts
@@ -104,6 +106,7 @@ class ConflictDetector:
                 return ConflictResult(
                     old_note_id='',
                     old_content=premise,
+                    old_category='',  # 由 detect() 填充
                     new_claim=hypothesis,
                     conflict_score=contradiction_score
                 )
@@ -139,6 +142,7 @@ class ConflictDetector:
                     return ConflictResult(
                         old_note_id='',
                         old_content=premise,
+                        old_category='',  # 由 detect() 填充
                         new_claim=hypothesis,
                         conflict_score=0.9  # 规则命中，给高分
                     )
@@ -149,12 +153,13 @@ class ConflictDetector:
         semantic_memory,    # SemanticMemory 实例
         conflicts: List[ConflictResult],
         new_message: Dict,
-        conversation_id: str
+        conversation_id: str,
+        llm_client=None     # 可选：用于高质量 note 提炼
     ):
         """
         执行记忆重巩固（Memory Reconsolidation）：
         1. 将旧 note 标记为 superseded_by 新 note
-        2. 创建反映新信息的 note
+        2. 创建反映新信息的 note（优先使用 LLM 提炼）
         3. 旧 note 不删除（保留溯源链）
         
         Args:
@@ -162,16 +167,27 @@ class ConflictDetector:
             conflicts: 矛盾检测结果列表
             new_message: 新消息
             conversation_id: 对话 ID
+            llm_client: 可选的 LLM 客户端（用于高质量提炼）
         """
         for conflict in conflicts:
-            # 创建新 note（反映最新信息）
-            new_note_id = semantic_memory._save_note(
-                conversation_id=conversation_id,
-                category='decision',
-                content=f'[更新] {conflict.new_claim[:200]}',
-                confidence=0.9,
-                source_msg_ids=[new_message.get('id', '')]
-            )
+            # 优先使用 LLM 提炼（高质量）
+            if llm_client:
+                note_ids = semantic_memory.extract_and_store(
+                    conversation_id=conversation_id,
+                    messages=[new_message],
+                    llm_client=llm_client,
+                    source_msg_ids=[new_message.get('id', '')]
+                )
+                new_note_id = note_ids[0] if note_ids else None
+            else:
+                # 降级：直接截取消息内容
+                new_note_id = semantic_memory._save_note(
+                    conversation_id=conversation_id,
+                    category=conflict.old_category,  # 继承旧 category
+                    content=f'[更新] {conflict.new_claim[:200]}',
+                    confidence=0.7,  # 降级时信心度降低
+                    source_msg_ids=[new_message.get('id', '')]
+                )
             
             if new_note_id:
                 # 标记旧 note 被取代（不删除，保留历史）
