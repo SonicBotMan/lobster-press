@@ -7,7 +7,7 @@ Semantic Memory Layer - 语义记忆层
 每轮对话的上下文组装时，Notes 层始终注入在最前面。
 
 Author: LobsterPress Team
-Version: v3.0.0
+Version: v3.2.1
 """
 
 import json
@@ -15,28 +15,8 @@ import hashlib
 from typing import List, Dict, Optional
 from datetime import datetime
 
-
-NOTE_EXTRACTION_PROMPT = """
-请从以下对话片段中提取「稳定的语义知识」，只提取明确陈述的事实，不要推断。
-
-JSON 格式：
-[
-  {{"category": "preference", "content": "用户偏好使用 PostgreSQL"}},
-  {{"category": "decision", "content": "项目采用 React 18 + TypeScript"}},
-  {{"category": "constraint", "content": "部署环境为 AWS，不能使用 GCP"}}
-]
-
-类别说明：
-- preference：用户/项目偏好
-- decision：技术选型、架构决策
-- constraint：硬性约束、限制条件
-- fact：客观事实（版本号、API 端点等）
-
-如果没有稳定知识，返回空数组 []。
-
-对话片段：
-{context}
-"""
+# v3.2.1: 使用集中的 prompt 模块
+from prompts import build_note_extraction_prompt
 
 
 class SemanticMemory:
@@ -80,6 +60,8 @@ class SemanticMemory:
         调用 LLM 从消息中提取语义知识，存入 notes 表。
         通常在每次 DAG 叶子压缩后调用（一次 LLM 调用，顺带提取）。
         
+        v3.2.1: 使用优化的 prompt 模板
+        
         Args:
             conversation_id: 对话 ID
             messages: 消息列表
@@ -89,11 +71,12 @@ class SemanticMemory:
         Returns:
             新创建的 note_id 列表
         """
-        context = self._format_messages(messages)
-        prompt = NOTE_EXTRACTION_PROMPT.format(context=context)
+        # v3.2.1: 使用优化的 prompt 构建
+        prompt = build_note_extraction_prompt(messages)
         
         try:
-            response = llm_client.complete(prompt, max_tokens=500)
+            # v3.2.1: 统一使用 generate() 方法
+            response = llm_client.generate(prompt, temperature=0.5, max_tokens=800)
             notes_data = json.loads(response.strip())
         except Exception as e:
             print(f'⚠️ Note 提取失败: {e}')
