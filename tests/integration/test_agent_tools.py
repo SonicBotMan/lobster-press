@@ -13,7 +13,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from src.database import LobsterDatabase
-from dag_compressor import DAGCompressor
+from src.dag_compressor import DAGCompressor
 from src.agent_tools import lobster_grep, lobster_describe, lobster_expand
 
 
