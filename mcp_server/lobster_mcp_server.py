@@ -31,14 +31,23 @@ class MCPTool:
 class LobsterPressMCPServer:
     """LobsterPress MCP Server"""
     
-    def __init__(self, sessions_dir: str = None):
+    def __init__(self, sessions_dir: str = None, db_path: str = None, llm_provider: str = None, llm_model: str = None):
         """初始化 MCP Server
         
         Args:
             sessions_dir: 会话目录
+            db_path: LobsterPress 数据库路径
+            llm_provider: LLM 提供商
+            llm_model: LLM 模型名称
         """
         self.sessions_dir = Path(sessions_dir or os.path.expanduser("~/.openclaw/agents/main/sessions"))
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
+        
+        # v3.2.2: OpenClaw 插件支持
+        self.db_path = db_path or os.path.expanduser("~/.openclaw/lobster.db")
+        self.llm_provider = llm_provider
+        self.llm_model = llm_model
+        self._db = None  # 懒加载数据库连接
         
         # 统计数据
         self.stats = {
@@ -158,6 +167,43 @@ class LobsterPressMCPServer:
                     },
                     "required": []
                 }
+            ),
+            # v3.2.2: OpenClaw 插件工具
+            MCPTool(
+                name="lobster_grep",
+                description="在 LobsterPress 记忆库中全文搜索历史对话（FTS5 + TF-IDF 重排序）",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "搜索关键词或短语"},
+                        "conversation_id": {"type": "string", "description": "限定搜索范围的会话 ID（可选）"},
+                        "limit": {"type": "integer", "description": "最多返回条数，默认 5", "default": 5}
+                    },
+                    "required": ["query"]
+                }
+            ),
+            MCPTool(
+                name="lobster_describe",
+                description="查看 LobsterPress 的 DAG 摘要层级结构",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "conversation_id": {"type": "string", "description": "会话 ID（可选，留空查全局）"}
+                    },
+                    "required": []
+                }
+            ),
+            MCPTool(
+                name="lobster_expand",
+                description="将 DAG 摘要节点展开，还原其对应的原始消息（无损检索）",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "summary_id": {"type": "string", "description": "要展开的摘要节点 ID"},
+                        "max_depth": {"type": "integer", "description": "最大展开层数，默认 2", "default": 2}
+                    },
+                    "required": ["summary_id"]
+                }
             )
         ]
     
@@ -229,8 +275,42 @@ class LobsterPressMCPServer:
         elif tool_name == "list_sessions":
             return await self._list_sessions(arguments.get("min_tokens", 10000))
         
+        # v3.2.2: OpenClaw 插件工具
+        elif tool_name == "lobster_grep":
+            from agent_tools import lobster_grep
+            db = self._get_db()
+            results = lobster_grep(
+                db,
+                arguments["query"],
+                conversation_id=arguments.get("conversation_id"),
+                limit=arguments.get("limit", 5)
+            )
+            return {"results": results}
+        
+        elif tool_name == "lobster_describe":
+            from agent_tools import lobster_describe
+            db = self._get_db()
+            return lobster_describe(db, conversation_id=arguments.get("conversation_id"))
+        
+        elif tool_name == "lobster_expand":
+            from agent_tools import lobster_expand
+            db = self._get_db()
+            return lobster_expand(db, arguments["summary_id"])
+        
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
+    
+    def _get_db(self):
+        """获取数据库连接（懒加载）"""
+        if self._db is None:
+            # 添加 src 目录到 path
+            src_dir = Path(__file__).parent.parent / "src"
+            if str(src_dir) not in sys.path:
+                sys.path.insert(0, str(src_dir))
+            
+            from database import LobsterDatabase
+            self._db = LobsterDatabase(self.db_path)
+        return self._db
     
     def _validate_session_id(self, session_id: str) -> str:
         """验证 session_id 防止路径遍历攻击（修复 Issue #12）
@@ -491,11 +571,19 @@ async def main():
     
     parser = argparse.ArgumentParser(description="LobsterPress MCP Server")
     parser.add_argument("--sessions-dir", help="会话目录")
+    parser.add_argument("--db", dest="db_path", help="LobsterPress 数据库路径")
+    parser.add_argument("--provider", dest="llm_provider", help="LLM 提供商")
+    parser.add_argument("--model", dest="llm_model", help="LLM 模型名称")
     parser.add_argument("--test", action="store_true", help="测试模式")
     
     args = parser.parse_args()
     
-    server = LobsterPressMCPServer(args.sessions_dir)
+    server = LobsterPressMCPServer(
+        sessions_dir=args.sessions_dir,
+        db_path=args.db_path,
+        llm_provider=args.llm_provider,
+        llm_model=args.llm_model
+    )
     
     if args.test:
         # 测试模式

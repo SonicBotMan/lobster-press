@@ -1,0 +1,39 @@
+{
+  "id": "lobster-press",
+  "uiHints": {
+    "llmProvider": {
+      "label": "LLM Provider",
+      "help": "用于 DAG 摘要压缩的 LLM 提供商（deepseek / openai / zhipu 等，留空则使用提取式摘要）"
+    },
+    "llmModel": {
+      "label": "LLM Model",
+      "help": "LLM 模型名称（如 deepseek-chat / gpt-4o-mini / glm-4-flash）"
+    },
+    "dbPath": {
+      "label": "Database Path",
+      "help": "LobsterPress SQLite 数据库路径（默认：~/.openclaw/lobster.db）"
+    },
+    "contextThreshold": {
+      "label": "Context Threshold",
+      "help": "触发压缩的上下文使用率阈值（0.0–1.0，默认 0.75）"
+    },
+    "freshTailCount": {
+      "label": "Fresh Tail Count",
+      "help": "受保护、不参与压缩的最近消息条数（默认 32）"
+    }
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled":          { "type": "boolean" },
+      "llmProvider":      { "type": "string" },
+      "llmApiKey":        { "type": "string" },
+      "llmModel":         { "type": "string" },
+      "dbPath":           { "type": "string" },
+      "contextThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
+      "freshTailCount":   { "type": "integer", "minimum": 1 },
+      "leafChunkTokens":  { "type": "integer", "minimum": 1000 }
+    }
+  }
+}

@@ -1,5 +1,12 @@
 # LobsterPress MCP Server
 
+> **推荐方式**：如果你在使用 OpenClaw，请优先使用
+> [插件安装模式](../README.md#-openclaw-插件推荐)，
+> 更简单，无需手动管理进程。
+>
+> 本文档描述直接运行 MCP Server 的高级用法，适合非 OpenClaw 环境
+> 或需要自定义集成的场景。
+
 基于 Model Context Protocol (MCP) 的 OpenClaw 会话压缩服务。
 
 ## 安装

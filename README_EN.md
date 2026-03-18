@@ -203,6 +203,47 @@ Raw messages seq 1..N
 
 ---
 
+## 🔌 OpenClaw Plugin (Recommended)
+
+LobsterPress can be used as a native [OpenClaw](https://github.com/openclaw/openclaw) plugin. No manual Python service deployment required — just one command:
+
+```bash
+openclaw plugins install @sonicbotman/lobster-press
+```
+
+After installation, enable it in your OpenClaw configuration:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "lobster-press": {
+        "enabled": true,
+        "config": {
+          "llmProvider": "deepseek",
+          "llmModel": "deepseek-chat",
+          "contextThreshold": 0.75,
+          "freshTailCount": 32
+        }
+      }
+    }
+  }
+}
+```
+
+Once enabled, OpenClaw Agent will automatically have access to three memory tools:
+- `lobster_grep` — Full-text search in historical memory (FTS5 + TF-IDF)
+- `lobster_describe` — View DAG summary hierarchy structure
+- `lobster_expand` — Losslessly expand summary to original messages
+
+### Coexists with lossless-claw
+
+LobsterPress registers as a **tool plugin**, not occupying the `contextEngine` slot. It can be used alongside [lossless-claw](https://github.com/martian-engineering/lossless-claw):
+- **lossless-claw** handles context window DAG compression
+- **lobster-press** handles cross-session long-term semantic memory retrieval
+
+---
+
 ## 🚀 Quick Start
 
 ```bash

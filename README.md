@@ -255,6 +255,47 @@ CREATE TABLE notes (
 
 ---
 
+## 🔌 OpenClaw 插件（推荐）
+
+LobsterPress 支持作为 [OpenClaw](https://github.com/openclaw/openclaw) 原生插件使用，无需手动部署 Python 服务，一行命令安装：
+
+```bash
+openclaw plugins install @sonicbotman/lobster-press
+```
+
+安装后在 OpenClaw 配置中启用：
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "lobster-press": {
+        "enabled": true,
+        "config": {
+          "llmProvider": "deepseek",
+          "llmModel": "deepseek-chat",
+          "contextThreshold": 0.75,
+          "freshTailCount": 32
+        }
+      }
+    }
+  }
+}
+```
+
+启用后 OpenClaw Agent 将自动获得三个记忆工具：
+- `lobster_grep` — 全文搜索历史记忆（FTS5 + TF-IDF）
+- `lobster_describe` — 查看 DAG 摘要层级结构
+- `lobster_expand` — 无损展开摘要原文
+
+### 与 lossless-claw 共存
+
+LobsterPress 以**工具插件**身份接入，不占用 `contextEngine` 插槽，可与 [lossless-claw](https://github.com/martian-engineering/lossless-claw) 同时启用：
+- **lossless-claw** 负责上下文窗口的 DAG 压缩
+- **lobster-press** 负责跨会话的长期语义记忆检索
+
+---
+
 ## 🚀 快速上手
 
 ```bash
