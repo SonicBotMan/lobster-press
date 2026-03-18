@@ -5,6 +5,39 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.2.3] - 2026-03-18
+
+### 🎯 版本定位
+
+**架构重构** (Issue #115)
+
+4-Phase 重构：IPC 可靠性 + DAG 收敛 + 数据库硬化 + 测试验证
+
+### ✨ 新增
+
+**Phase 1: IPC Reliability**
+- Ready handshake: Python 启动后发送 `lobster-press/ready`
+- Request ID 路由: 并发请求响应不混淆
+- `pendingRequests` Map: Promise 路由
+- 进程退出处理: pending 请求失败快
+
+**Phase 2: DAG Convergence**
+- `condensed_compact`: 固定窗口批处理（不再 first-N forever）
+- `leaf_compact`: Episode token guard（跳过太小的 episode）
+
+**Phase 3: Database Hardening**
+- `save_message`: 事务包装（原子性保证）
+
+**Phase 4: Tests & Verification**
+- `test_dag_convergence.py`: DAG 收敛单元测试
+
+### 🐛 Bug 修复
+
+- 冷启动竞态条件（mcpReady 设置太早）
+- 并发请求响应混淆
+- DAG 压缩不收敛
+- 消息和 FTS 索引不一致
+
 ## [3.2.2] - 2026-03-17
 
 ### 🎯 版本定位
