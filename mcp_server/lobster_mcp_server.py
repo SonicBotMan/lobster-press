@@ -565,9 +565,16 @@ class LobsterPressMCPServer:
         return score
 
 
+def emit(obj: Dict[str, Any]) -> None:
+    """发送 JSON 响应到 stdout"""
+    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+
 async def main():
     """主入口"""
     import argparse
+    import time
     
     parser = argparse.ArgumentParser(description="LobsterPress MCP Server")
     parser.add_argument("--sessions-dir", help="会话目录")
@@ -600,14 +607,51 @@ async def main():
         
         print("\n✅ MCP Server 正常工作")
     else:
+        # Phase 1 (Issue #115): 发送 ready handshake
+        emit({"type": "lobster-press/ready", "ts": time.time()})
+        
         # MCP 协议模式（读取 stdin）
         for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            
+            request_id = None
             try:
-                request = json.loads(line)
-                response = await server.handle_request(request)
-                print(json.dumps(response))
+                req = json.loads(line)
+                request_id = req.get("requestId") or req.get("id")
+                method = req.get("method")
+                
+                if method == "tools/call":
+                    params = req.get("params", {})
+                    tool_name = params.get("name")
+                    arguments = params.get("arguments", {})
+                    result = await server._call_tool(tool_name, arguments)
+                    emit({
+                        "requestId": request_id,
+                        "status": "ok",
+                        "result": result,
+                    })
+                else:
+                    # 其他方法使用原有处理逻辑
+                    response = await server.handle_request(req)
+                    emit({
+                        "requestId": request_id,
+                        "status": "ok",
+                        "result": response,
+                    })
             except json.JSONDecodeError as e:
-                print(json.dumps({"error": f"Invalid JSON: {e}"}))
+                emit({
+                    "requestId": request_id,
+                    "status": "error",
+                    "error": f"Invalid JSON: {e}",
+                })
+            except Exception as e:
+                emit({
+                    "requestId": request_id,
+                    "status": "error",
+                    "error": str(e),
+                })
 
 
 if __name__ == "__main__":

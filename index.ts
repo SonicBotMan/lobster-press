@@ -3,91 +3,222 @@
  *
  * DAG-based conversation summarization with Ebbinghaus forgetting curve,
  * semantic notes, contradiction detection.
+ *
+ * Phase 1 IPC Refactor (Issue #115):
+ * - Ready handshake from Python
+ * - Request ID routing for concurrent requests
+ * - Clean failure on child process exit
  */
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 
-// Python MCP Server 进程（懒启动）
+// ─── IPC Types ───────────────────────────────────────────────────────────────
+
+type McpEnvelope = {
+  type?: string;
+  requestId?: string;
+  status?: string;
+  result?: unknown;
+  error?: unknown;
+  [key: string]: unknown;
+};
+
+// ─── Global State ────────────────────────────────────────────────────────────
+
 let mcpProcess: ChildProcess | null = null;
 let mcpReady = false;
+let bootPromise: Promise<ChildProcess> | null = null;
+let stdoutBuffer = "";
 
-/** 启动 Python MCP Server */
-function ensureMcpServer(config: Record<string, unknown>): ChildProcess {
-  if (mcpProcess && mcpReady) return mcpProcess;
+const pendingRequests = new Map<
+  string,
+  {
+    resolve: (value: McpEnvelope) => void;
+    reject: (reason: Error) => void;
+    timer: NodeJS.Timeout;
+  }
+>();
 
-  const dbPath = (config.dbPath as string) || join(process.env.HOME ?? "~", ".openclaw/lobster.db");
-  const pythonCmd = process.env.LOBSTER_PYTHON ?? "python3";
+// ─── IPC Helpers ─────────────────────────────────────────────────────────────
 
-  mcpProcess = spawn(pythonCmd, [
-    "-m", "mcp_server.lobster_mcp_server",
-    "--db", dbPath,
-    "--provider", (config.llmProvider as string) || "",
-    "--model", (config.llmModel as string) || "",
-  ], {
-    env: {
-      ...process.env,
-      LOBSTER_LLM_API_KEY: (config.llmApiKey as string) || process.env.LOBSTER_LLM_API_KEY || "",
-    },
-    stdio: ["pipe", "pipe", "inherit"],
-  });
-
-  mcpReady = true;
-
-  mcpProcess.on("exit", () => {
-    mcpProcess = null;
-    mcpReady = false;
-  });
-
-  return mcpProcess;
+function generateRequestId(): string {
+  return `lobster-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-/** 向 Python MCP Server 发送请求 */
+function handleStdoutLine(line: string): void {
+  let msg: McpEnvelope;
+  try {
+    msg = JSON.parse(line);
+  } catch {
+    return;
+  }
+
+  // Ready handshake from Python
+  if (msg.type === "lobster-press/ready") {
+    mcpReady = true;
+    return;
+  }
+
+  // Route response by requestId
+  const requestId = msg.requestId;
+  if (!requestId) return;
+
+  const pending = pendingRequests.get(requestId);
+  if (!pending) return;
+
+  clearTimeout(pending.timer);
+  pendingRequests.delete(requestId);
+
+  if (msg.status === "error") {
+    pending.reject(
+      new Error(typeof msg.error === "string" ? msg.error : JSON.stringify(msg.error))
+    );
+  } else {
+    pending.resolve(msg);
+  }
+}
+
+function attachStdoutDispatcher(proc: ChildProcess): void {
+  if (!proc.stdout) return;
+  if ((proc.stdout as { __lobsterDispatcherAttached?: boolean }).__lobsterDispatcherAttached) return;
+
+  (proc.stdout as { __lobsterDispatcherAttached?: boolean }).__lobsterDispatcherAttached = true;
+
+  proc.stdout.on("data", (chunk: Buffer) => {
+    stdoutBuffer += chunk.toString("utf8");
+    const lines = stdoutBuffer.split("\n");
+    stdoutBuffer = lines.pop() ?? "";
+
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      handleStdoutLine(line);
+    }
+  });
+
+  proc.on("exit", (code) => {
+    mcpProcess = null;
+    mcpReady = false;
+    bootPromise = null;
+
+    // Fail all pending requests
+    for (const [, pending] of pendingRequests) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error(`lobster-press MCP exited: code=${code ?? "unknown"}`));
+    }
+    pendingRequests.clear();
+  });
+}
+
+async function ensureMcpServer(config: Record<string, unknown>): Promise<ChildProcess> {
+  if (mcpProcess && mcpReady) return mcpProcess;
+  if (bootPromise) return bootPromise;
+
+  bootPromise = new Promise((resolve, reject) => {
+    const dbPath =
+      (config.dbPath as string) ||
+      join(process.env.HOME ?? "~", ".openclaw/lobster.db");
+    const pythonCmd = process.env.LOBSTER_PYTHON ?? "python3";
+
+    const proc = spawn(
+      pythonCmd,
+      [
+        "-m",
+        "mcp_server.lobster_mcp_server",
+        "--db",
+        dbPath,
+        "--provider",
+        (config.llmProvider as string) || "",
+        "--model",
+        (config.llmModel as string) || "",
+      ],
+      {
+        env: {
+          ...process.env,
+          LOBSTER_LLM_API_KEY:
+            (config.llmApiKey as string) ||
+            process.env.LOBSTER_LLM_API_KEY ||
+            "",
+        },
+        stdio: ["pipe", "pipe", "inherit"],
+      }
+    );
+
+    mcpProcess = proc;
+    mcpReady = false;
+    attachStdoutDispatcher(proc);
+
+    const startedAt = Date.now();
+    const poll = setInterval(() => {
+      if (mcpReady) {
+        clearInterval(poll);
+        resolve(proc);
+      } else if (Date.now() - startedAt > 10_000) {
+        clearInterval(poll);
+        bootPromise = null;
+        reject(new Error("lobster-press MCP did not become ready within 10s"));
+      }
+    }, 50);
+
+    proc.once("error", (err) => {
+      clearInterval(poll);
+      bootPromise = null;
+      reject(err);
+    });
+
+    proc.once("exit", (code) => {
+      if (!mcpReady) {
+        clearInterval(poll);
+        bootPromise = null;
+        reject(new Error(`lobster-press MCP exited before ready: code=${code ?? "unknown"}`));
+      }
+    });
+  });
+
+  try {
+    return await bootPromise;
+  } finally {
+    if (mcpReady) bootPromise = null;
+  }
+}
+
 async function callMcp(
   config: Record<string, unknown>,
   toolName: string,
   args: Record<string, unknown>
 ): Promise<{ content: Array<{ type: "text"; text: string }>; details: unknown }> {
-  const proc = ensureMcpServer(config);
+  const proc = await ensureMcpServer(config);
+  const requestId = generateRequestId();
 
-  return new Promise((resolve, reject) => {
-    const request = JSON.stringify({
-      method: "tools/call",
-      params: { name: toolName, arguments: args },
-    }) + "\n";
-
-    let output = "";
-
-    const onData = (chunk: Buffer) => {
-      output += chunk.toString();
-      const lines = output.split("\n");
-      for (const line of lines.slice(0, -1)) {
-        if (line.trim()) {
-          proc.stdout?.off("data", onData);
-          try {
-            const result = JSON.parse(line);
-            resolve({
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-              details: result,
-            });
-          } catch (e) {
-            reject(e);
-          }
-          return;
-        }
-      }
-      output = lines[lines.length - 1] ?? "";
-    };
-
-    proc.stdout?.on("data", onData);
-    proc.stdin?.write(request);
-
-    setTimeout(() => {
-      proc.stdout?.off("data", onData);
-      reject(new Error("lobster-press MCP tool call timed out after 30s"));
+  const response = await new Promise<McpEnvelope>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingRequests.delete(requestId);
+      reject(new Error(`lobster-press MCP tool call timed out after 30s: ${toolName}`));
     }, 30_000);
+
+    pendingRequests.set(requestId, { resolve, reject, timer });
+
+    const request =
+      JSON.stringify({
+        method: "tools/call",
+        requestId,
+        params: { name: toolName, arguments: args },
+      }) + "\n";
+
+    proc.stdin?.write(request);
   });
+
+  return {
+    content: [
+      {
+        type: "text",
+        text: JSON.stringify(response.result ?? response, null, 2),
+      },
+    ],
+    details: response,
+  };
 }
 
 // ─── Tool Schemas ─────────────────────────────────────────────────────────────
