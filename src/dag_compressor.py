@@ -129,6 +129,12 @@ class DAGCompressor:
         # 7. 为每个情节生成叶子摘要
         last_summary = None
         for episode in episodes:
+            # Phase 2 (Issue #115): Episode token guard - 跳过太小的 episode
+            episode_tokens = sum(m.get("token_count", 0) for m in episode)
+            if episode_tokens < max_tokens * 0.5:
+                print(f"⏭️ skip small episode: {episode_tokens} tokens (< {max_tokens * 0.5})")
+                continue
+            
             # 生成摘要内容
             summary_content = self._generate_leaf_summary(episode)
             
@@ -252,11 +258,14 @@ class DAGCompressor:
     def condensed_compact(self, conversation_id: str, depth: int = 0, min_fanout: int = None) -> Optional[Dict]:
         """压缩摘要：摘要 → 更高层的摘要
         
+        Phase 2 (Issue #115): 使用固定窗口批处理，避免 first-N forever
+        
         借鉴 lossless-claw 的 condensed pass：
         1. 找到同深度的连续摘要（≥ min_fanout）
-        2. 合并摘要内容
-        3. 生成更高层的摘要
-        4. 保存摘要和关系
+        2. 按 min_fanout 窗口批处理所有摘要
+        3. 合并摘要内容
+        4. 生成更高层的摘要
+        5. 保存摘要和关系
         
         Args:
             conversation_id: 对话 ID
@@ -264,7 +273,7 @@ class DAGCompressor:
             min_fanout: 最小子节点数（默认 condensed_min_fanout）
         
         Returns:
-            生成的摘要，如果无需压缩则返回 None
+            最后一个生成的摘要，如果无需压缩则返回 None
         """
         if min_fanout is None:
             min_fanout = self.condensed_min_fanout
@@ -276,37 +285,37 @@ class DAGCompressor:
             print(f"⚠️ 摘要数 ({len(summaries)}) < {min_fanout}，无需压缩")
             return None
         
-        # 2. 选择连续的摘要块
-        chunk = summaries[:min_fanout]  # 简化版：选择前 N 个
+        # Phase 2: 固定窗口批处理，处理所有可压缩的摘要
+        last_summary = None
+        i = 0
+        while i + min_fanout <= len(summaries):
+            chunk = summaries[i:i + min_fanout]
+            combined_content = self._combine_summaries(chunk)
+            summary_content = self._generate_condensed_summary(combined_content, depth)
+
+            summary = {
+                'conversation_id': conversation_id,
+                'kind': 'condensed',
+                'depth': depth + 1,
+                'content': summary_content,
+                'parent_summaries': [s['summary_id'] for s in chunk],
+                'earliest_at': chunk[0].get('earliest_at'),
+                'latest_at': chunk[-1].get('latest_at'),
+                'descendant_count': sum(s.get('descendant_count', 0) for s in chunk),
+            }
+
+            summary_id = self.db.save_summary(summary)
+            summary['summary_id'] = summary_id
+            last_summary = summary
+            
+            print(f"✅ 创建压缩摘要: {summary_id}")
+            print(f"   - 深度: {depth + 1}")
+            print(f"   - 父摘要: {len(chunk)} 个")
+            print(f"   - 总消息数: {summary['descendant_count']}")
+            
+            i += min_fanout
         
-        # 3. 合并摘要内容
-        combined_content = self._combine_summaries(chunk)
-        
-        # 4. 生成更高层的摘要
-        summary_content = self._generate_condensed_summary(combined_content, depth)
-        
-        # 5. 创建摘要对象
-        summary = {
-            'conversation_id': conversation_id,
-            'kind': 'condensed',
-            'depth': depth + 1,
-            'content': summary_content,
-            'parent_summaries': [s['summary_id'] for s in chunk],
-            'earliest_at': chunk[0].get('earliest_at'),
-            'latest_at': chunk[-1].get('latest_at'),
-            'descendant_count': sum(s.get('descendant_count', 0) for s in chunk)
-        }
-        
-        # 6. 保存摘要
-        summary_id = self.db.save_summary(summary)
-        summary['summary_id'] = summary_id
-        
-        print(f"✅ 创建压缩摘要: {summary_id}")
-        print(f"   - 深度: {depth + 1}")
-        print(f"   - 父摘要: {len(chunk)} 个")
-        print(f"   - 总消息数: {summary['descendant_count']}")
-        
-        return summary
+        return last_summary
     
     def _combine_summaries(self, summaries: List[Dict]) -> str:
         """合并摘要内容
