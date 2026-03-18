@@ -1,6 +1,6 @@
 {
   "name": "@sonicbotman/lobster-press",
-  "version": "3.2.3",
+  "version": "3.2.4",
   "description": "Cognitive Memory System for AI Agents — OpenClaw Plugin",
   "type": "module",
   "main": "dist/index.js",
@@ -40,5 +40,8 @@
   "bugs": {
     "url": "https://github.com/SonicBotMan/lobster-press/issues"
   },
-  "homepage": "https://github.com/SonicBotMan/lobster-press#readme"
+  "homepage": "https://github.com/SonicBotMan/lobster-press#readme",
+  "openclaw": {
+    "extensions": ["./dist/index.js"]
+  }
 }
