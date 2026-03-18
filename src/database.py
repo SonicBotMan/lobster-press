@@ -226,6 +226,8 @@ class LobsterDatabase:
     def save_message(self, message: Dict) -> str:
         """保存消息（永久存储）
         
+        Phase 3 (Issue #115): 使用事务确保消息和 FTS 索引的原子性
+        
         Args:
             message: 消息对象（v2.5.0 支持 msg_type, tfidf_score, compression_exempt）
         
@@ -247,35 +249,36 @@ class LobsterDatabase:
         structural_bonus = message.get('structural_bonus', 0.0)
         compression_exempt = 1 if message.get('compression_exempt', False) else 0
         
-        # Bug 1 修复：查询是否已存在（区分 INSERT vs REPLACE）
-        self.cursor.execute(
-            "SELECT id FROM messages WHERE message_id = ?", (message_id,)
-        )
-        existing = self.cursor.fetchone()
-        old_rowid = existing[0] if existing else None
-        
-        # 执行 UPSERT
-        self.cursor.execute("""
-            INSERT OR REPLACE INTO messages 
-            (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
-             msg_type, tfidf_score, structural_bonus, compression_exempt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
-              msg_type, tfidf_score, structural_bonus, compression_exempt))
-        
-        new_rowid = self.cursor.lastrowid
-        
-        # 维护 FTS5 索引：先删旧，再插新
-        if old_rowid is not None:
+        # Phase 3: 使用事务确保原子性
+        with self.conn:
+            # Bug 1 修复：查询是否已存在（区分 INSERT vs REPLACE）
             self.cursor.execute(
-                "DELETE FROM messages_fts WHERE rowid = ?", (old_rowid,)
+                "SELECT id FROM messages WHERE message_id = ?", (message_id,)
             )
-        self.cursor.execute(
-            "INSERT INTO messages_fts (rowid, message_id, content) VALUES (?, ?, ?)",
-            (new_rowid, message_id, content)
-        )
+            existing = self.cursor.fetchone()
+            old_rowid = existing[0] if existing else None
+            
+            # 执行 UPSERT
+            self.cursor.execute("""
+                INSERT OR REPLACE INTO messages 
+                (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
+                 msg_type, tfidf_score, structural_bonus, compression_exempt)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
+                  msg_type, tfidf_score, structural_bonus, compression_exempt))
+            
+            new_rowid = self.cursor.lastrowid
+            
+            # 维护 FTS5 索引：先删旧，再插新
+            if old_rowid is not None:
+                self.cursor.execute(
+                    "DELETE FROM messages_fts WHERE rowid = ?", (old_rowid,)
+                )
+            self.cursor.execute(
+                "INSERT INTO messages_fts (rowid, message_id, content) VALUES (?, ?, ?)",
+                (new_rowid, message_id, content)
+            )
         
-        self.conn.commit()
         return message_id
     
     def get_messages(self, conversation_id: str, limit: int = None) -> List[Dict]:
