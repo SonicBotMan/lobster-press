@@ -5,6 +5,12 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.2.5] - 2026-03-18
+
+### 🐛 Bug 修复
+
+- 将 `@sinclair/typebox` 移到 dependencies（修复插件加载失败问题）
+
 ## [3.2.4] - 2026-03-18
 
 ### 🐛 Bug 修复
