@@ -383,8 +383,8 @@ const lobsterPlugin = {
       async ingest() {
         return { ingested: true };
       },
-      async assemble(p: { messages: unknown[] }) {
-        return { messages: p.messages, estimatedTokens: 0 };
+      async assemble(p: { messages: any[] }) {
+        return { messages: p.messages as any[], estimatedTokens: 0 };
       },
     };
 
