@@ -313,13 +313,13 @@ const lobsterPlugin = {
         ownsCompaction: true,
       },
 
-      // v4.0.0: Focus 主动压缩触发常量
-      const FOCUS_COMPRESSION_INTERVAL = 12;  // 论文建议 10-15，取 12
-      const FOCUS_URGENT_THRESHOLD = 0.85;    // 上下文使用率超过 85% 时立即触发
-
       // 关键：每次 turn 后自动检查上下文使用率
       // v4.0.0: Focus 主动压缩触发（定时 + 紧急 + 被动三策略）
       async afterTurn(params: any) {
+        // v4.0.0: Focus 主动压缩触发常量
+        const FOCUS_COMPRESSION_INTERVAL = 12;  // 论文建议 10-15，取 12
+        const FOCUS_URGENT_THRESHOLD = 0.85;    // 上下文使用率超过 85% 时立即触发
+
         const db = await this._getDb();
         const threshold = (pluginConfig.contextThreshold as number) ?? 0.8;
         const tokenBudget = params.tokenBudget ?? 128000;
