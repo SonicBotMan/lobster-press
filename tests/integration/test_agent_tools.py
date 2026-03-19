@@ -10,11 +10,11 @@ from pathlib import Path
 from datetime import datetime
 
 # 添加 src 目录
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from src.database import LobsterDatabase
-from src.dag_compressor import DAGCompressor
-from src.agent_tools import lobster_grep, lobster_describe, lobster_expand
+from database import LobsterDatabase
+from dag_compressor import DAGCompressor
+from agent_tools import lobster_grep, lobster_describe, lobster_expand
 
 
 def test_agent_tools():
