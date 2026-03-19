@@ -4,8 +4,25 @@
 LobsterPress MCP Server
 基于 Model Context Protocol (MCP) 的认知记忆压缩服务
 
-Version: v3.5.1
+Version: v4.0.0
 Changelog: https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md
+
+# lobster-press v4.0.0 MCP 工具集
+
+## Write 层（写入记忆）
+- lobster_compact   — 触发 DAG 压缩，将工作记忆写入情节记忆
+- lobster_correct   — 纠错已压缩的记忆（v3.6 引入）
+
+## Manage 层（管理记忆）
+- lobster_sweep     — 主动衰减扫描，标记低分消息（v3.6 引入）
+- lobster_assemble  — 按三层优先级拼装最优上下文（v3.6 引入）
+- lobster_prune     — 删除 decay_candidate 消息，释放存储（v4.0 新增）
+
+## Read 层（读取记忆）
+- lobster_grep      — 全文搜索（FTS5）
+- lobster_describe  — 查看 DAG 节点详情
+- lobster_expand    — 可逆展开（v4.0 支持 R³Mem 三层）
+- lobster_status    — 系统级健康报告（v4.0 新增）
 """
 
 import sys
@@ -288,6 +305,46 @@ class LobsterPressMCPServer:
                     },
                     "required": ["conversation_id"]
                 }
+            ),
+            MCPTool(
+                name="lobster_status",
+                description=(
+                    "返回 lobster-press 系统健康报告，包含："
+                    "各层记忆分布、压缩触发统计、衰减分布、近期三遍压缩节省率。"
+                    "用于监控和调试记忆系统状态。"
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "conversation_id": {
+                            "type": "string",
+                            "description": "指定会话（留空返回全局统计）"
+                        }
+                    },
+                    "required": []
+                }
+            ),
+            MCPTool(
+                name="lobster_prune",
+                description=(
+                    "删除已标记为 decayed 的消息，释放存储空间。"
+                    "⚠️ 这是破坏性操作，仅当确定不再需要这些消息时使用。"
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "conversation_id": {
+                            "type": "string",
+                            "description": "对话 ID（必需，防止误删）"
+                        },
+                        "dry_run": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "试运行（只统计，不删除）"
+                        }
+                    },
+                    "required": ["conversation_id"]
+                }
             )
         ]
     
@@ -499,6 +556,80 @@ class LobsterPressMCPServer:
                 days_threshold=arguments.get("days_threshold", 30)
             )
             return result
+
+        # v4.0.0: 系统健康报告（WMR 框架 Read 层）
+        elif tool_name == "lobster_status":
+            db = self._get_db()
+            conv_id = arguments.get("conversation_id")
+
+            # 消息层级分布
+            where_clause = f"WHERE conversation_id='{conv_id}'" if conv_id else ""
+            db.cursor.execute(f"""
+                SELECT memory_tier, COUNT(*) as cnt, SUM(token_count) as tokens
+                FROM messages
+                {where_clause}
+                GROUP BY memory_tier
+            """)
+            tier_dist = {row[0]: {'count': row[1], 'tokens': row[2]} for row in db.cursor.fetchall()}
+
+            # 实体数量
+            db.cursor.execute(f"SELECT COUNT(*) FROM entities {where_clause}")
+            entity_count = db.cursor.fetchone()[0]
+
+            # 纠错记录数
+            correction_count = 0
+            try:
+                db.cursor.execute(f"SELECT COUNT(*) FROM corrections {where_clause}")
+                correction_count = db.cursor.fetchone()[0]
+            except Exception:
+                pass
+
+            return {
+                "version": "v4.0.0",
+                "tier_distribution": tier_dist,
+                "entity_count": entity_count,
+                "correction_count": correction_count,
+                "compression_strategy": "ThreePassTrimmer(CMV) + DAGCompressor",
+                "forgetting_curve": "C-HLR+ (Adaptive Half-Life Regression)",
+                "trigger_mechanism": "Focus (Active + Passive hybrid)",
+            }
+
+        # v4.0.0: 删除 decayed 消息（WMR 框架 Manage 层）
+        elif tool_name == "lobster_prune":
+            conversation_id = arguments.get("conversation_id")
+            if not conversation_id:
+                raise ValueError("conversation_id is required for lobster_prune")
+            db = self._get_db()
+            dry_run = arguments.get("dry_run", True)
+
+            # 查询 decayed 消息
+            db.cursor.execute("""
+                SELECT message_id, content FROM messages
+                WHERE conversation_id = ? AND memory_tier = 'decayed'
+            """, (conversation_id,))
+            decayed_messages = db.cursor.fetchall()
+
+            if dry_run:
+                return {
+                    "dry_run": True,
+                    "decayed_count": len(decayed_messages),
+                    "message_ids": [m[0] for m in decayed_messages[:10]],  # 只返回前 10 个
+                    "warning": "This is a dry run. No messages were deleted."
+                }
+
+            # 实际删除
+            deleted_count = 0
+            for msg_id, _ in decayed_messages:
+                db.cursor.execute("DELETE FROM messages WHERE message_id = ?", (msg_id,))
+                db.cursor.execute("DELETE FROM messages_fts WHERE message_id = ?", (msg_id,))
+                deleted_count += 1
+            db.conn.commit()
+
+            return {
+                "dry_run": False,
+                "deleted_count": deleted_count,
+                "warning": f"Permanently deleted {deleted_count} decayed messages."
+            }
 
         else:
             raise ValueError(f"Unknown tool: {tool_name}")

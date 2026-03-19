@@ -16,6 +16,7 @@ import math
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime
+from three_pass_trimmer import ThreePassTrimmer  # v4.0 新增
 
 
 class LobsterDatabase:
@@ -25,6 +26,7 @@ class LobsterDatabase:
         """初始化数据库
 
         v3.6.0: 新增 namespace 参数（Issue #127 模块四）
+        v4.0.0: 新增 trimmer（CMV 三遍压缩）
 
         Args:
             db_path: 数据库文件路径
@@ -32,6 +34,7 @@ class LobsterDatabase:
         """
         self.db_path = db_path
         self.namespace = namespace  # v3.6.0 新增
+        self.trimmer = ThreePassTrimmer()  # v4.0.0 新增
         self.conn = None
         self.cursor = None
         self._init_database()
@@ -185,6 +188,7 @@ class LobsterDatabase:
         self.migrate_v30()  # 三层记忆模型
         self.migrate_v31()  # 命名空间隔离
         self.migrate_v32()  # 记忆纠错系统
+        self.migrate_v40()  # v4.0.0 R³Mem 可逆三层压缩
     
     def migrate_v25(self):
         """v2.5.0 schema 迁移
@@ -255,6 +259,68 @@ class LobsterDatabase:
             CREATE INDEX IF NOT EXISTS idx_corrections_target 
             ON corrections(target_type, target_id)
         """)
+        
+        self.conn.commit()
+
+    def migrate_v40(self):
+        """v4.0.0 schema 迁移：R³Mem 可逆三层压缩
+        
+        新增表：
+        - entities: 实体追踪（人名、文件名、概念等）
+        - entity_mentions: 实体-消息关联
+        
+        新增字段：
+        - summaries.r3_layer: R³Mem 层级（1=document, 2=paragraph, 3=entity）
+        - summaries.memory_tier: 记忆层级（working/episodic/semantic）
+        - messages.memory_tier: 记忆层级（working/episodic/semantic）
+        - conversations.namespace: 命名空间
+        
+        Ref: arXiv:2502.15957 — R³Mem: Bridging Memory Retention and Retrieval
+        """
+        migrations = [
+            # 实体表：追踪对话中出现的关键实体
+            """
+            CREATE TABLE IF NOT EXISTS entities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id TEXT UNIQUE NOT NULL,
+                conversation_id TEXT NOT NULL,
+                namespace TEXT DEFAULT 'default',
+                entity_type TEXT NOT NULL,
+                entity_name TEXT NOT NULL,
+                first_seen_at TEXT NOT NULL,
+                last_seen_at TEXT NOT NULL,
+                mention_count INTEGER DEFAULT 1,
+                summary TEXT
+            );
+            """,
+            # 实体-消息关联表
+            """
+            CREATE TABLE IF NOT EXISTS entity_mentions (
+                entity_id TEXT NOT NULL,
+                message_id TEXT NOT NULL,
+                PRIMARY KEY (entity_id, message_id)
+            );
+            """,
+            # summaries 表增加 r3_layer 字段
+            "ALTER TABLE summaries ADD COLUMN r3_layer INTEGER DEFAULT 1",
+            # summaries 表增加 memory_tier 字段
+            "ALTER TABLE summaries ADD COLUMN memory_tier TEXT DEFAULT 'episodic'",
+            # messages 表增加 memory_tier 字段
+            "ALTER TABLE messages ADD COLUMN memory_tier TEXT DEFAULT 'working'",
+            # conversations 表增加 namespace 字段
+            "ALTER TABLE conversations ADD COLUMN namespace TEXT DEFAULT 'default'",
+            # 创建索引
+            "CREATE INDEX IF NOT EXISTS idx_entities_conversation ON entities(conversation_id)",
+            "CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(entity_name)",
+            "CREATE INDEX IF NOT EXISTS idx_conv_namespace ON conversations(namespace)",
+        ]
+        
+        for sql in migrations:
+            try:
+                self.cursor.execute(sql)
+            except sqlite3.OperationalError:
+                # 字段或索引已存在，忽略
+                pass
         
         self.conn.commit()
 
@@ -408,10 +474,13 @@ class LobsterDatabase:
     
     def touch_message(self, message_id: str):
         """
-        v2.6.0：更新消息的最后访问时间和访问次数（记忆巩固）
+        v4.0.0: 更新访问记录 + C-HLR+ 间隔重复稳定性增长
         
-        每次 lobster_grep 命中时调用，被引用的记忆重置衰减计数器，
-        稳定性提升（间隔重复效应）。
+        稳定性增长从固定 *1.3 改为对数增长：
+        new_stability = old_stability * (1 + 0.5 / sqrt(access_count + 1))
+        首次访问时增幅最大（+50%），随后收益递减（避免无限增长）
+        
+        Ref: arXiv:2004.11327 — Adaptive Forgetting Curves
         
         Args:
             message_id: 消息 ID
@@ -421,24 +490,31 @@ class LobsterDatabase:
             UPDATE messages
             SET last_accessed_at = ?,
                 access_count = COALESCE(access_count, 0) + 1,
-                stability = COALESCE(stability, 14.0) * 1.3
+                stability = COALESCE(stability, 14.0) * (
+                    1.0 + 0.5 / SQRT(COALESCE(access_count, 0) + 1.0)
+                )
             WHERE message_id = ?
         """, (now, message_id))
         self.conn.commit()
     
     def _compute_retention(self, msg: Dict, current_time: datetime) -> float:
         """
-        v2.6.0：计算动态保留率（遗忘曲线）
+        v4.0.0: C-HLR+ 自适应遗忘曲线
         
-        R(t) = base_score * e^(-t / stability)
+        半衰期公式（复杂度驱动）：
+            h = base_h * (1 + α * complexity) * spaced_repetition_bonus
         
-        stability（半衰期天数）按消息类型设置：
-          decision : 90 天  — 架构决策应该长期记住
-          config   : 120 天 — 配置信息极少变化
-          code     : 60 天  — 代码片段中期保留
-          error    : 30 天  — 错误日志短期高价值
-          chitchat : 3 天   — 闲聊迅速归零
-          unknown  : 14 天  — 默认两周
+        保留概率：
+            R(t) = base_score * 2^(-delta_t / h)
+        
+        complexity = 词汇丰富度(0-1) × 句子数量因子 × 结构深度因子
+        spaced_repetition_bonus = 1 + 0.5 * log(1 + access_count)
+        
+        对比原实现：
+        - 原版：R(t) = base_score * e^(-t / stability)，stability 为固定常数
+        - v4.0：半衰期随内容复杂度动态调整，指数底数从 e 改为 2（更符合记忆研究惯例）
+        
+        Ref: arXiv:2004.11327 — Adaptive Forgetting Curves for Spaced Repetition
         
         Args:
             msg: 消息字典
@@ -447,35 +523,94 @@ class LobsterDatabase:
         Returns:
             动态保留率（0.0 - base_score）
         """
-        STABILITY_MAP = {
+        # ── 基础半衰期（天），按消息类型，与 v2.6 保持一致 ──
+        BASE_HALF_LIFE = {
             'decision': 90.0,
             'config':   120.0,
             'code':     60.0,
             'error':    30.0,
             'chitchat': 3.0,
             'question': 7.0,
+            'fact':     14.0,
             'unknown':  14.0,
         }
         
+        # ── Step 1: 基础参数 ──
         base_score = msg.get('tfidf_score', 1.0) + msg.get('structural_bonus', 0.0)
-        msg_type = msg.get('msg_type', 'unknown')
-        stability = msg.get('stability') or STABILITY_MAP.get(msg_type, 14.0)
+        if base_score <= 0:
+            base_score = 1.0
         
-        # 上次访问时间（优先用 last_accessed_at，其次 created_at）
-        ref_time_str = msg.get('last_accessed_at') or msg.get('created_at')
+        msg_type = msg.get('msg_type', 'unknown')
+        base_h = BASE_HALF_LIFE.get(msg_type, 14.0)
+        
+        # ── Step 2: 内容复杂度因子（C-HLR+ 核心创新）──
+        content = msg.get('content', '')
+        if not isinstance(content, str):
+            content = str(content)
+        
+        complexity = self._compute_complexity(content)  # 返回 [0.0, 3.0]
+        alpha = 0.5  # 复杂度权重系数（论文推荐值）
+        
+        # ── Step 3: 间隔重复加成（已被 touch_message 动态更新）──
+        access_count = msg.get('access_count', 0) or 0
+        spaced_bonus = 1.0 + 0.5 * math.log1p(access_count)
+        
+        # ── Step 4: 自适应半衰期 ──
+        adaptive_h = base_h * (1.0 + alpha * complexity) * spaced_bonus
+        
+        # ── Step 5: 时间衰减（以 2 为底，符合记忆研究惯例）──
+        ref_time_str = msg.get('last_accessed_at') or msg.get('created_at', '')
         try:
             ref_time = datetime.fromisoformat(ref_time_str)
-            delta_days = (current_time - ref_time).total_seconds() / 86400.0
+            delta_days = max((current_time - ref_time).total_seconds() / 86400.0, 0.0)
         except Exception:
             delta_days = 0.0
         
-        retention = math.exp(-max(delta_days, 0) / stability)
-        
-        # compression_exempt 的消息保留率不衰减
+        # compression_exempt 消息不衰减
         if msg.get('compression_exempt'):
-            return base_score  # 不乘衰减系数
+            return base_score
         
-        return base_score * retention
+        retention = base_score * math.pow(2.0, -delta_days / adaptive_h)
+        return retention
+    
+    def _compute_complexity(self, content: str) -> float:
+        """
+        v4.0.0: 计算文本复杂度分数（C-HLR+ 辅助方法）
+        
+        三个维度的加权组合：
+        1. 词汇丰富度 = unique_words / total_words（type-token ratio）
+        2. 长度因子 = min(len(content) / 500, 1.0)（归一化到 [0,1]）
+        3. 结构深度 = 是否含代码块/列表/嵌套结构
+        
+        Returns:
+            complexity in [0.0, 3.0]
+        
+        Ref: arXiv:2004.11327
+        """
+        if not content or len(content) < 20:
+            return 0.0
+        
+        # 维度1：词汇丰富度（TTR）
+        words = content.lower().split()
+        if len(words) < 5:
+            ttr = 0.5
+        else:
+            ttr = min(len(set(words)) / len(words), 1.0)
+        
+        # 维度2：长度因子
+        length_factor = min(len(content) / 500.0, 1.0)
+        
+        # 维度3：结构深度
+        structure_score = 0.0
+        if '```' in content or '    ' in content:   # 代码块
+            structure_score += 0.5
+        if any(content.count(marker) > 2 for marker in ['- ', '* ', '1. ']):  # 列表
+            structure_score += 0.3
+        if content.count('\n') > 5:  # 多段落
+            structure_score += 0.2
+        
+        complexity = ttr + length_factor + min(structure_score, 1.0)
+        return min(complexity, 3.0)  # 上限 3.0
     
     def remove_messages_from_context(self, conversation_id: str, message_ids: List[str]) -> int:
         """从 context_items 中移除指定消息（light 去重策略使用）
@@ -851,6 +986,54 @@ class LobsterDatabase:
             "success": True
         }
 
+    def upsert_entity(
+        self,
+        conversation_id: str,
+        entity_name: str,
+        entity_type: str,
+        message_ids: List[str],
+        namespace: str = 'default'
+    ) -> str:
+        """v4.0.0: 插入或更新实体记录，关联消息（R³Mem 模块四）
+
+        由 lobster_compact 在生成摘要后调用（实体提取由 LLM 完成）。
+
+        Args:
+            conversation_id: 对话 ID
+            entity_name: 实体名称（人名、文件名、概念等）
+            entity_type: 实体类型（'person', 'file', 'concept', 'decision'）
+            message_ids: 关联的消息 ID 列表
+            namespace: 命名空间（默认 'default'）
+
+        Returns:
+            entity_id: 实体 ID
+
+        Ref: arXiv:2502.15957 — R³Mem: Bridging Memory Retention and Retrieval
+        """
+        now = datetime.utcnow().isoformat()
+        entity_id = f"ent_{hashlib.md5((conversation_id + entity_name).encode()).hexdigest()[:12]}"
+        
+        # 插入或更新实体
+        self.cursor.execute("""
+            INSERT INTO entities
+                (entity_id, conversation_id, namespace, entity_type, entity_name,
+                 first_seen_at, last_seen_at, mention_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(entity_id) DO UPDATE SET
+                last_seen_at = excluded.last_seen_at,
+                mention_count = mention_count + ?
+        """, (entity_id, conversation_id, namespace, entity_type, entity_name,
+              now, now, len(message_ids), len(message_ids)))
+        
+        # 关联消息
+        for msg_id in message_ids:
+            self.cursor.execute("""
+                INSERT OR IGNORE INTO entity_mentions (entity_id, message_id) VALUES (?, ?)
+            """, (entity_id, msg_id))
+        
+        self.conn.commit()
+        return entity_id
+
     def sweep_decayed_messages(self, conversation_id: str, days_threshold: int = 30) -> dict:
         """v3.6.1: 清理衰减消息（Issue #127 模块二 + Issue #129 Bug 1, 2）
 
@@ -961,30 +1144,86 @@ class LobsterDatabase:
 
         return summary
     
-    def expand_summary(self, summary_id: str) -> List[Dict]:
-        """展开摘要 - 借鉴 lcm_expand
-        
+    def expand_summary(
+        self,
+        summary_id: str,
+        target_layer: int = 1,
+        entity_filter: str = None
+    ) -> List[Dict]:
+        """v4.0.0: R³Mem 可逆三层展开
+
+        target_layer 含义（对应 R³Mem 论文）：
+            1 = Document-Level：返回 summaries（当前行为，保持兼容）
+            2 = Paragraph-Level：返回原始 messages
+            3 = Entity-Level：返回与特定实体相关的 messages
+
+        entity_filter: 实体名称（仅 target_layer=3 时生效）
+
+        Ref: arXiv:2502.15957 — R³Mem: Bridging Memory Retention and Retrieval
+
         Args:
             summary_id: 摘要 ID
-        
+            target_layer: 目标展开层级（1, 2, 3）
+            entity_filter: 实体过滤（仅 layer=3）
+
         Returns:
-            原始消息列表（递归展开 DAG）
+            消息或摘要列表
         """
         summary = self.describe_summary(summary_id)
-        
         if not summary:
             return []
-        
-        if summary['kind'] == 'leaf':
-            # 叶子摘要：直接返回源消息
-            return summary['children']
-        else:
-            # 压缩摘要：递归展开所有子摘要
+
+        # Layer 1: document-level（返回子摘要列表，原有行为）
+        if target_layer == 1:
+            if summary['kind'] == 'leaf':
+                return summary['children']  # 返回源消息
+            return summary['children']      # 返回子摘要（原逻辑）
+
+        # Layer 2: paragraph-level（递归展开到原始消息）
+        if target_layer == 2:
+            if summary['kind'] == 'leaf':
+                return summary['children']
             all_messages = []
             for child in summary['children']:
-                all_messages.extend(self.expand_summary(child['summary_id']))
+                child_id = child.get('summary_id') or child.get('message_id')
+                if child.get('summary_id'):
+                    all_messages.extend(self.expand_summary(child_id, target_layer=2))
+                else:
+                    all_messages.append(child)
             return all_messages
-    
+
+        # Layer 3: entity-level（按实体过滤）
+        if target_layer == 3:
+            all_messages = self.expand_summary(summary_id, target_layer=2)
+            if not entity_filter:
+                return all_messages
+            # 过滤与实体相关的消息
+            self.cursor.execute("""
+                SELECT em.message_id FROM entity_mentions em
+                JOIN entities e ON em.entity_id = e.entity_id
+                WHERE e.entity_name LIKE ?
+            """, (f'%{entity_filter}%',))
+            relevant_ids = {row[0] for row in self.cursor.fetchall()}
+            return [m for m in all_messages if m.get('message_id') in relevant_ids]
+
+        return []
+
+    def get_turn_count(self, conversation_id: str) -> int:
+        """v4.0.0: 获取对话的轮次数（user 消息数量）
+
+        Args:
+            conversation_id: 对话 ID
+
+        Returns:
+            轮次数
+        """
+        self.cursor.execute(
+            "SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND role = 'user'",
+            (conversation_id,)
+        )
+        result = self.cursor.fetchone()
+        return result[0] if result else 0
+
     # ==================== 辅助方法 ====================
     
     def _generate_id(self, prefix: str) -> str:

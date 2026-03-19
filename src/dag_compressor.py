@@ -421,6 +421,8 @@ class DAGCompressor:
         3. 检查是否需要压缩摘要
         4. 递归压缩到指定深度
         
+        v4.0.0: 压缩前先执行 CMV 三遍无损压缩
+        
         Args:
             conversation_id: 对话 ID
             context_threshold: 上下文阈值（默认 0.75）
@@ -429,6 +431,7 @@ class DAGCompressor:
         Returns:
             是否执行了压缩
         """
+        import sys
         print(f"\n🔄 增量压缩检查: {conversation_id}")
         
         # 1. 获取当前上下文大小
@@ -444,6 +447,12 @@ class DAGCompressor:
         if usage_ratio < context_threshold:
             print(f"✅ 使用率 < {context_threshold:.0%}，无需压缩")
             return False
+        
+        # v4.0.0: 压缩前先执行 CMV 三遍无损压缩
+        trimmed, stats = self.db.trimmer.trim(messages)
+        if stats['reduction_pct'] > 0:
+            print(f"[ThreePassTrimmer] reduction: {stats['reduction_pct']}%", file=sys.stderr)
+            messages = trimmed  # 用压缩后的版本做摘要
         
         # 2. 执行叶子压缩
         print(f"\n🚀 开始叶子压缩...")
