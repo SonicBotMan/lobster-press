@@ -272,17 +272,21 @@ class LobsterPressMCPServer:
             # v3.6.0: 主动衰减清理（Issue #127 模块二）
             MCPTool(
                 name="lobster_sweep",
-                description="清理衰减消息（基于遗忘曲线，删除低价值、长期未访问的消息）",
+                description="清理衰减消息（基于遗忘曲线，标记低价值、长期未访问的消息为 decayed，无损原则）",
                 input_schema={
                     "type": "object",
                     "properties": {
+                        "conversation_id": {
+                            "type": "string",
+                            "description": "对话 ID（必需，防止跨 namespace 误删）"
+                        },
                         "days_threshold": {
                             "type": "integer",
                             "default": 30,
                             "description": "未访问天数阈值"
                         }
                     },
-                    "required": []
+                    "required": ["conversation_id"]
                 }
             )
         ]
@@ -484,9 +488,14 @@ class LobsterPressMCPServer:
             return result
 
         # v3.6.0: 主动衰减清理（Issue #127 模块二）
+        # v3.6.1: 添加 conversation_id 参数（Issue #129 Bug 2）
         elif tool_name == "lobster_sweep":
+            conversation_id = arguments.get("conversation_id")
+            if not conversation_id:
+                raise ValueError("conversation_id is required for lobster_sweep")
             db = self._get_db()
             result = db.sweep_decayed_messages(
+                conversation_id=conversation_id,
                 days_threshold=arguments.get("days_threshold", 30)
             )
             return result

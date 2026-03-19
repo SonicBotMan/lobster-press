@@ -5,6 +5,52 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.6.1] - 2026-03-19
+
+### 🐛 Bug 修复（Issue #129）
+
+**🔴 严重（2个）**：
+
+1. **sweep_decayed_messages 违反无损原则 + FTS 删除逻辑错误** ✅
+   - 改为标记 `memory_tier='decayed'`，不物理删除消息本体
+   - 使用 `remove_messages_from_context` 从上下文移除
+   - 修复 FTS 删除语句逻辑（先查 rowid 再删除）
+   
+2. **sweep_decayed_messages 缺少 conversation_id 参数** ✅
+   - 添加必需参数 `conversation_id`
+   - 防止跨 namespace 误删数据
+   - 更新 `lobster_sweep` MCP 工具参数
+
+**🟠 较严重（3个）**：
+
+3. **apply_correction('delete') 不清理 FTS 索引** ✅
+   - 删除前先查 rowid
+   - 同步删除 FTS 索引记录
+   
+4. **apply_correction('content') FTS 内容不同步** ✅
+   - 更新主表后重建 FTS 索引（delete + insert）
+   - 保持 FTS 与主表一致
+   
+5. **_row_to_dict / _execute_fetch_all fallback 列表缺少 memory_tier** ✅
+   - 补充 `memory_tier` 字段到两个方法的 fallback 列表
+   - 避免列偏移问题
+
+**🟡 一般（2个）**：
+
+6. **database.py 文件头版本号未更新** ✅
+   - 更新为 v3.6.1
+   
+7. **get_context_by_tier 依赖 Bug 1 修复** ✅
+   - 自动生效（sweep 标记为 decayed，查询已排除）
+
+### 📝 修改的文件
+
+- `src/database.py` - 修复 7 个 bug（sweep_decayed_messages, apply_correction, _row_to_dict, _execute_fetch_all）
+- `mcp_server/lobster_mcp_server.py` - 更新 lobster_sweep 参数
+- `skill/lobster-press/Skill.md` - 更新 lobster_sweep 文档
+
+---
+
 ## [3.6.0] - 2026-03-19
 
 ### 🎉 MemOS 架构升级（Issue #127）

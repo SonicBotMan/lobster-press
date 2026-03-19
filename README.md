@@ -54,7 +54,43 @@ LobsterPress v3.0 是基于认知科学论文实现的 LLM 记忆系统，融合
    - `search_messages/search_summaries` 支持 `cross_namespace` 参数
    - MCP Server 支持 `--namespace` 参数
 
-2. **模块一：三层记忆模型** - working/episodic/semantic
+## 🆕 v3.6.1 新特性：Bug 修复（Issue #129）
+
+**代码审查发现的 7 个 bug 全部修复**：
+
+### 🔴 严重（2个）
+1. **sweep_decayed_messages 违反无损原则** ✅
+   - 改为标记 `memory_tier='decayed'`，不物理删除
+   - 使用 `remove_messages_from_context` 从上下文移除
+   
+2. **sweep_decayed_messages 缺少 conversation_id** ✅
+   - 添加必需参数 `conversation_id`
+   - 防止跨 namespace 误删
+
+### 🟠 较严重（3个）
+3. **apply_correction('delete') 不清理 FTS 索引** ✅
+   - 删除前先查 rowid，同步删除 FTS 记录
+   
+4. **apply_correction('content') FTS 不同步** ✅
+   - 更新内容后重建 FTS 索引（delete + insert）
+   
+5. **_row_to_dict fallback 列表缺少 memory_tier** ✅
+   - 补充 `memory_tier` 字段到 fallback 列表
+
+### 🟡 一般（2个）
+6. **文件头版本号未更新** ✅
+   - 更新为 v3.6.1
+   
+7. **get_context_by_tier 依赖 Bug 1 修复** ✅
+   - 自动生效（sweep 标记为 decayed，查询已排除）
+
+---
+
+## 🆕 v3.6.0 新特性：MemOS 架构（Issue #127）
+
+**四层架构升级**：
+
+1. **模块四：命名空间隔离** - 多 Agent/项目隔离
    - 数据库支持 `memory_tier` 字段
    - `get_context_by_tier()` 方法按层级获取记忆
    - `lobster_assemble` MCP 工具智能拼装上下文
