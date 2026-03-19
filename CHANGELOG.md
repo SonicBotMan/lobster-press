@@ -5,6 +5,66 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.3.0] - 2026-03-19
+
+### 🎯 版本定位
+
+**自动上下文监测与压缩** (Issue #123)
+
+实现 ContextEngine 接口，超越 lossless-claw 的自动压缩能力。
+
+### ✨ 新增
+
+**ContextEngine 注册**
+- `index.ts` 实现 `afterTurn()` 钩子：每次 turn 后自动检查上下文使用率
+- `index.ts` 实现 `compact()` 方法：调用 Python 层的真实压缩逻辑
+- 注册为 OpenClaw ContextEngine 插件
+
+**自动压缩工具**
+- `mcp_server/lobster_mcp_server.py` 新增 `lobster_compress` 工具
+- 调用真实的 `DAGCompressor.incremental_compact()`
+- 支持强制压缩（force 参数）
+
+**参数改进**
+- `src/dag_compressor.py` 添加 `token_budget` 参数
+- 不再硬编码 `128000`，使用传入的值
+
+### 🐛 Bug 修复
+
+- 修复 TypeScript 类型错误（ContextEngine 接口兼容性）
+- 修复 `afterTurn` 参数类型（AgentMessage 处理）
+- 修复 `compact` 返回类型（CompactResult 接口）
+
+### 🔧 技术细节
+
+- 异步压缩：不阻塞用户 turn
+- 智能触发：只在超过阈值（默认 0.8）时压缩
+- Token 估算：从 messages 中动态计算
+
+## [3.2.9] - 2026-03-19
+
+### 🐛 Bug 修复
+
+- 修复 Python import path 问题
+- 添加 `sys.path.insert(0, str(Path(__file__).parent.parent / "src"))` 到 `mcp_server/lobster_mcp_server.py`
+- Python 可以正确找到 `src/` 目录中的模块
+
+## [3.2.8] - 2026-03-19
+
+### 🐛 Bug 修复
+
+- 修复 `agent_tools` 模块未包含问题
+- 添加 `src/` 到 package.json 的 files 字段
+- 包大小从 22.8 KB 增加到 62.7 KB
+
+## [3.2.7] - 2026-03-19
+
+### 🐛 Bug 修复
+
+- 修复 MCP server cwd path 问题（Issue #121）
+- 将 `join(__dirname, "mcp_server")` 改为 `join(__dirname, "..")`
+- 原因：npm 包结构中 `dist/` 和 `mcp_server/` 是同级目录
+
 ## [3.2.6] - 2026-03-18
 
 ### 🐛 Bug 修复
