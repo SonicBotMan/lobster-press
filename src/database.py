@@ -5,7 +5,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: v2.5.0
+Version: v3.6.1
 """
 
 import sqlite3
@@ -799,13 +799,37 @@ class LobsterDatabase:
         # 应用纠错
         table = 'messages' if target_type == 'message' else 'summaries'
         id_field = 'message_id' if target_type == 'message' else 'summary_id'
+        fts_table = 'messages_fts' if target_type == 'message' else 'summaries_fts'
 
         if correction_type == 'delete':
-            # 删除记录
+            # 先查 rowid（Issue #129 Bug 3 修复）
+            self.cursor.execute(f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,))
+            row = self.cursor.fetchone()
+            if row:
+                # 删除 FTS 索引
+                self.cursor.execute(f"DELETE FROM {fts_table} WHERE rowid = ?", (row[0],))
+            # 删除主表记录
             self.cursor.execute(f"DELETE FROM {table} WHERE {id_field} = ?", (target_id,))
         elif correction_type == 'content':
-            # 修改内容
-            self.cursor.execute(f"UPDATE {table} SET content = ? WHERE {id_field} = ?", (new_value, target_id))
+            # 先查 rowid（Issue #129 Bug 4 修复）
+            self.cursor.execute(f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,))
+            row = self.cursor.fetchone()
+            if row:
+                old_rowid = row[0]
+                # 更新主表内容
+                self.cursor.execute(f"UPDATE {table} SET content = ? WHERE {id_field} = ?",
+                                    (new_value, target_id))
+                # 同步 FTS：删除旧记录
+                self.cursor.execute(f"DELETE FROM {fts_table} WHERE rowid = ?", (old_rowid,))
+                # 插入新记录
+                self.cursor.execute(
+                    f"INSERT INTO {fts_table} (rowid, {id_field}, content) VALUES (?, ?, ?)",
+                    (old_rowid, target_id, new_value)
+                )
+            else:
+                # 如果记录不存在，只更新主表
+                self.cursor.execute(f"UPDATE {table} SET content = ? WHERE {id_field} = ?",
+                                    (new_value, target_id))
         elif correction_type == 'metadata':
             # 修改元数据
             self.cursor.execute(f"UPDATE {table} SET metadata = ? WHERE {id_field} = ?", (new_value, target_id))
@@ -827,12 +851,15 @@ class LobsterDatabase:
             "success": True
         }
 
-    def sweep_decayed_messages(self, days_threshold: int = 30) -> dict:
-        """v3.6.0: 清理衰减消息（Issue #127 模块二）
+    def sweep_decayed_messages(self, conversation_id: str, days_threshold: int = 30) -> dict:
+        """v3.6.1: 清理衰减消息（Issue #127 模块二 + Issue #129 Bug 1, 2）
 
-        基于遗忘曲线，删除低价值、长期未访问的消息。
+        基于遗忘曲线，将低价值、长期未访问的消息标记为 decayed。
+
+        ⚠️ 无损原则：消息本体永久保留，只从上下文移除并标记 tier。
 
         Args:
+            conversation_id: 对话 ID（防止跨 namespace 误删）
             days_threshold: 未访问天数阈值（默认 30 天）
 
         Returns:
@@ -842,35 +869,42 @@ class LobsterDatabase:
 
         cutoff_date = (datetime.utcnow() - timedelta(days=days_threshold)).isoformat()
 
-        # 查找符合衰减条件的消息
+        # 查找符合衰减条件的消息（增加 conversation_id 过滤）
         self.cursor.execute("""
             SELECT message_id, tfidf_score, access_count, last_accessed_at
             FROM messages
-            WHERE last_accessed_at < ?
+            WHERE conversation_id = ?
+              AND COALESCE(last_accessed_at, created_at) < ?
               AND compression_exempt = 0
               AND tfidf_score < 0.1
             ORDER BY tfidf_score ASC, last_accessed_at ASC
             LIMIT 100
-        """, (cutoff_date,))
+        """, (conversation_id, cutoff_date))
 
-        candidates = self.cursor.fetchall()
+        candidates = [row[0] for row in self.cursor.fetchall()]
 
-        # 删除消息
-        deleted_count = 0
-        for msg in candidates:
-            message_id = msg[0]
-            # 从 FTS 索引删除
-            self.cursor.execute("DELETE FROM messages_fts WHERE message_id = ?", (message_id,))
-            # 从 summary_messages 关系删除
-            self.cursor.execute("DELETE FROM summary_messages WHERE message_id = ?", (message_id,))
-            # 删除消息本身
-            self.cursor.execute("DELETE FROM messages WHERE message_id = ?", (message_id,))
-            deleted_count += 1
+        if not candidates:
+            return {
+                "swept_count": 0,
+                "candidates": 0,
+                "days_threshold": days_threshold,
+                "cutoff_date": cutoff_date
+            }
+
+        # 无损删除：只从 context_items 移除（参考 remove_messages_from_context）
+        swept_count = self.remove_messages_from_context(conversation_id, candidates)
+
+        # 标记 memory_tier 为 decayed（可查询，不物理删除）
+        placeholders = ','.join('?' * len(candidates))
+        self.cursor.execute(
+            f"UPDATE messages SET memory_tier = 'decayed' WHERE message_id IN ({placeholders})",
+            candidates
+        )
 
         self.conn.commit()
 
         return {
-            "deleted_count": deleted_count,
+            "swept_count": swept_count,
             "candidates": len(candidates),
             "days_threshold": days_threshold,
             "cutoff_date": cutoff_date
@@ -1036,11 +1070,13 @@ class LobsterDatabase:
                 columns = ['id', 'message_id', 'conversation_id', 'seq', 'role',
                           'content', 'token_count', 'created_at', 'metadata',
                           'msg_type', 'tfidf_score', 'structural_bonus', 'compression_exempt',
-                          'last_accessed_at', 'access_count', 'stability']
+                          'last_accessed_at', 'access_count', 'stability',
+                          'memory_tier']  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
             elif table == 'summaries':
                 columns = ['id', 'summary_id', 'conversation_id', 'kind', 'depth',
                           'content', 'token_count', 'earliest_at', 'latest_at',
-                          'descendant_count', 'created_at']
+                          'descendant_count', 'created_at',
+                          'memory_tier']  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
             else:
                 columns = []
         
@@ -1081,11 +1117,13 @@ class LobsterDatabase:
                 columns = ['id', 'message_id', 'conversation_id', 'seq', 'role', 
                           'content', 'token_count', 'created_at', 'metadata',
                           'msg_type', 'tfidf_score', 'structural_bonus', 'compression_exempt',
-                          'last_accessed_at', 'access_count', 'stability']
+                          'last_accessed_at', 'access_count', 'stability',
+                          'memory_tier']  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
             elif table == 'summaries':
                 columns = ['id', 'summary_id', 'conversation_id', 'kind', 'depth',
                           'content', 'token_count', 'earliest_at', 'latest_at',
-                          'descendant_count', 'created_at']
+                          'descendant_count', 'created_at',
+                          'memory_tier']  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
             else:
                 return dict(row)
         

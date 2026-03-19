@@ -179,16 +179,23 @@ python3 scripts/context-compressor-v5.sh --dry-run abc123
 }
 ```
 
-### `lobster_sweep` 参数（v3.6.0+）
+### `lobster_sweep` 参数（v3.6.1+）
 
 | 参数 | 类型 | 必需 | 说明 |
 |------|------|------|------|
+| `conversation_id` | string | 是 | 对话 ID（防止跨 namespace 误删） |
 | `days_threshold` | integer | 否 | 未访问天数阈值（默认 30） |
 
 **返回值**：
 
 ```json
 {
+  "swept_count": 5,
+  "candidates": 5,
+  "days_threshold": 30,
+  "cutoff_date": "2026-02-17T17:00:00Z"
+}
+```
   "deleted_count": 5,
   "candidates": 5,
   "days_threshold": 30,
