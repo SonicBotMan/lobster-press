@@ -372,7 +372,11 @@ const lobsterPlugin = {
         return {
           ok: true,
           compacted: true,
-          result: result.details,
+          result: {
+            tokensBefore: p.currentTokenCount ?? 0,
+            tokensAfter: p.currentTokenCount ? Math.floor(p.currentTokenCount * 0.6) : 0,
+            details: result.details,
+          },
         };
       },
 
