@@ -135,6 +135,7 @@ async function ensureMcpServer(config: Record<string, unknown>): Promise<ChildPr
         (config.llmModel as string) || "",
       ],
       {
+        cwd: join(__dirname, "mcp_server"),
         env: {
           ...process.env,
           LOBSTER_LLM_API_KEY:
