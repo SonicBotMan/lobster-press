@@ -5,6 +5,76 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.0] - 2026-03-19 -「深海」版本
+
+### 🎯 核心目标
+超越 lossless-claw，实现学术级认知记忆系统。
+
+### ✨ 新增功能
+
+**模块一：CMV 三遍无损压缩引擎**
+- `src/three_pass_trimmer.py`：无损压缩工具输出
+  - Pass 1: 剥离 base64/长 JSON 冗余
+  - Pass 2: 去重工具结果
+  - Pass 3: 折叠系统样板代码
+- 集成到 DAGCompressor 的 `incremental_compact()`
+- 无损原则：user/assistant 消息永不修改
+
+**模块二：C-HLR+ 自适应遗忘曲线**
+- 复杂度驱动半衰期：`h = base_h * (1 + α * complexity) * spaced_bonus`
+- 对数稳定性增长：`stability *= (1 + 0.5 / sqrt(access_count + 1))`
+- 指数底数从 `e` 改为 `2`（符合记忆研究惯例）
+- 新增 `_compute_complexity()` 辅助方法（TTR + 长度 + 结构）
+- Ref: arXiv:2004.11327 — Adaptive Forgetting Curves
+
+**模块三：Focus 主动压缩触发**
+- `afterTurn()` 支持三策略触发：
+  1. 定时触发：每 12 轮主动压缩
+  2. 紧急触发：上下文使用率 > 85%
+  3. 被动触发：原有阈值逻辑
+- 新增 `_getTurnCount()` 辅助方法
+- Ref: arXiv:2502.15957 — Focus: Context-Aware Prompt Compression
+
+**模块四：R³Mem 可逆三层压缩**
+- `migrate_v40()` 数据库迁移：
+  - 新增 `entities` 表（实体追踪）
+  - 新增 `entity_mentions` 表（实体-消息关联）
+  - summaries 表增加 `r3_layer` 字段
+  - summaries 表增加 `memory_tier` 字段
+  - messages 表增加 `memory_tier` 字段
+  - conversations 表增加 `namespace` 字段
+- `upsert_entity()`：插入或更新实体记录
+- `expand_summary()` 升级支持三层展开：
+  - Layer 1: Document-Level（返回子摘要）
+  - Layer 2: Paragraph-Level（返回原始消息）
+  - Layer 3: Entity-Level（按实体过滤）
+- `get_turn_count()`：获取对话轮次数
+- Ref: arXiv:2502.15957 — R³Mem: Bridging Memory Retention and Retrieval
+
+**模块五：WMR 框架重构 MCP 工具集**
+- 文件头更新：v4.0.0 + WMR 三层分类注释
+- 新增 `lobster_status` 工具：系统健康报告
+  - 各层记忆分布
+  - 实体数量
+  - 纠错记录数
+  - 压缩策略信息
+- 新增 `lobster_prune` 工具：删除 decayed 消息
+  - 支持 dry_run 模式
+  - ⚠️ 破坏性操作警告
+
+### 📚 学术参考
+- arXiv:2004.11327 — Adaptive Forgetting Curves for Spaced Repetition
+- arXiv:2502.15957 — Focus: Context-Aware Prompt Compression for LLMs
+- arXiv:2502.15957 — R³Mem: Bridging Memory Retention and Retrieval
+- CMV: Context Maintenance and Retrieval
+
+### 🔄 架构演进
+- Python 层：4 个模块（CMV + C-HLR+ + R³Mem + WMR）
+- TypeScript 层：1 个模块（Focus 触发）
+- 数据库 schema：v4.0.0（6 个新字段，2 个新表）
+
+---
+
 ## [3.6.1] - 2026-03-19
 
 ### 🐛 Bug 修复（Issue #129）

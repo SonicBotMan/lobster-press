@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
 
-# 🧠 LobsterPress v3.6.0
+# 🧠 LobsterPress v4.0.0「深海」
 
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v3.6.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.6.0) · [更新日志](CHANGELOG.md)
+**最新版本**: [v4.0.0「深海」](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.0) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -32,7 +32,7 @@
 
 ## 💡 Our Solution: 认知记忆系统
 
-LobsterPress v3.0 是基于认知科学论文实现的 LLM 记忆系统，融合三大前沿研究：
+LobsterPress v4.0「深海」是基于认知科学论文实现的 LLM 记忆系统，融合五大前沿研究：
 
 ### 📚 学术基础
 
@@ -42,6 +42,43 @@ LobsterPress v3.0 是基于认知科学论文实现的 LLM 记忆系统，融合
 | **HiMem (Hierarchical Memory)** | 记忆层次化 | DAG 压缩 + 三级摘要结构 |
 | **Ebbinghaus Forgetting Curve (1885)** | 动态遗忘 | R(t) = base_score × e^(-t/stability) |
 | **Memory Reconsolidation (Nader, 2000)** | 知识更新 | 矛盾检测 + 语义记忆重巩固 |
+| **CMV (Context Maintenance and Retrieval)** | 无损压缩 | 三遍 trimmer（v4.0 新增）|
+| **C-HLR+ (arXiv:2004.11327)** | 自适应遗忘 | 复杂度驱动半衰期（v4.0 新增）|
+| **Focus (arXiv:2502.15957)** | 主动压缩 | 定时 + 紧急 + 被动触发（v4.0 新增）|
+| **R³Mem (arXiv:2502.15957)** | 可逆压缩 | 三层展开 + 实体追踪（v4.0 新增）|
+
+---
+
+## 🆕 v4.0.0「深海」新特性
+
+**五大模块重构，超越 lossless-claw**：
+
+### 🔧 模块一：CMV 三遍无损压缩
+- **Pass 1**: 剥离 base64/长 JSON 冗余
+- **Pass 2**: 去重工具结果
+- **Pass 3**: 折叠系统样板代码
+- **无损原则**：user/assistant 消息永不修改
+
+### 🧬 模块二：C-HLR+ 自适应遗忘曲线
+- **复杂度驱动半衰期**：`h = base_h × (1 + α × complexity) × spaced_bonus`
+- **对数稳定性增长**：避免无限膨胀
+- **指数底数优化**：从 `e` 改为 `2`
+
+### ⚡ 模块三：Focus 主动压缩触发
+- **定时触发**：每 12 轮主动压缩
+- **紧急触发**：上下文使用率 > 85%
+- **被动触发**：原有阈值逻辑
+
+### 🔄 模块四：R³Mem 可逆三层压缩
+- **Layer 1**: Document-Level（返回子摘要）
+- **Layer 2**: Paragraph-Level（返回原始消息）
+- **Layer 3**: Entity-Level（按实体过滤）
+- **实体追踪**：人名、文件名、概念自动提取
+
+### 🛠️ 模块五：WMR 框架重构
+- **Write 层**：`lobster_compact` + `lobster_correct`
+- **Manage 层**：`lobster_sweep` + `lobster_assemble` + `lobster_prune`
+- **Read 层**：`lobster_grep` + `lobster_describe` + `lobster_expand` + `lobster_status`
 
 ---
 

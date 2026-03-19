@@ -313,11 +313,20 @@ const lobsterPlugin = {
         ownsCompaction: true,
       },
 
+      // v4.0.0: Focus 主动压缩触发常量
+      const FOCUS_COMPRESSION_INTERVAL = 12;  // 论文建议 10-15，取 12
+      const FOCUS_URGENT_THRESHOLD = 0.85;    // 上下文使用率超过 85% 时立即触发
+
       // 关键：每次 turn 后自动检查上下文使用率
+      // v4.0.0: Focus 主动压缩触发（定时 + 紧急 + 被动三策略）
       async afterTurn(params: any) {
+        const db = await this._getDb();
         const threshold = (pluginConfig.contextThreshold as number) ?? 0.8;
         const tokenBudget = params.tokenBudget ?? 128000;
-        
+
+        // v4.0.0: 获取轮次数
+        const turnCount = await this._getTurnCount(params.sessionId);
+
         // 估算当前 token 数量（从 messages 中）
         const currentTokenCount = (params.messages || []).reduce((total: number, msg: any) => {
           let content = "";
@@ -329,9 +338,51 @@ const lobsterPlugin = {
           // 粗略估算：1 token ≈ 4 字符
           return total + Math.ceil(content.length / 4);
         }, 0);
-        
+
         const ratio = currentTokenCount / tokenBudget;
 
+        // ── Focus 策略一：定时主动提示（每 N 轮）──
+        if (turnCount > 0 && turnCount % FOCUS_COMPRESSION_INTERVAL === 0) {
+          api.logger.info(
+            `[lobster-press] Focus scheduled compression at turn ${turnCount}`
+          );
+
+          await callMcp(pluginConfig, "lobster_compress", {
+            conversation_id: params.sessionId,
+            current_tokens: currentTokenCount,
+            token_budget: tokenBudget,
+            strategy: 'focus_scheduled',
+            force: true,
+          });
+
+          // 向 Agent 注入压缩完成通知
+          return {
+            stopReason: null,
+            additionalMessages: [{
+              role: 'system' as const,
+              content: `[lobster-press] Scheduled memory consolidation completed at turn ${turnCount}. ` +
+                       `Context optimized. Previous context preserved in memory DAG.`
+            }]
+          };
+        }
+
+        // ── Focus 策略二：紧急触发（上下文使用率过高）──
+        if (ratio > FOCUS_URGENT_THRESHOLD) {
+          api.logger.warn(
+            `[lobster-press] URGENT: Context at ${(ratio * 100).toFixed(1)}% capacity`
+          );
+
+          return {
+            stopReason: null,
+            additionalMessages: [{
+              role: 'system' as const,
+              content: `[lobster-press] URGENT: Context at ${Math.round(ratio * 100)}% capacity. ` +
+                       `Call lobster_compact immediately before proceeding with next task step.`
+            }]
+          };
+        }
+
+        // ── Focus 策略三：被动阈值触发（原有逻辑）──
         if (ratio <= threshold) {
           api.logger.info(
             `[lobster-press] Context ${(ratio * 100).toFixed(1)}% ≤ ${threshold * 100}%, no compression needed`
@@ -344,7 +395,6 @@ const lobsterPlugin = {
         );
 
         // v3.4.0: 修复 Bug #124 - afterTurn 触发时传 force: true
-        // TypeScript 层已经做了阈值判断，Python 层无需再判断
         callMcp(pluginConfig, "lobster_compress", {
           conversation_id: params.sessionId,
           current_tokens: currentTokenCount,
@@ -353,6 +403,26 @@ const lobsterPlugin = {
         }).catch((err) =>
           api.logger.error(`[lobster-press] auto-compress failed: ${err}`)
         );
+      },
+
+      // v4.0.0: 辅助方法 - 获取轮次数
+      async _getTurnCount(sessionId: string): Promise<number> {
+        try {
+          const result = await callMcp(pluginConfig, "lobster_describe", {
+            conversation_id: sessionId
+          });
+          // lobster_describe 返回 turn_count（如果数据库实现了 get_turn_count）
+          return (result.details as any)?.turn_count ?? 0;
+        } catch (err) {
+          api.logger.error(`[lobster-press] _getTurnCount failed: ${err}`);
+          return 0;
+        }
+      },
+
+      // v4.0.0: 辅助方法 - 获取数据库实例
+      async _getDb(): Promise<any> {
+        // 返回空对象，实际调用在 Python 层
+        return {};
       },
 
       // ContextEngine 必需方法：compact
