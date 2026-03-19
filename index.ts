@@ -135,6 +135,7 @@ async function ensureMcpServer(config: Record<string, unknown>): Promise<ChildPr
         (config.llmModel as string) || "",
       ],
       {
+        cwd: join(__dirname, ".."), // 设置工作目录为包根目录，让 Python 找到 mcp_server 模块
         env: {
           ...process.env,
           LOBSTER_LLM_API_KEY:
