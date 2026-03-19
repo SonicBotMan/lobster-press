@@ -301,9 +301,71 @@ const lobsterPlugin = {
       },
     });
 
+    // ── ContextEngine Registration (v3.3.0) ────────────────────────────────────
+    // 参考 lossless-claw 的实现，注册为 ContextEngine，实现自动压缩
+    const lobsterEngine = {
+      info: {
+        id: "lobster-press",
+        name: "LobsterPress Memory Engine",
+        version: "3.3.0",
+        ownsCompaction: true,
+      },
+
+      // 关键：每次 turn 后自动检查上下文使用率
+      async afterTurn(params: {
+        sessionId: string;
+        sessionFile: string;
+        messages: Array<{ role: string; content: string }>;
+        tokenBudget: number;
+        currentTokenCount: number;
+        isHeartbeat?: boolean;
+      }) {
+        const threshold = (pluginConfig.contextThreshold as number) ?? 0.8;
+        const ratio = params.currentTokenCount / params.tokenBudget;
+
+        if (ratio <= threshold) {
+          api.logger.info(
+            `[lobster-press] Context ${(ratio * 100).toFixed(1)}% ≤ ${threshold * 100}%, no compression needed`
+          );
+          return;
+        }
+
+        api.logger.info(
+          `[lobster-press] Context ${(ratio * 100).toFixed(1)}% > ${threshold * 100}%, triggering auto-compress`
+        );
+
+        // 异步执行压缩，不阻塞当前 turn
+        callMcp(pluginConfig, "lobster_compress", {
+          conversation_id: params.sessionId,
+          current_tokens: params.currentTokenCount,
+          token_budget: params.tokenBudget,
+          force: false,
+        }).catch((err) =>
+          api.logger.error("[lobster-press] auto-compress failed:", err)
+        );
+      },
+
+      // 其他必需方法（暂时用空实现）
+      async bootstrap() {
+        return { bootstrapped: false, reason: "not implemented" };
+      },
+      async ingest() {
+        return { ingested: true };
+      },
+      async assemble(p: { messages: unknown[] }) {
+        return { messages: p.messages, estimatedTokens: 0 };
+      },
+    };
+
+    // 注册为 ContextEngine
+    api.registerContextEngine("lobster-press", () => lobsterEngine);
+
     api.logger.info(
       `[lobster-press] Plugin loaded (db=${pluginConfig.dbPath ?? "~/.openclaw/lobster.db"}, ` +
       `provider=${pluginConfig.llmProvider ?? "none (extractive fallback)"})`
+    );
+    api.logger.info(
+      `[lobster-press] ContextEngine registered (threshold=${(pluginConfig.contextThreshold as number) ?? 0.8})`
     );
   },
 };

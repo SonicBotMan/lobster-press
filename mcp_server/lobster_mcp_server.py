@@ -207,6 +207,21 @@ class LobsterPressMCPServer:
                     },
                     "required": ["summary_id"]
                 }
+            ),
+            # v3.3.0: 自动压缩工具（调用真实 DAGCompressor）
+            MCPTool(
+                name="lobster_compress",
+                description="增量压缩：检查上下文使用率，超过阈值时执行真正的 DAG 压缩",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "conversation_id": {"type": "string", "description": "对话 ID"},
+                        "current_tokens": {"type": "integer", "description": "当前 token 数量"},
+                        "token_budget": {"type": "integer", "description": "token 预算"},
+                        "force": {"type": "boolean", "description": "是否强制压缩（忽略阈值）", "default": False}
+                    },
+                    "required": ["conversation_id", "current_tokens", "token_budget"]
+                }
             )
         ]
     
@@ -299,6 +314,43 @@ class LobsterPressMCPServer:
             from agent_tools import lobster_expand
             db = self._get_db()
             return lobster_expand(db, arguments["summary_id"])
+        
+        # v3.3.0: 自动压缩工具（调用真实 DAGCompressor）
+        elif tool_name == "lobster_compress":
+            from dag_compressor import DAGCompressor
+            db = self._get_db()
+            llm = self._get_llm() if self.llm_provider else None
+            compressor = DAGCompressor(db, llm_client=llm)
+            
+            current_tokens = arguments["current_tokens"]
+            token_budget = arguments["token_budget"]
+            conversation_id = arguments["conversation_id"]
+            force = arguments.get("force", False)
+            threshold = token_budget * 0.75  # 默认 75% 阈值
+            
+            # 检查是否超过阈值
+            if current_tokens < threshold and not force:
+                return {
+                    "compressed": False,
+                    "reason": "below_threshold",
+                    "usage_ratio": round(current_tokens / token_budget, 3),
+                    "threshold": 0.75
+                }
+            
+            # 执行压缩（调用真实的 DAGCompressor）
+            did_compress = compressor.incremental_compact(
+                conversation_id,
+                context_threshold=0.0 if force else 0.75,
+                token_budget=token_budget
+            )
+            
+            return {
+                "compressed": did_compress,
+                "conversation_id": conversation_id,
+                "current_tokens": current_tokens,
+                "token_budget": token_budget,
+                "threshold": 0.75
+            }
         
         else:
             raise ValueError(f"Unknown tool: {tool_name}")

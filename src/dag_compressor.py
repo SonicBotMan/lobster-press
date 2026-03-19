@@ -412,7 +412,7 @@ class DAGCompressor:
     
     # ==================== 增量压缩 ====================
     
-    def incremental_compact(self, conversation_id: str, context_threshold: float = 0.75) -> bool:
+    def incremental_compact(self, conversation_id: str, context_threshold: float = 0.75, token_budget: int = None) -> bool:
         """增量压缩
         
         借鉴 lossless-claw 的 incremental compaction：
@@ -424,6 +424,7 @@ class DAGCompressor:
         Args:
             conversation_id: 对话 ID
             context_threshold: 上下文阈值（默认 0.75）
+            token_budget: token 预算（默认 128000）
         
         Returns:
             是否执行了压缩
@@ -434,8 +435,8 @@ class DAGCompressor:
         messages = self.db.get_messages(conversation_id)
         total_tokens = sum(m.get('token_count', 0) for m in messages)
         
-        # 假设最大上下文为 128k tokens
-        max_tokens = 128000
+        # v3.3.0: 使用传入的 token_budget，不再硬编码 128000
+        max_tokens = token_budget or 128000
         usage_ratio = total_tokens / max_tokens
         
         print(f"📊 上下文使用率: {usage_ratio:.1%} ({total_tokens:,} / {max_tokens:,} tokens)")
