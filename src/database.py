@@ -13,10 +13,17 @@ import json
 import hashlib
 import uuid
 import math
+import sys
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime
-from three_pass_trimmer import ThreePassTrimmer  # v4.0 新增
+
+# v4.0.0: 导入 ThreePassTrimmer（兼容多种导入场景）
+try:
+    from .three_pass_trimmer import ThreePassTrimmer
+except ImportError:
+    # 当直接运行或从父目录导入时
+    from three_pass_trimmer import ThreePassTrimmer
 
 
 class LobsterDatabase:
