@@ -5,6 +5,25 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.4.1] - 2026-03-19
+
+### 📚 文档更新（Issue #125）
+
+**Skill.md 完全重写**
+- 更新版本：v1.2.2 → v3.4.1
+- 更新描述：TF-IDF 方案 → 认知记忆系统（DAG 压缩）
+- 新增内容：
+  - ContextEngine 集成说明
+  - MCP 工具 API 文档
+  - 压缩策略表格
+  - 架构设计图
+  - 使用示例
+  - 依赖说明（包括 tiktoken 可选依赖）
+
+**问题修复**
+- 🔴 问题 1：Skill.md 版本过时 ✅ 已修复
+- 🟢 问题 3：tiktoken 可选依赖文档 ✅ 已添加
+
 ## [3.4.0] - 2026-03-19
 
 ### 🐛 Bug 修复（Issue #124）

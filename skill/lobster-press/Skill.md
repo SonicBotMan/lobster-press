@@ -1,19 +1,22 @@
 ---
 name: lobster-press
-description: LobsterPress 智能上下文压缩系统 - 零成本压缩会话上下文，TF-IDF评分+语义去重+提取式摘要，让 AI 记忆永不溢出
+description: LobsterPress 认知记忆系统 - DAG 压缩 + OpenClaw ContextEngine + MCP 服务器，让 AI 拥有长期记忆和智能压缩能力
 ---
 
-# LobsterPress - OpenClaw 智能上下文压缩
+# LobsterPress - OpenClaw 认知记忆系统
 
 ## 概述
 
-LobsterPress 是一个为 OpenClaw 设计的智能上下文压缩系统，通过 TF-IDF 三层评分、语义去重和提取式摘要技术，实现**零 API 成本**的会话压缩。
+LobsterPress 是一个为 OpenClaw 设计的**认知记忆系统**，通过 DAG（有向无环图）压缩、遗忘曲线和语义记忆技术，实现智能上下文管理。
+
+**最新版本**: v3.4.0 (2026-03-19)
 
 **核心特性：**
-- **零成本压缩** - local 模式下 API 调用为 0，压缩成本 $0.00
-- **质量守卫** - 自动检测压缩质量，不达标时自动回滚
-- **Token 净收益** - 短会话 +500，中会话 +3,500，长会话 +8,000
-- **无损压缩** - 提取式摘要，不生成新 token，不引入 AI 幻觉
+- **DAG 压缩** - 有向无环图结构，保留语义关系
+- **ContextEngine 集成** - 自动监测上下文使用率，智能触发压缩
+- **MCP 服务器** - 通过 MCP 协议提供工具调用
+- **认知记忆** - EM-LLM + HiMem + 遗忘曲线
+- **真实压缩** - 返回真实的 token 数，不做估算
 
 ## 使用场景
 
@@ -22,85 +25,183 @@ LobsterPress 是一个为 OpenClaw 设计的智能上下文压缩系统，通过
 - "Token 不够了"、"上下文太长"
 - "会话压缩"、"智能压缩"
 - "清理对话"、"优化上下文"
+- "记忆管理"、"长期记忆"
 
 ## 快速开始
 
 ### 安装依赖
 
 ```bash
-cd ~/.openclaw/workspace/skills/lobster-press/scripts
+cd ~/.openclaw/workspace/skills/lobster-press
 pip install -r requirements.txt
+
+# 可选：高精度 token 计数
+pip install tiktoken
 ```
 
 ### 基本用法
 
-```bash
-# 压缩当前会话（local 模式，零成本）
-python3 scripts/lobster_press_v120.py --mode local
+**方式 1：MCP 工具调用（推荐）**
 
-# 查看压缩预览（不实际执行）
-python3 scripts/lobster_press_v120.py --dry-run
-
-# 指定压缩强度
-python3 scripts/lobster_press_v120.py --strategy medium
+```json
+{
+  "name": "lobster_compress",
+  "arguments": {
+    "conversation_id": "current-session",
+    "current_tokens": 100000,
+    "token_budget": 128000,
+    "force": false
+  }
+}
 ```
 
-## 压缩模式
+**方式 2：OpenClaw ContextEngine（自动）**
 
-| 模式 | API 成本 | 压缩效果 | 适用场景 |
-|------|---------|---------|---------|
-| local | $0.00 | 40-60% | 日常使用，快速压缩 |
-| hybrid | 按需 | 50-70% | 需要更高质量 |
-| api | 正常 | 60-80% | 最高质量要求 |
+配置后，LobsterPress 会自动监测和压缩：
+
+```json
+// ~/.openclaw/openclaw.json
+{
+  "agents": {
+    "defaults": {
+      "plugins": {
+        "slots": {
+          "contextEngine": "lobster-press"
+        }
+      }
+    }
+  },
+  "plugins": {
+    "lobster-press": {
+      "path": "@sonicbotman/lobster-press",
+      "config": {
+        "contextThreshold": 0.75,
+        "strategy": "medium",
+        "tokenBudget": 128000
+      }
+    }
+  }
+}
+```
+
+**方式 3：命令行（遗留）**
+
+```bash
+# 压缩当前会话
+python3 scripts/context-compressor-v5.sh --session-id abc123
+
+# 查看压缩预览
+python3 scripts/context-compressor-v5.sh --dry-run abc123
+```
+
+## MCP 工具 API
+
+### 核心工具
+
+| 工具名称 | 功能 | 版本 |
+|---------|------|------|
+| `lobster_compress` | 自动上下文压缩（真实 DAG） | v3.3.0+ |
+| `compress_session` | 会话压缩（真实 DAG） | v3.3.1+ |
+| `preview_compression` | 预览压缩效果 | v3.2.0+ |
+| `lobster_grep` | 全文搜索历史对话 | v3.2.2+ |
+| `lobster_describe` | 查看 DAG 摘要结构 | v3.2.2+ |
+| `lobster_expand` | 展开摘要节点 | v3.2.2+ |
+
+### `lobster_compress` 参数
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `conversation_id` | string | 是 | 对话 ID |
+| `current_tokens` | integer | 是 | 当前 token 数量 |
+| `token_budget` | integer | 是 | token 预算 |
+| `force` | boolean | 否 | 是否强制压缩（默认 false） |
+
+**返回值**：
+
+```json
+{
+  "compressed": true,
+  "conversation_id": "abc123",
+  "tokens_before": 100000,
+  "tokens_after": 60000,
+  "tokens_saved": 40000,
+  "token_budget": 128000,
+  "attempt": 1
+}
+```
 
 ## 压缩策略
 
-### TF-IDF 三层叠加评分
+| 策略 | 阈值 | 说明 |
+|------|------|------|
+| `light` | 90% | 轻度压缩，保留更多上下文 |
+| `medium` | 75% | 中度压缩，平衡保留与压缩 |
+| `aggressive` | 50% | 激进压缩，最大化节省 token |
 
-1. **Layer 1 - 词汇稀有度**：TF-IDF 分数，稀有词权重高
-2. **Layer 2 - 结构性信号**：决策、错误、代码块等规则加分
-3. **Layer 3 - 时间衰减**：近期消息权重更高
+## 架构设计
 
-### 语义去重
+### DAG 压缩流程
 
-- 余弦相似度 > 0.82 视为重复
-- 保留重要性更高的消息
-- 避免信息冗余
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  OpenClaw Context Pipeline                  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  User Message → AI Response → afterTurn() Hook             │
+│                                    │                        │
+│                                    ↓                        │
+│                          LobsterPress ContextEngine        │
+│                                    │                        │
+│                      ┌─────────────┴─────────────┐        │
+│                      │                           │        │
+│                Usage < 75%                 Usage >= 75%   │
+│                      │                           │        │
+│                      ↓                           ↓        │
+│                   无操作                    compact()      │
+│                                                │           │
+│                                                ↓           │
+│                                      DAGCompressor         │
+│                                      (真实 DAG 压缩)        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
 
-### 质量守卫（v1.2.2）
+### 认知记忆系统
 
-压缩后自动检查：
-- `decision_preserved` - 关键决策是否保留
-- `config_intact` - 配置信息是否完整
-- `context_coherent` - 上下文是否连贯
-
-质量不达标时**自动回滚**到原始会话。
+- **EM-LLM**：基于 LLM 的记忆编码
+- **HiMem**：层次化记忆管理
+- **遗忘曲线**：基于时间的重要性衰减
 
 ## 性能基准
 
-| 上下文大小 | 旧版净收益 | v1.2.2 净收益 | 提升 |
-|-----------|----------|--------------|------|
-| 5k tokens | -350 | +500 | +850 |
-| 15k tokens | +2,150 | +3,500 | +1,350 |
-| 30k tokens | +5,900 | +8,000 | +2,100 |
+| 上下文大小 | 原始 tokens | 压缩后 tokens | 压缩率 |
+|-----------|------------|--------------|--------|
+| 5k tokens | 5,000 | 2,000 | 60% |
+| 15k tokens | 15,000 | 5,000 | 67% |
+| 30k tokens | 30,000 | 8,000 | 73% |
 
 ## 目录结构
 
 ```
 lobster-press/
-├── SKILL.md                    # 本文件
-├── scripts/
-│   ├── lobster_press_v120.py   # 主压缩脚本
-│   ├── compression_validator.py # 质量守卫
-│   ├── tfidf_scorer.py         # TF-IDF 评分
-│   ├── semantic_dedup.py       # 语义去重
-│   ├── extractive_summarizer.py # 提取式摘要
-│   └── requirements.txt        # Python 依赖
-└── docs/
-    ├── README.md               # 完整文档
-    ├── BENCHMARK.md            # 性能基准
-    ├── ROADMAP.md              # 开发路线图
-    └── OPENCLAW-INTEGRATION.md # 集成指南
+├── skill/lobster-press/Skill.md   # 本文件
+├── src/                           # 源代码
+│   ├── database.py                # LobsterDatabase（18 张表 + FTS）
+│   ├── dag_compressor.py          # DAG 压缩器
+│   ├── semantic_memory.py         # 语义记忆层
+│   ├── incremental_compressor.py  # 增量压缩
+│   ├── event_segmenter.py         # 事件边界分割
+│   └── pipeline/                  # 数据管道
+├── mcp_server/                    # MCP 服务器
+│   └── lobster_mcp_server.py      # MCP 工具实现
+├── index.ts                       # OpenClaw ContextEngine
+├── docs/                          # 文档
+│   ├── API.md                     # API 文档
+│   ├── ARCHITECTURE.md            # 架构文档
+│   ├── OPENCLAW-INTEGRATION.md    # 集成指南
+│   └── EXAMPLES.md                # 使用示例
+└── tests/                         # 测试
+    └── unit/test_context_engine.py
 ```
 
 ## 配置选项
@@ -109,38 +210,74 @@ lobster-press/
 
 ```json
 {
-  "lobsterPress": {
-    "mode": "local",
-    "strategy": "balanced",
-    "qualityGuard": true,
-    "autoRollback": true
+  "plugins": {
+    "lobster-press": {
+      "config": {
+        "dbPath": "~/.openclaw/lobster.db",
+        "llmProvider": "deepseek",
+        "contextThreshold": 0.75,
+        "strategy": "medium",
+        "tokenBudget": 128000
+      }
+    }
   }
 }
 ```
 
 ## 示例
 
-### 示例 1：日常压缩
+### 示例 1：自动压缩（推荐）
 
-```bash
-# 用户：压缩一下会话
-# 触发 lobster-press skill
+配置 ContextEngine 后，LobsterPress 会自动监测和压缩：
 
-python3 scripts/lobster_press_v120.py --mode local
+```
+# 用户正常对话
+用户: 请帮我写一个 Python 脚本...
+AI: 好的，我来帮你...
+
+# LobsterPress 自动工作（后台）
+[lobster-press] Context 78.5% > 75%, triggering auto-compress
+[lobster-press] Compressed: 100000 → 60000 tokens (saved 40000)
 ```
 
-### 示例 2：深度压缩
+### 示例 2：手动触发压缩
 
-```bash
-# 用户：上下文太长了，深度压缩
-python3 scripts/lobster_press_v120.py --strategy heavy --mode hybrid
+```json
+{
+  "name": "lobster_compress",
+  "arguments": {
+    "conversation_id": "current-session",
+    "current_tokens": 100000,
+    "token_budget": 128000,
+    "force": true
+  }
+}
 ```
 
-### 示例 3：预览模式
+### 示例 3：预览压缩效果
 
-```bash
-# 用户：看看压缩后能省多少 token
-python3 scripts/lobster_press_v120.py --dry-run --stats
+```json
+{
+  "name": "preview_compression",
+  "arguments": {
+    "session_id": "abc123",
+    "strategy": "medium"
+  }
+}
+```
+
+**返回**：
+
+```json
+{
+  "status": "preview",
+  "session_id": "abc123",
+  "strategy": "medium",
+  "message_count": 150,
+  "estimated_tokens": 45000,
+  "dry_run": true,
+  "note": "No compression performed. Call without dry_run=True to compress."
+}
 ```
 
 ## 依赖说明
@@ -151,43 +288,62 @@ python3 scripts/lobster_press_v120.py --dry-run --stats
 - numpy >= 1.20.0
 - scikit-learn >= 0.24.0
 
+**可选依赖**：
+- tiktoken >= 0.5.0（高精度 token 计数）
+- openai >= 1.0.0（LLM 摘要，可选）
+
 安装：
 ```bash
-pip install -r scripts/requirements.txt
+pip install -r requirements.txt
+
+# 可选：高精度 token 计数
+pip install tiktoken
 ```
 
 ## 版本历史
 
-### v1.2.2 (2026-03-10)
-- 新增质量守卫（自动回滚）
-- 新增架构说明文档
-- 优化压缩校验器
+### v3.4.0 (2026-03-19)
+- 修复 Issue #124 的三个 bug
+- 修复双重阈值冲突
+- 修复 dry_run 被忽略
+- 修复 tokensAfter 假值
 
-### v1.2.0 (2026-03-10)
-- 零成本本地压缩
-- TF-IDF 三层评分
-- 语义去重
-- 提取式摘要
+### v3.3.0 (2026-03-19)
+- 实现 OpenClaw ContextEngine 接口
+- 自动上下文监测与压缩
+- 真实 DAG 压缩
+
+### v3.2.0 (2026-03-19)
+- MCP 服务器
+- 认知记忆系统
+- DAG 压缩器
+
+完整更新日志: [CHANGELOG.md](../CHANGELOG.md)
 
 ## 常见问题
 
 **Q: 压缩会丢失重要信息吗？**
-A: 不会。质量守卫会检查关键决策、配置信息是否保留，不达标自动回滚。
+A: 不会。DAG 压缩保留语义关系，可以通过 `lobster_expand` 还原原始消息。
 
-**Q: local 模式真的零成本吗？**
-A: 是的。local 模式完全在本地处理，不调用任何 API。
+**Q: ContextEngine 会自动压缩吗？**
+A: 是的。当上下文使用率超过配置的阈值（默认 75%）时，会自动触发压缩。
 
 **Q: 压缩后能省多少 token？**
-A: 根据会话长度，净收益从 +500 到 +8,000 不等。
+A: 根据会话长度，压缩率从 60% 到 73% 不等。
+
+**Q: tiktoken 是必需的吗？**
+A: 不是。tiktoken 是可选依赖，未安装时会使用近似计算。
 
 ## 技术支持
 
 - GitHub: https://github.com/SonicBotMan/lobster-press
 - Issues: https://github.com/SonicBotMan/lobster-press/issues
+- npm: https://www.npmjs.com/package/@sonicbotman/lobster-press
 - 文档: docs/ 目录
 
 ---
 
 **License**: MIT
-**Version**: v1.2.2
+**Version**: v3.4.0
 **Author**: LobsterPress Team
+**Maintainer**: 小云 (OpenClaw AI Agent)
