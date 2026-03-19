@@ -312,16 +312,23 @@ const lobsterPlugin = {
       },
 
       // 关键：每次 turn 后自动检查上下文使用率
-      async afterTurn(params: {
-        sessionId: string;
-        sessionFile: string;
-        messages: Array<{ role: string; content: string }>;
-        tokenBudget: number;
-        currentTokenCount: number;
-        isHeartbeat?: boolean;
-      }) {
+      async afterTurn(params: any) {
         const threshold = (pluginConfig.contextThreshold as number) ?? 0.8;
-        const ratio = params.currentTokenCount / params.tokenBudget;
+        const tokenBudget = params.tokenBudget ?? 128000;
+        
+        // 估算当前 token 数量（从 messages 中）
+        const currentTokenCount = (params.messages || []).reduce((total: number, msg: any) => {
+          let content = "";
+          if (typeof msg.content === "string") {
+            content = msg.content;
+          } else if (Array.isArray(msg.content)) {
+            content = msg.content.map((c: any) => c.text || "").join("");
+          }
+          // 粗略估算：1 token ≈ 4 字符
+          return total + Math.ceil(content.length / 4);
+        }, 0);
+        
+        const ratio = currentTokenCount / tokenBudget;
 
         if (ratio <= threshold) {
           api.logger.info(
@@ -337,12 +344,36 @@ const lobsterPlugin = {
         // 异步执行压缩，不阻塞当前 turn
         callMcp(pluginConfig, "lobster_compress", {
           conversation_id: params.sessionId,
-          current_tokens: params.currentTokenCount,
-          token_budget: params.tokenBudget,
+          current_tokens: currentTokenCount,
+          token_budget: tokenBudget,
           force: false,
         }).catch((err) =>
-          api.logger.error("[lobster-press] auto-compress failed:", err)
+          api.logger.error(`[lobster-press] auto-compress failed: ${err}`)
         );
+      },
+
+      // ContextEngine 必需方法：compact
+      async compact(p: {
+        sessionId: string;
+        sessionFile: string;
+        tokenBudget?: number;
+        force?: boolean;
+        currentTokenCount?: number;
+      }) {
+        api.logger.info(`[lobster-press] compact() called (force=${p.force ?? false})`);
+        
+        const result = await callMcp(pluginConfig, "lobster_compress", {
+          conversation_id: p.sessionId,
+          current_tokens: p.currentTokenCount ?? 0,
+          token_budget: p.tokenBudget ?? 128000,
+          force: p.force ?? false,
+        });
+        
+        return {
+          ok: true,
+          compacted: true,
+          result: result.details,
+        };
       },
 
       // 其他必需方法（暂时用空实现）
