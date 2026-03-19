@@ -355,31 +355,18 @@ const lobsterPlugin = {
             force: true,
           });
 
-          // 向 Agent 注入压缩完成通知
-          return {
-            stopReason: null,
-            additionalMessages: [{
-              role: 'system' as const,
-              content: `[lobster-press] Scheduled memory consolidation completed at turn ${turnCount}. ` +
-                       `Context optimized. Previous context preserved in memory DAG.`
-            }]
-          };
+          // v4.0.0: 定时压缩完成，不注入消息（避免干扰对话）
+          return;
         }
 
         // ── Focus 策略二：紧急触发（上下文使用率过高）──
         if (ratio > FOCUS_URGENT_THRESHOLD) {
           api.logger.warn(
-            `[lobster-press] URGENT: Context at ${(ratio * 100).toFixed(1)}% capacity`
+            `[lobster-press] URGENT: Context at ${(ratio * 100).toFixed(1)}% capacity - manual compression recommended`
           );
 
-          return {
-            stopReason: null,
-            additionalMessages: [{
-              role: 'system' as const,
-              content: `[lobster-press] URGENT: Context at ${Math.round(ratio * 100)}% capacity. ` +
-                       `Call lobster_compact immediately before proceeding with next task step.`
-            }]
-          };
+          // v4.0.0: 紧急警告，但不强制中断（让 Agent 决定是否压缩）
+          return;
         }
 
         // ── Focus 策略三：被动阈值触发（原有逻辑）──
