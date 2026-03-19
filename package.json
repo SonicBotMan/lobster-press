@@ -1,6 +1,6 @@
 {
   "name": "@sonicbotman/lobster-press",
-  "version": "3.3.2",
+  "version": "3.4.0",
   "description": "Cognitive Memory System for AI Agents — OpenClaw Plugin",
   "type": "module",
   "main": "dist/index.js",

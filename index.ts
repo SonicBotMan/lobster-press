@@ -341,12 +341,13 @@ const lobsterPlugin = {
           `[lobster-press] Context ${(ratio * 100).toFixed(1)}% > ${threshold * 100}%, triggering auto-compress`
         );
 
-        // 异步执行压缩，不阻塞当前 turn
+        // v3.4.0: 修复 Bug #124 - afterTurn 触发时传 force: true
+        // TypeScript 层已经做了阈值判断，Python 层无需再判断
         callMcp(pluginConfig, "lobster_compress", {
           conversation_id: params.sessionId,
           current_tokens: currentTokenCount,
           token_budget: tokenBudget,
-          force: false,
+          force: true,  // v3.4.0: TS 层已判断，Python 层直接执行
         }).catch((err) =>
           api.logger.error(`[lobster-press] auto-compress failed: ${err}`)
         );
@@ -361,20 +362,26 @@ const lobsterPlugin = {
         currentTokenCount?: number;
       }) {
         api.logger.info(`[lobster-press] compact() called (force=${p.force ?? false})`);
-        
+
         const result = await callMcp(pluginConfig, "lobster_compress", {
           conversation_id: p.sessionId,
           current_tokens: p.currentTokenCount ?? 0,
           token_budget: p.tokenBudget ?? 128000,
           force: p.force ?? false,
         });
-        
+
+        // v3.4.0: 修复 Bug #124 - 读取真实的 tokens_after 和 tokens_saved
+        const compressResult = result as any;
+        const tokensAfter = compressResult?.tokens_after ?? 0;
+        const tokensSaved = compressResult?.tokens_saved ?? 0;
+
         return {
           ok: true,
           compacted: true,
           result: {
             tokensBefore: p.currentTokenCount ?? 0,
-            tokensAfter: p.currentTokenCount ? Math.floor(p.currentTokenCount * 0.6) : 0,
+            tokensAfter: tokensAfter,  // v3.4.0: 真实值
+            tokensSaved: tokensSaved,  // v3.4.0: 真实值
             details: result.details,
           },
         };

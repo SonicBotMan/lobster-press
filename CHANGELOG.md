@@ -5,6 +5,49 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.4.0] - 2026-03-19
+
+### 🐛 Bug 修复（Issue #124）
+
+**Bug 1（高优先级）：修复双重阈值冲突**
+- **问题**：TypeScript 层和 Python 层都有阈值判断，导致配置不生效
+- **影响**：用户配置 `contextThreshold: 0.7` 时，压缩不触发
+- **修复**：
+  - Python 层移除重复阈值判断，直接执行压缩
+  - TypeScript 层的 `afterTurn` 传 `force: true`
+  - 阈值判断只在 TypeScript 层进行
+
+**Bug 2（高优先级）：修复 `dry_run=True` 被忽略**
+- **问题**：v3.3.0 重写后，`dry_run` 参数被丢失
+- **影响**：`preview_compression` 实际执行了真实压缩（危险！）
+- **修复**：
+  - `_compress_session` 添加 `dry_run` 参数处理
+  - `dry_run=True` 时提前返回预览结果，不执行压缩
+
+**Bug 3（中优先级）：修复 `tokensAfter` 返回假值**
+- **问题**：`tokensAfter` 用 `currentTokenCount * 0.6` 估算
+- **影响**：OpenClaw 用这个值做决策会得到错误数据
+- **修复**：
+  - Python 层返回真实的 `tokens_after` 和 `tokens_saved`
+  - TypeScript 层从返回结果中读取真实值
+
+### 🔧 技术细节
+
+**Python 层修改**：
+- `lobster_compress` 工具：移除重复阈值判断，返回真实 token 数
+- `_compress_session` 方法：添加 `dry_run` 参数处理
+
+**TypeScript 层修改**：
+- `afterTurn` 方法：传 `force: true` 给 Python 层
+- `compact` 方法：读取真实的 `tokens_after` 和 `tokens_saved`
+
+### ✅ 验收标准
+
+- [x] `contextThreshold: 0.7` 配置下，70% 时自动压缩能正常触发
+- [x] 调用 `preview_compression` 后，数据库内容没有被修改
+- [x] `compact()` 返回的 `tokensAfter` 与数据库中实际 token 数一致
+- [x] 现有测试全部通过（9/9）
+
 ## [3.3.2] - 2026-03-19
 
 ### 🧪 测试覆盖

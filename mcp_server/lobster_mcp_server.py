@@ -328,14 +328,9 @@ class LobsterPressMCPServer:
             force = arguments.get("force", False)
             threshold = token_budget * 0.75  # 默认 75% 阈值
 
-            # 检查是否超过阈值
-            if current_tokens < threshold and not force:
-                return {
-                    "compressed": False,
-                    "reason": "below_threshold",
-                    "usage_ratio": round(current_tokens / token_budget, 3),
-                    "threshold": 0.75
-                }
+            # v3.4.0: 移除 Python 层的重复阈值判断（修复 Bug #124）
+            # TypeScript 层已经做了阈值判断，Python 层直接执行
+            # force 参数保留，用于手动调用时使用
 
             # v3.3.1: 错误处理和重试机制
             max_retries = 3
@@ -346,16 +341,22 @@ class LobsterPressMCPServer:
                     # 执行压缩（调用真实的 DAGCompressor）
                     did_compress = compressor.incremental_compact(
                         conversation_id,
-                        context_threshold=0.0 if force else 0.75,
+                        context_threshold=0.0,  # v3.4.0: 始终为 0，由 TS 层控制阈值
                         token_budget=token_budget
                     )
+
+                    # v3.4.0: 返回真实的 tokens_after（修复 Bug #124）
+                    messages_after = db.get_messages(conversation_id)
+                    tokens_after = sum(m.get('token_count', 0) for m in messages_after)
+                    tokens_saved = current_tokens - tokens_after
 
                     return {
                         "compressed": did_compress,
                         "conversation_id": conversation_id,
-                        "current_tokens": current_tokens,
+                        "tokens_before": current_tokens,
+                        "tokens_after": tokens_after,  # 真实值
+                        "tokens_saved": tokens_saved,   # 真实值
                         "token_budget": token_budget,
-                        "threshold": 0.75,
                         "attempt": attempt + 1
                     }
                 except Exception as e:
@@ -419,13 +420,31 @@ class LobsterPressMCPServer:
         return session_id
     
     async def _compress_session(self, session_id: str, strategy: str, dry_run: bool) -> Dict[str, Any]:
-        """压缩会话（v3.3.0: 使用真实 DAGCompressor，v3.3.1: 错误处理）"""
+        """压缩会话（v3.3.0: 使用真实 DAGCompressor，v3.4.0: 修复 dry_run）"""
         # 验证 session_id（修复 Issue #12）
         session_id = self._validate_session_id(session_id)
         session_file = self.sessions_dir / f"{session_id}.jsonl"
 
         if not session_file.exists():
             raise FileNotFoundError(f"Session not found: {session_id}")
+
+        # v3.4.0: 修复 dry_run 被忽略的问题（修复 Bug #124）
+        if dry_run:
+            db = self._get_db()
+            messages = db.get_messages(session_id)
+            summaries = db.get_summaries(session_id)
+            total_tokens = sum(m.get('token_count', 0) for m in messages)
+
+            return {
+                "status": "preview",
+                "session_id": session_id,
+                "strategy": strategy,
+                "message_count": len(messages),
+                "summary_count": len(summaries),
+                "estimated_tokens": total_tokens,
+                "dry_run": True,
+                "note": "No compression performed. Call without dry_run=True to compress."
+            }
 
         # v3.3.0: 调用真实 DAGCompressor（不再使用假 DAG）
         from dag_compressor import DAGCompressor
@@ -466,7 +485,7 @@ class LobsterPressMCPServer:
                     "compressed": did_compress,
                     "message_count": len(messages),
                     "estimated_tokens": estimated_tokens,
-                    "method": "real_dag_v3.3.0",
+                    "method": "real_dag_v3.4.0",
                     "attempt": attempt + 1
                 }
             except Exception as e:
