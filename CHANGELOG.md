@@ -5,6 +5,29 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.5.1] - 2026-03-19
+
+### 🐛 Bug 修复（Issue #126）
+
+**Bug 1（高）：compact() 取值路径错误** ✅
+- 修复 `tokensAfter` 永远为 0 的问题
+- 正确路径：`result.details.result.tokens_after`
+- Bug #124 的 Bug 3 修复现在完全生效
+
+**Bug 4（中）：MCP Server 文件头版本号过时** ✅
+- 更新版本号：v1.3.0 → v3.5.1
+- 添加 Changelog 链接
+
+### 📝 修改的文件
+
+- `index.ts` - 修复 compact() 取值路径
+- `mcp_server/lobster_mcp_server.py` - 更新文件头版本号
+
+### 🎯 遗留问题（下个迭代）
+
+- Bug 2：`lobster_compress` 中死代码 `threshold` 残留
+- Bug 3：`_row_to_dict` 光标竞争问题
+
 ## [3.5.0] - 2026-03-19
 
 ### ✨ 新功能（Issue #125 问题 2）

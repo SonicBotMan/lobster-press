@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-LobsterPress MCP Server v1.0.0
-基于 Model Context Protocol (MCP) 的压缩服务
+LobsterPress MCP Server
+基于 Model Context Protocol (MCP) 的认知记忆压缩服务
 
-Issue: #42 - v2.0 架构演进：向 MCP Server 演进
-Author: LobsterPress Team
-Version: v1.3.0
+Version: v3.5.1
+Changelog: https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md
 """
 
 import sys

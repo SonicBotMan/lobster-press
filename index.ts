@@ -370,8 +370,8 @@ const lobsterPlugin = {
           force: p.force ?? false,
         });
 
-        // v3.4.0: 修复 Bug #124 - 读取真实的 tokens_after 和 tokens_saved
-        const compressResult = result as any;
+        // v3.5.1: 修复 Bug #126 - 正确的取值路径（tokens_after 在 details.result 里）
+        const compressResult = (result.details as any)?.result;
         const tokensAfter = compressResult?.tokens_after ?? 0;
         const tokensSaved = compressResult?.tokens_saved ?? 0;
 
