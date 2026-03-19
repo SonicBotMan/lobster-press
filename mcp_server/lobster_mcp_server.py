@@ -32,23 +32,28 @@ class MCPTool:
 
 class LobsterPressMCPServer:
     """LobsterPress MCP Server"""
-    
-    def __init__(self, sessions_dir: str = None, db_path: str = None, llm_provider: str = None, llm_model: str = None):
+
+    def __init__(self, sessions_dir: str = None, db_path: str = None, llm_provider: str = None,
+                 llm_model: str = None, namespace: str = "default"):
         """初始化 MCP Server
-        
+
+        v3.6.0: 新增 namespace 参数（Issue #127 模块四）
+
         Args:
             sessions_dir: 会话目录
             db_path: LobsterPress 数据库路径
             llm_provider: LLM 提供商
             llm_model: LLM 模型名称
+            namespace: 记忆命名空间（用于多 Agent/项目隔离）
         """
         self.sessions_dir = Path(sessions_dir or os.path.expanduser("~/.openclaw/agents/main/sessions"))
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # v3.2.2: OpenClaw 插件支持
         self.db_path = db_path or os.path.expanduser("~/.openclaw/lobster.db")
         self.llm_provider = llm_provider
         self.llm_model = llm_model
+        self.namespace = namespace  # v3.6.0 新增
         self._db = None  # 懒加载数据库连接
         
         # 统计数据
@@ -210,7 +215,11 @@ class LobsterPressMCPServer:
             # v3.3.0: 自动压缩工具（调用真实 DAGCompressor）
             MCPTool(
                 name="lobster_compress",
-                description="增量压缩：检查上下文使用率，超过阈值时执行真正的 DAG 压缩",
+                description=(
+                    "增量压缩：执行 DAG 压缩。\n"
+                    "注意：阈值判断由调用方（TypeScript ContextEngine）负责，"
+                    "Python 层总是执行压缩（context_threshold=0.0）。"
+                ),
                 input_schema={
                     "type": "object",
                     "properties": {
@@ -220,6 +229,60 @@ class LobsterPressMCPServer:
                         "force": {"type": "boolean", "description": "是否强制压缩（忽略阈值）", "default": False}
                     },
                     "required": ["conversation_id", "current_tokens", "token_budget"]
+                }
+            ),
+            # v3.6.0: 按三层记忆模型拼装上下文（Issue #127 模块一）
+            MCPTool(
+                name="lobster_assemble",
+                description=(
+                    "按三层记忆模型拼装最优上下文（working + episodic + semantic），"
+                    "不超过 token_budget。优先级：semantic > episodic > working。"
+                ),
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "conversation_id": {"type": "string", "description": "对话 ID"},
+                        "token_budget": {"type": "integer", "default": 8000},
+                        "tiers": {
+                            "type": "array",
+                            "items": {"type": "string", "enum": ["working", "episodic", "semantic"]},
+                            "default": ["semantic", "episodic", "working"]
+                        }
+                    },
+                    "required": ["conversation_id"]
+                }
+            ),
+            # v3.6.0: 记忆纠错（Issue #127 模块三）
+            MCPTool(
+                name="lobster_correct",
+                description="应用记忆纠错（修改或删除错误记忆）",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "target_type": {"type": "string", "enum": ["message", "summary"]},
+                        "target_id": {"type": "string", "description": "目标 ID"},
+                        "correction_type": {"type": "string", "enum": ["content", "metadata", "delete"]},
+                        "old_value": {"type": "string", "description": "旧值"},
+                        "new_value": {"type": "string", "description": "新值"},
+                        "reason": {"type": "string", "description": "纠错原因"}
+                    },
+                    "required": ["target_type", "target_id", "correction_type"]
+                }
+            ),
+            # v3.6.0: 主动衰减清理（Issue #127 模块二）
+            MCPTool(
+                name="lobster_sweep",
+                description="清理衰减消息（基于遗忘曲线，删除低价值、长期未访问的消息）",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "days_threshold": {
+                            "type": "integer",
+                            "default": 30,
+                            "description": "未访问天数阈值"
+                        }
+                    },
+                    "required": []
                 }
             )
         ]
@@ -325,7 +388,9 @@ class LobsterPressMCPServer:
             token_budget = arguments["token_budget"]
             conversation_id = arguments["conversation_id"]
             force = arguments.get("force", False)
-            threshold = token_budget * 0.75  # 默认 75% 阈值
+
+            # v3.6.0: 删除死代码 threshold（Issue #126 Bug 2）
+            # 阈值判断由 TypeScript 层负责，Python 层直接执行
 
             # v3.4.0: 移除 Python 层的重复阈值判断（修复 Bug #124）
             # TypeScript 层已经做了阈值判断，Python 层直接执行
@@ -373,10 +438,62 @@ class LobsterPressMCPServer:
                 "retries": max_retries,
                 "conversation_id": conversation_id
             }
-        
+
+        # v3.6.0: 按三层记忆模型拼装上下文（Issue #127 模块一）
+        elif tool_name == "lobster_assemble":
+            db = self._get_db()
+            conversation_id = arguments["conversation_id"]
+            token_budget = arguments.get("token_budget", 8000)
+            tiers = arguments.get("tiers", ["semantic", "episodic", "working"])
+
+            # 获取三层记忆
+            context = db.get_context_by_tier(conversation_id, tiers)
+            assembled = []
+            used_tokens = 0
+
+            # 优先级：semantic（压缩最多）> episodic > working（最新）
+            for tier in tiers:
+                for item in context.get(tier, []):
+                    item_tokens = item.get('token_count', 0)
+                    if used_tokens + item_tokens > token_budget:
+                        break
+                    assembled.append({"tier": tier, **item})
+                    used_tokens += item_tokens
+
+            return {
+                "assembled": assembled,
+                "total_tokens": used_tokens,
+                "token_budget": token_budget,
+                "tier_breakdown": {
+                    t: len([x for x in assembled if x['tier'] == t])
+                    for t in tiers
+                }
+            }
+
+        # v3.6.0: 记忆纠错（Issue #127 模块三）
+        elif tool_name == "lobster_correct":
+            db = self._get_db()
+            result = db.apply_correction(
+                target_type=arguments["target_type"],
+                target_id=arguments["target_id"],
+                correction_type=arguments["correction_type"],
+                old_value=arguments.get("old_value"),
+                new_value=arguments.get("new_value"),
+                reason=arguments.get("reason")
+            )
+            return result
+
+        # v3.6.0: 主动衰减清理（Issue #127 模块二）
+        elif tool_name == "lobster_sweep":
+            db = self._get_db()
+            result = db.sweep_decayed_messages(
+                days_threshold=arguments.get("days_threshold", 30)
+            )
+            return result
+
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
-    
+
     def _get_db(self):
         """获取数据库连接（懒加载）"""
         if self._db is None:
@@ -384,9 +501,10 @@ class LobsterPressMCPServer:
             src_dir = Path(__file__).parent.parent / "src"
             if str(src_dir) not in sys.path:
                 sys.path.insert(0, str(src_dir))
-            
+
             from database import LobsterDatabase
-            self._db = LobsterDatabase(self.db_path)
+            # v3.6.0: 传递 namespace 到数据库（Issue #127 模块四）
+            self._db = LobsterDatabase(self.db_path, namespace=self.namespace)
         return self._db
     
     def _validate_session_id(self, session_id: str) -> str:
@@ -655,15 +773,18 @@ async def main():
     parser.add_argument("--db", dest="db_path", help="LobsterPress 数据库路径")
     parser.add_argument("--provider", dest="llm_provider", help="LLM 提供商")
     parser.add_argument("--model", dest="llm_model", help="LLM 模型名称")
+    parser.add_argument("--namespace", dest="namespace", default="default",
+                        help="记忆命名空间（用于多 Agent/项目隔离）")
     parser.add_argument("--test", action="store_true", help="测试模式")
-    
+
     args = parser.parse_args()
-    
+
     server = LobsterPressMCPServer(
         sessions_dir=args.sessions_dir,
         db_path=args.db_path,
         llm_provider=args.llm_provider,
-        llm_model=args.llm_model
+        llm_model=args.llm_model,
+        namespace=args.namespace  # v3.6.0 新增
     )
     
     if args.test:

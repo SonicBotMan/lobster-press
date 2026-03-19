@@ -133,6 +133,8 @@ async function ensureMcpServer(config: Record<string, unknown>): Promise<ChildPr
         (config.llmProvider as string) || "",
         "--model",
         (config.llmModel as string) || "",
+        "--namespace",  // v3.6.0 新增（Issue #127 模块四）
+        (config.namespace as string) || "default",
       ],
       {
         cwd: join(__dirname, ".."), // 设置工作目录为包根目录，让 Python 找到 mcp_server 模块
@@ -394,8 +396,33 @@ const lobsterPlugin = {
       async ingest() {
         return { ingested: true };
       },
-      async assemble(p: { messages: any[] }) {
-        return { messages: p.messages as any[], estimatedTokens: 0 };
+      async assemble(p: { messages: any[]; sessionId?: string; tokenBudget?: number }) {
+        // v3.6.0: 调用 lobster_assemble 按三层记忆模型拼装上下文（Issue #127 模块一）
+        if (!p.sessionId) {
+          return { messages: p.messages as any[], estimatedTokens: 0 };
+        }
+
+        try {
+          const result = await callMcp(pluginConfig, "lobster_assemble", {
+            conversation_id: p.sessionId,
+            token_budget: p.tokenBudget ?? 8000,
+          });
+
+          const assembled = (result.details as any)?.result?.assembled ?? [];
+          const totalTokens = (result.details as any)?.result?.total_tokens ?? 0;
+
+          // 将三层记忆转为 messages 格式
+          const messages = assembled.map((item: any) => ({
+            role: item.role ?? "assistant",
+            content: item.content ?? "",
+            _tier: item.tier, // 保留层级信息
+          }));
+
+          return { messages, estimatedTokens: totalTokens };
+        } catch (error) {
+          // 失败时返回原始消息
+          return { messages: p.messages as any[], estimatedTokens: 0 };
+        }
       },
     };
 
