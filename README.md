@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
 
-# 🧠 LobsterPress v3.3.0
+# 🧠 LobsterPress v3.3.1
 
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v3.3.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.3.0) · [更新日志](CHANGELOG.md)
+**最新版本**: [v3.3.1](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.3.1) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -545,7 +545,8 @@ src/
 | v3.2.2 | 2026-03-17 | 工程规范整改：CI/CD + 测试重组 |
 | v3.2.3 ~ v3.2.6 | 2026-03-18 | Bug 修复：npm 包完整性 |
 | v3.2.7 ~ v3.2.9 | 2026-03-19 | Bug 修复：模块导入路径 |
-| **v3.3.0** ⭐ | 2026-03-19 | 自动上下文监测与压缩（ContextEngine）|
+| v3.3.0 | 2026-03-19 | 自动上下文监测与压缩（ContextEngine）|
+| **v3.3.1** ⭐ | 2026-03-19 | 修复假 DAG + 错误处理 |
 
 <details>
 <summary>查看完整版本详情</summary>

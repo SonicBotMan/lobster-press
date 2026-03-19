@@ -5,6 +5,28 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.3.1] - 2026-03-19
+
+### 🐛 Bug 修复
+
+**修复 `compress_session` 的假 DAG 问题**
+- `_compress_session` 方法现在调用真实的 `DAGCompressor`
+- 移除旧的关键词评分实现（假 DAG）
+- 统一使用 DAG 语义压缩
+
+### 🔧 改进
+
+**错误处理和重试机制**
+- `lobster_compress` 工具添加重试机制（最多 3 次）
+- `_compress_session` 方法添加错误处理
+- 指数退避：每次重试间隔递增（1s, 2s, 3s）
+- 失败时返回详细错误信息
+
+**策略映射优化**
+- `light` 策略：90% 阈值触发
+- `medium` 策略：75% 阈值触发
+- `aggressive` 策略：50% 阈值触发
+
 ## [3.3.0] - 2026-03-19
 
 ### 🎯 版本定位

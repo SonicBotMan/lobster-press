@@ -321,13 +321,13 @@ class LobsterPressMCPServer:
             db = self._get_db()
             llm = self._get_llm() if self.llm_provider else None
             compressor = DAGCompressor(db, llm_client=llm)
-            
+
             current_tokens = arguments["current_tokens"]
             token_budget = arguments["token_budget"]
             conversation_id = arguments["conversation_id"]
             force = arguments.get("force", False)
             threshold = token_budget * 0.75  # 默认 75% 阈值
-            
+
             # 检查是否超过阈值
             if current_tokens < threshold and not force:
                 return {
@@ -336,20 +336,42 @@ class LobsterPressMCPServer:
                     "usage_ratio": round(current_tokens / token_budget, 3),
                     "threshold": 0.75
                 }
-            
-            # 执行压缩（调用真实的 DAGCompressor）
-            did_compress = compressor.incremental_compact(
-                conversation_id,
-                context_threshold=0.0 if force else 0.75,
-                token_budget=token_budget
-            )
-            
+
+            # v3.3.1: 错误处理和重试机制
+            max_retries = 3
+            last_error = None
+
+            for attempt in range(max_retries):
+                try:
+                    # 执行压缩（调用真实的 DAGCompressor）
+                    did_compress = compressor.incremental_compact(
+                        conversation_id,
+                        context_threshold=0.0 if force else 0.75,
+                        token_budget=token_budget
+                    )
+
+                    return {
+                        "compressed": did_compress,
+                        "conversation_id": conversation_id,
+                        "current_tokens": current_tokens,
+                        "token_budget": token_budget,
+                        "threshold": 0.75,
+                        "attempt": attempt + 1
+                    }
+                except Exception as e:
+                    last_error = str(e)
+                    if attempt < max_retries - 1:
+                        # 等待后重试
+                        import asyncio
+                        await asyncio.sleep(1 * (attempt + 1))
+                        continue
+
+            # 所有重试都失败
             return {
-                "compressed": did_compress,
-                "conversation_id": conversation_id,
-                "current_tokens": current_tokens,
-                "token_budget": token_budget,
-                "threshold": 0.75
+                "compressed": False,
+                "error": last_error,
+                "retries": max_retries,
+                "conversation_id": conversation_id
             }
         
         else:
@@ -397,92 +419,71 @@ class LobsterPressMCPServer:
         return session_id
     
     async def _compress_session(self, session_id: str, strategy: str, dry_run: bool) -> Dict[str, Any]:
-        """压缩会话"""
+        """压缩会话（v3.3.0: 使用真实 DAGCompressor，v3.3.1: 错误处理）"""
         # 验证 session_id（修复 Issue #12）
         session_id = self._validate_session_id(session_id)
         session_file = self.sessions_dir / f"{session_id}.jsonl"
-        
+
         if not session_file.exists():
             raise FileNotFoundError(f"Session not found: {session_id}")
-        
-        # 读取会话
-        messages = []
-        with open(session_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                if line.strip():
-                    messages.append(json.loads(line))
-        
-        total_messages = len(messages)
-        
-        # 估算 Token 数
-        estimated_tokens = self._estimate_tokens(messages)
-        
-        # 根据策略决定保留比例
-        retention_ratios = {
-            "light": 0.7,
-            "medium": 0.5,
-            "aggressive": 0.3
+
+        # v3.3.0: 调用真实 DAGCompressor（不再使用假 DAG）
+        from dag_compressor import DAGCompressor
+        db = self._get_db()
+        llm = self._get_llm() if self.llm_provider else None
+        compressor = DAGCompressor(db, llm_client=llm)
+
+        # 根据策略决定阈值
+        thresholds = {
+            "light": 0.9,      # 只在 90% 时触发
+            "medium": 0.75,    # 在 75% 时触发
+            "aggressive": 0.5  # 在 50% 时触发
         }
-        retention_ratio = retention_ratios.get(strategy, 0.5)
-        
-        # 计算要保留的消息数
-        keep_count = int(total_messages * retention_ratio)
-        
-        # 评分并排序（简化版）
-        scored_messages = []
-        for i, msg in enumerate(messages):
-            score = self._score_message(msg)
-            scored_messages.append((i, score, msg))
-        
-        # 按分数排序，保留高分消息
-        scored_messages.sort(key=lambda x: x[1], reverse=True)
-        keep_indices = set(x[0] for x in scored_messages[:keep_count])
-        
-        # 按原始顺序保留
-        compressed_messages = [msg for i, msg in enumerate(messages) if i in keep_indices]
-        
-        # 计算压缩后的 Token 数
-        compressed_tokens = self._estimate_tokens(compressed_messages)
-        tokens_saved = estimated_tokens - compressed_tokens
-        
-        if dry_run:
-            return {
-                "status": "preview",
-                "session_id": session_id,
-                "original_messages": total_messages,
-                "compressed_messages": len(compressed_messages),
-                "original_tokens": estimated_tokens,
-                "compressed_tokens": compressed_tokens,
-                "tokens_saved": tokens_saved,
-                "compression_ratio": f"{(tokens_saved / estimated_tokens * 100):.1f}%" if estimated_tokens > 0 else "0%",
-                "strategy": strategy
-            }
-        
-        # 实际写入（备份原文件）
-        backup_file = self.sessions_dir / f"{session_id}.backup.{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        session_file.rename(backup_file)
-        
-        with open(session_file, 'w', encoding='utf-8') as f:
-            for msg in compressed_messages:
-                f.write(json.dumps(msg, ensure_ascii=False) + '\n')
-        
-        # 更新统计
-        self.stats["total_compressions"] += 1
-        self.stats["total_messages_processed"] += total_messages
-        self.stats["total_tokens_saved"] += tokens_saved
-        self.stats["last_compression"] = datetime.now().isoformat()
-        
+        threshold = thresholds.get(strategy, 0.75)
+
+        # v3.3.1: 错误处理和重试机制
+        max_retries = 3
+        last_error = None
+
+        for attempt in range(max_retries):
+            try:
+                # 执行真实 DAG 压缩
+                did_compress = compressor.incremental_compact(
+                    conversation_id=session_id,
+                    context_threshold=threshold,
+                    token_budget=128000
+                )
+
+                # 获取压缩后的统计
+                messages = db.get_messages(session_id)
+                estimated_tokens = sum(m.get('token_count', 0) for m in messages)
+
+                return {
+                    "status": "success" if did_compress else "skipped",
+                    "session_id": session_id,
+                    "strategy": strategy,
+                    "threshold": threshold,
+                    "compressed": did_compress,
+                    "message_count": len(messages),
+                    "estimated_tokens": estimated_tokens,
+                    "method": "real_dag_v3.3.0",
+                    "attempt": attempt + 1
+                }
+            except Exception as e:
+                last_error = str(e)
+                if attempt < max_retries - 1:
+                    # 等待后重试
+                    import asyncio
+                    await asyncio.sleep(1 * (attempt + 1))
+                    continue
+
+        # 所有重试都失败
         return {
-            "status": "success",
+            "status": "error",
+            "error": last_error,
+            "retries": max_retries,
             "session_id": session_id,
-            "original_messages": total_messages,
-            "compressed_messages": len(compressed_messages),
-            "original_tokens": estimated_tokens,
-            "compressed_tokens": compressed_tokens,
-            "tokens_saved": tokens_saved,
-            "compression_ratio": f"{(tokens_saved / estimated_tokens * 100):.1f}%" if estimated_tokens > 0 else "0%",
-            "strategy": strategy,
-            "backup_file": str(backup_file)
+            "strategy": strategy
         }
     
     async def _preview_compression(self, session_id: str, strategy: str) -> Dict[str, Any]:
