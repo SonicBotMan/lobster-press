@@ -1,129 +1,178 @@
 # 贡献指南
 
-感谢你考虑为 LobsterPress 做贡献！🎉
+感谢您考虑为 LobsterPress 贡献代码！
 
-## 🤝 如何贡献
+## 🚀 快速开始
 
-### 报告 Bug
-
-如果你发现了 Bug，请：
-1. 在 [GitHub Issues](https://github.com/SonicBotMan/lobster-press/issues) 中搜索，确认没有被报告过
-2. 创建新的 Issue，包含：
-   - 清晰的标题
-   - 详细的问题描述
-   - 复现步骤
-   - 预期行为和实际行为
-   - 环境信息（Python 版本、操作系统等）
-
-### 提出新功能
-
-如果你有新功能的想法，请：
-1. 在 [GitHub Discussions](https://github.com/SonicBotMan/lobster-press/discussions) 中讨论
-2. 说明功能的使用场景和价值
-3. 等待社区反馈后再开始实现
-
-### 提交代码
-
-#### 1. Fork 仓库
+### 1. Fork 并克隆仓库
 
 ```bash
-# 在 GitHub 上 Fork 仓库
-# 然后克隆到本地
 git clone https://github.com/YOUR_USERNAME/lobster-press.git
 cd lobster-press
 ```
 
-#### 2. 创建分支
+### 2. 安装依赖
 
 ```bash
-# 创建新分支
+# Python 依赖
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+# Node.js 依赖（用于 MCP Server）
+npm install
+```
+
+### 3. 运行测试
+
+```bash
+# 运行所有测试
+pytest tests/
+
+# 运行单元测试
+pytest tests/unit/
+
+# 运行集成测试
+pytest tests/integration/
+
+# 带覆盖率报告
+pytest tests/ --cov=src --cov-report=term-missing
+```
+
+### 4. 代码检查
+
+```bash
+# 格式化代码
+black src/ tests/
+isort src/ tests/
+
+# Lint 检查
+flake8 src/ tests/
+
+# 类型检查
+mypy src/
+```
+
+## 📋 开发流程
+
+### 1. 创建功能分支
+
+```bash
 git checkout -b feature/your-feature-name
 ```
 
-#### 3. 编写代码
+### 2. 编写代码
 
 - 遵循现有的代码风格
-- 添加必要的注释
-- 编写测试（如果适用）
-- 更新文档（如果需要）
+- 添加必要的测试
+- 更新相关文档
 
-#### 4. 提交更改
+### 3. 运行测试
+
+确保所有测试通过：
 
 ```bash
-# 添加更改
-git add .
+pytest tests/ -v --cov=src --cov-fail-under=20
+```
 
-# 提交（使用清晰的提交信息）
-git commit -m "feat: add your feature description"
+### 4. 提交代码
 
-# 推送到你的 Fork
+使用清晰的提交信息：
+
+```bash
+git commit -m "feat: 添加新功能"
+git commit -m "fix: 修复 bug"
+git commit -m "docs: 更新文档"
+git commit -m "test: 添加测试"
+git commit -m "chore: 维护性更新"
+```
+
+### 5. 推送并创建 PR
+
+```bash
 git push origin feature/your-feature-name
 ```
 
-#### 5. 创建 Pull Request
+然后在 GitHub 上创建 Pull Request。
 
-1. 在 GitHub 上创建 Pull Request
-2. 填写 PR 模板（如果有的话）
-3. 等待代码审查
+## ✅ CI/CD 流程
 
-## 📝 代码规范
+每次提交都会自动运行以下检查：
 
-### Python 代码
+### 1. 测试工作流 (`.github/workflows/test.yml`)
 
-- 使用 Pylint 检查代码
-- 遵循 PEP 8 风格指南
-- 添加类型提示（如果可能）
-- 编写 docstrings
+- **Python 测试**: 在 Python 3.10, 3.11, 3.12 上运行
+- **Node.js 测试**: 在 Node.js 18, 20, 22 上运行
+- **覆盖率检查**: 要求最低 20% 覆盖率
+- **代码质量检查**: Black, isort, Flake8, ESLint
 
-### Shell 脚本
+### 2. 发布工作流 (`.github/workflows/release.yml`)
 
-- 使用 ShellCheck 检查脚本
-- 添加详细的注释
-- 使用 `set -e` 确保错误时退出
+当创建 Release 时自动触发：
 
-### 文档
+- 运行测试
+- 构建项目
+- 发布到 npm (@sonicbotman/lobster-press)
+- 发布到 GitHub Packages
 
-- 使用清晰的 Markdown 格式
-- 添加代码示例
-- 更新相关的文档文件
+### 3. 依赖更新 (`.github/dependabot.yml`)
 
-## 🧪 测试
+Dependabot 每周自动检查依赖更新：
 
-在提交 PR 之前，请确保：
+- Python 依赖
+- Node.js 依赖
+- GitHub Actions
 
-```bash
-# 运行测试（如果有）
-python -m pytest tests/
+## 🎯 代码规范
 
-# 检查代码风格
-pylint src/
+### Python
 
-# 检查 Shell 脚本
-shellcheck scripts/*.sh
-```
+- **格式化**: Black (line-length: 100)
+- **导入排序**: isort
+- **Lint**: Flake8
+- **类型提示**: 鼓励使用 type hints
 
-## 📋 Pull Request 检查清单
+### TypeScript
 
-在提交 PR 之前，请确认：
+- **格式化**: Prettier
+- **Lint**: ESLint
+- **编译**: TypeScript strict mode
 
-- [ ] 代码遵循项目的代码规范
+### 测试
+
+- **单元测试**: `tests/unit/`
+- **集成测试**: `tests/integration/`
+- **覆盖率**: 目标 50%+（最低 20%）
+
+## 📝 文档规范
+
+- 更新 README.md（如果需要）
+- 更新 CHANGELOG.md
+- 添加必要的代码注释
+- 更新 API 文档（如果需要）
+
+## 🔍 PR 审查清单
+
+在提交 PR 前，请确保：
+
+- [ ] 所有测试通过
+- [ ] 代码格式符合规范
 - [ ] 添加了必要的测试
-- [ ] 所有测试都通过
 - [ ] 更新了相关文档
-- [ ] 提交信息清晰明了
-- [ ] PR 标题清晰描述更改内容
+- [ ] 提交信息清晰
+- [ ] 没有引入新的 lint 错误
+
+## 📚 相关资源
+
+- [GitHub Actions 文档](https://docs.github.com/en/actions)
+- [Pytest 文档](https://docs.pytest.org/)
+- [Codecov 文档](https://docs.codecov.com/)
+- [Semantic Versioning](https://semver.org/)
 
 ## 💬 获取帮助
 
-如果你有任何问题，可以：
-
-- 在 [GitHub Discussions](https://github.com/SonicBotMan/lobster-press/discussions) 中提问
-- 在 [GitHub Issues](https://github.com/SonicBotMan/lobster-press/issues) 中报告问题
-
-## 🙏 感谢
-
-感谢所有为 LobsterPress 做出贡献的人！
+- 创建 Issue: https://github.com/SonicBotMan/lobster-press/issues
+- 讨论区: https://github.com/SonicBotMan/lobster-press/discussions
 
 ---
 
-**LobsterPress** - *从有损到无损的跨越* 🦞✨
+再次感谢您的贡献！🎉
