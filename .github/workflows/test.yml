@@ -54,7 +54,7 @@ jobs:
             coverage.xml
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         if: matrix.python-version == '3.11'
         with:
           files: ./coverage.xml
