@@ -19,6 +19,9 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
+# 添加 src/ 目录到 Python 模块搜索路径
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 
 @dataclass
 class MCPTool:
