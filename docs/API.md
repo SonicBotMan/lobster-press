@@ -2,11 +2,253 @@
 
 ## 📖 概述
 
-LobsterPress 提供命令行 API，所有功能通过 Bash 脚本调用。
+LobsterPress 提供两种 API：
+1. **MCP 工具 API**（推荐）：通过 OpenClaw MCP 协议调用
+2. **命令行 API**：通过 Bash 脚本调用（遗留）
 
 ---
 
-## 🔧 核心压缩 API
+## 🔌 MCP 工具 API（v3.3.0+）
+
+### 概述
+
+LobsterPress 通过 MCP (Model Context Protocol) 协议提供以下工具：
+
+| 工具名称 | 功能 | 版本 |
+|---------|------|------|
+| `lobster_compress` | 自动上下文压缩（真实 DAG） | v3.3.0+ |
+| `compress_session` | 会话压缩（真实 DAG） | v3.3.1+ |
+| `preview_compression` | 预览压缩效果 | v3.2.0+ |
+| `get_compression_stats` | 获取压缩统计 | v3.2.0+ |
+| `update_weights` | 更新评分权重 | v3.2.0+ |
+| `list_sessions` | 列出可压缩会话 | v3.2.0+ |
+| `lobster_grep` | 全文搜索历史对话 | v3.2.2+ |
+| `lobster_describe` | 查看 DAG 摘要结构 | v3.2.2+ |
+| `lobster_expand` | 展开摘要节点 | v3.2.2+ |
+
+---
+
+### `lobster_compress` - 自动上下文压缩 ⭐ v3.3.0+
+
+**功能**：检查上下文使用率，超过阈值时执行真实的 DAG 压缩
+
+**参数**：
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `conversation_id` | string | 是 | 对话 ID |
+| `current_tokens` | integer | 是 | 当前 token 数量 |
+| `token_budget` | integer | 是 | token 预算 |
+| `force` | boolean | 否 | 是否强制压缩（默认 false） |
+
+**返回值**：
+
+```json
+{
+  "compressed": true,
+  "conversation_id": "abc123",
+  "current_tokens": 100000,
+  "token_budget": 128000,
+  "threshold": 0.75,
+  "attempt": 1
+}
+```
+
+**触发逻辑**：
+- 默认阈值：75%（`token_budget * 0.75`）
+- 当 `current_tokens >= threshold` 或 `force=true` 时触发压缩
+- 使用真实的 `DAGCompressor.incremental_compact()`
+
+**错误处理**（v3.3.1+）：
+- 最多重试 3 次
+- 指数退避：1s, 2s, 3s
+- 失败时返回详细错误信息
+
+**示例**：
+
+```json
+{
+  "name": "lobster_compress",
+  "arguments": {
+    "conversation_id": "session-123",
+    "current_tokens": 100000,
+    "token_budget": 128000,
+    "force": false
+  }
+}
+```
+
+---
+
+### `compress_session` - 会话压缩 ⭐ v3.3.1+
+
+**功能**：使用真实 DAG 压缩指定会话
+
+**参数**：
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `session_id` | string | 是 | 会话 ID |
+| `strategy` | string | 否 | 压缩策略：light/medium/aggressive（默认 medium） |
+| `dry_run` | boolean | 否 | 预览模式（默认 false） |
+
+**策略映射**（v3.3.1+）：
+
+| 策略 | 阈值 | 说明 |
+|------|------|------|
+| `light` | 90% | 轻度压缩，保留更多上下文 |
+| `medium` | 75% | 中度压缩，平衡保留与压缩 |
+| `aggressive` | 50% | 激进压缩，最大化节省 token |
+
+**返回值**：
+
+```json
+{
+  "status": "success",
+  "session_id": "abc123",
+  "strategy": "medium",
+  "threshold": 0.75,
+  "compressed": true,
+  "message_count": 150,
+  "estimated_tokens": 45000,
+  "method": "real_dag_v3.3.0",
+  "attempt": 1
+}
+```
+
+**重要变更**（v3.3.1）：
+- ✅ 使用真实的 `DAGCompressor`（不再使用假 DAG）
+- ✅ 调用 `incremental_compact()` 方法
+- ✅ 错误处理和重试机制
+
+**示例**：
+
+```json
+{
+  "name": "compress_session",
+  "arguments": {
+    "session_id": "session-123",
+    "strategy": "medium",
+    "dry_run": false
+  }
+}
+```
+
+---
+
+### `preview_compression` - 预览压缩效果
+
+**功能**：预览压缩效果（不实际应用）
+
+**参数**：同 `compress_session`
+
+**返回值**：
+
+```json
+{
+  "status": "preview",
+  "session_id": "abc123",
+  "original_messages": 200,
+  "compressed_messages": 100,
+  "original_tokens": 80000,
+  "compressed_tokens": 40000,
+  "tokens_saved": 40000,
+  "compression_ratio": "50.0%",
+  "strategy": "medium"
+}
+```
+
+---
+
+### `lobster_grep` - 全文搜索
+
+**功能**：在 LobsterPress 记忆库中全文搜索历史对话（FTS5 + TF-IDF 重排序）
+
+**参数**：
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `query` | string | 是 | 搜索关键词或短语 |
+| `conversation_id` | string | 否 | 限定搜索范围的会话 ID |
+| `limit` | integer | 否 | 最多返回条数（默认 5） |
+
+**返回值**：
+
+```json
+{
+  "results": [
+    {
+      "message_id": "msg-123",
+      "conversation_id": "conv-456",
+      "content": "相关消息内容...",
+      "score": 0.95,
+      "timestamp": "2026-03-19T10:30:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### `lobster_describe` - 查看 DAG 结构
+
+**功能**：查看 LobsterPress 的 DAG 摘要层级结构
+
+**参数**：
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `conversation_id` | string | 否 | 会话 ID（可选，留空查全局） |
+
+**返回值**：
+
+```json
+{
+  "summaries": [
+    {
+      "summary_id": "sum-123",
+      "depth": 0,
+      "message_count": 10,
+      "content": "摘要内容...",
+      "created_at": "2026-03-19T10:30:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### `lobster_expand` - 展开摘要节点
+
+**功能**：将 DAG 摘要节点展开，还原其对应的原始消息（无损检索）
+
+**参数**：
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `summary_id` | string | 是 | 要展开的摘要节点 ID |
+| `max_depth` | integer | 否 | 最大展开层数（默认 2） |
+
+**返回值**：
+
+```json
+{
+  "summary_id": "sum-123",
+  "messages": [
+    {
+      "message_id": "msg-1",
+      "role": "user",
+      "content": "原始消息内容...",
+      "timestamp": "2026-03-19T10:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+## 🔧 命令行 API（遗留）
 
 ### `context-compressor-v5.sh`
 

@@ -5,6 +5,34 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.3.2] - 2026-03-19
+
+### 🧪 测试覆盖
+
+**新增 ContextEngine 测试**
+- `tests/unit/test_context_engine.py`：9 个测试用例
+- 测试 `afterTurn` 钩子签名和触发逻辑
+- 测试 `compact` 方法签名和行为
+- 测试 `lobster_compress` 工具的阈值检查
+- 测试重试机制（v3.3.1）
+- 测试策略映射（light/medium/aggressive）
+- 所有测试通过 ✅
+
+### 📚 文档更新
+
+**API 文档**
+- `docs/API.md`：添加完整的 MCP 工具 API 文档
+- 新增 `lobster_compress` 工具文档（v3.3.0+）
+- 新增 `compress_session` 真实 DAG 文档（v3.3.1+）
+- 新增其他 MCP 工具文档（grep, describe, expand）
+
+**OpenClaw 集成文档**
+- `docs/OPENCLAW-INTEGRATION.md`：添加 ContextEngine 集成文档
+- 详细说明 `afterTurn` 和 `compact` 方法
+- 架构图和工作流程
+- 配置示例和故障排查
+- 优势对比表（OpenClaw 内置 vs LobsterPress）
+
 ## [3.3.1] - 2026-03-19
 
 ### 🐛 Bug 修复

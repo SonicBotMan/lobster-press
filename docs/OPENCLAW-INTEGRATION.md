@@ -1,10 +1,253 @@
 # OpenClaw 集成指南
 
-本文档说明如何将 LobsterPress 与 OpenClaw 的内置 Compaction 功能协调工作，避免重复压缩。
+本文档说明如何将 LobsterPress 与 OpenClaw 集成，包括：
+1. **ContextEngine 集成**（v3.3.0+）：自动上下文监测与压缩
+2. **Compaction 协调**：与 OpenClaw 内置 Compaction 功能协调工作
 
 ---
 
-## 背景
+## 🚀 ContextEngine 集成（v3.3.0+）⭐
+
+### 概述
+
+LobsterPress v3.3.0+ 实现了 OpenClaw 的 **ContextEngine 接口**，可以：
+- ✅ 自动监测上下文使用率（每次 turn 后）
+- ✅ 智能触发压缩（超过阈值时）
+- ✅ 使用真实 DAG 压缩（语义理解）
+- ✅ 异步执行（不阻塞用户）
+
+### 架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  OpenClaw Context Pipeline                  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  User Message → AI Response → afterTurn() Hook             │
+│                                    │                        │
+│                                    ↓                        │
+│                          LobsterPress ContextEngine        │
+│                                    │                        │
+│                      ┌─────────────┴─────────────┐        │
+│                      │                           │        │
+│                Usage < 75%                 Usage >= 75%   │
+│                      │                           │        │
+│                      ↓                           ↓        │
+│                   无操作                    compact()      │
+│                                                │           │
+│                                                ↓           │
+│                                      DAGCompressor         │
+│                                      (真实 DAG 压缩)        │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 核心方法
+
+#### 1. `afterTurn(messages, sessionFile)`
+
+**功能**：每次 turn 后自动调用，检查上下文使用率
+
+**返回值**：
+
+```typescript
+{
+  shouldCompact: boolean,  // 是否应该压缩
+  currentTokens: number,   // 当前 token 数
+  tokenBudget: number,     // token 预算
+  usageRatio: number       // 使用率（0-1）
+}
+```
+
+**触发逻辑**：
+- 默认阈值：75%（可配置）
+- 当 `usageRatio >= 0.75` 时，`shouldCompact = true`
+- OpenClaw 会自动调用 `compact()` 方法
+
+#### 2. `compact(currentTokenCount, tokenBudget, force)`
+
+**功能**：执行实际的压缩操作
+
+**参数**：
+- `currentTokenCount`: 当前 token 数
+- `tokenBudget`: token 预算
+- `force`: 是否强制压缩（可选，默认 false）
+
+**返回值**：
+
+```typescript
+{
+  compressed: boolean,      // 是否执行了压缩
+  tokensBefore: number,     // 压缩前 token 数
+  tokensAfter: number,      // 压缩后 token 数
+  force: boolean           // 是否强制压缩
+}
+```
+
+**实现细节**：
+- 调用 `lobster_compress` MCP 工具
+- 使用真实的 `DAGCompressor.incremental_compact()`
+- 异步执行，不阻塞用户 turn
+- 错误处理和重试机制（v3.3.1+）
+
+### 配置
+
+在 `~/.openclaw/openclaw.json` 中配置：
+
+```json
+{
+  "agents": {
+    "defaults": {
+      "plugins": {
+        "slots": {
+          "contextEngine": "lobster-press"
+        }
+      },
+      "compaction": {
+        "mode": "safeguard",
+        "reserveTokens": 8000
+      }
+    }
+  },
+  "plugins": {
+    "lobster-press": {
+      "path": "@sonicbotman/lobster-press",
+      "config": {
+        "contextThreshold": 0.75,
+        "strategy": "medium",
+        "tokenBudget": 128000
+      }
+    }
+  }
+}
+```
+
+**配置说明**：
+- `slots.contextEngine`: 指定使用 LobsterPress 作为 ContextEngine
+- `contextThreshold`: 压缩阈值（默认 0.75）
+- `strategy`: 压缩策略（light/medium/aggressive）
+- `tokenBudget`: token 预算（默认 128000）
+
+### 优势对比
+
+| 特性 | OpenClaw 内置 Compaction | LobsterPress ContextEngine |
+|------|-------------------------|---------------------------|
+| 触发方式 | 手动 `/compact` 或达到限制 | 自动监测 + 智能触发 |
+| 压缩算法 | 基于规则 | DAG 语义压缩 |
+| 理解能力 | 有限（关键词） | 深度语义理解 |
+| 可配置性 | 中等 | 高（策略、阈值、权重） |
+| 重试机制 | 无 | ✅ 3 次重试 + 指数退避 |
+| 错误处理 | 基础 | ✅ 详细错误信息 |
+| 性能影响 | 低 | 中（异步执行） |
+
+### 使用示例
+
+#### 1. 自动压缩（推荐）
+
+配置后，LobsterPress 会自动监测和压缩：
+
+```bash
+# 1. 安装 LobsterPress
+npm install -g @sonicbotman/lobster-press
+
+# 2. 配置 OpenClaw（如上）
+
+# 3. 重启 OpenClaw
+openclaw restart
+
+# 4. 正常使用，LobsterPress 自动工作
+```
+
+#### 2. 手动触发
+
+也可以手动调用 `lobster_compress` 工具：
+
+```json
+{
+  "name": "lobster_compress",
+  "arguments": {
+    "conversation_id": "current-session",
+    "current_tokens": 100000,
+    "token_budget": 128000,
+    "force": false
+  }
+}
+```
+
+#### 3. 强制压缩
+
+即使未达到阈值，也可以强制压缩：
+
+```json
+{
+  "name": "lobster_compress",
+  "arguments": {
+    "conversation_id": "current-session",
+    "current_tokens": 50000,
+    "token_budget": 128000,
+    "force": true
+  }
+}
+```
+
+### 监控和日志
+
+LobsterPress 会记录压缩历史到数据库：
+
+```bash
+# 查看压缩统计
+sqlite3 ~/.openclaw/lobster.db "
+SELECT
+  conversation_id,
+  COUNT(*) as compression_count,
+  SUM(tokens_saved) as total_saved
+FROM compression_history
+GROUP BY conversation_id
+ORDER BY total_saved DESC
+LIMIT 10;
+"
+```
+
+### 故障排查
+
+#### 问题 1：压缩未触发
+
+**检查**：
+1. 确认 `contextEngine` 插件已配置
+2. 检查 `contextThreshold` 设置
+3. 查看 OpenClaw 日志
+
+```bash
+openclaw logs | grep -i lobster
+```
+
+#### 问题 2：压缩失败
+
+**检查**：
+1. 确认数据库路径正确
+2. 检查磁盘空间
+3. 查看错误信息
+
+```bash
+# 查看最近的错误
+sqlite3 ~/.openclaw/lobster.db "
+SELECT * FROM compression_history
+WHERE status = 'error'
+ORDER BY created_at DESC
+LIMIT 5;
+"
+```
+
+#### 问题 3：性能影响
+
+**优化**：
+1. 调高 `contextThreshold`（例如 0.8）
+2. 使用 `light` 策略
+3. 禁用自动压缩，手动触发
+
+---
+
+## 🔄 Compaction 协调（遗留）
 
 OpenClaw 从 2026.3 版本开始内置了 **Compaction** 功能：
 - 自动在接近上下文窗口限制时压缩会话
