@@ -9,7 +9,7 @@ description: LobsterPress 认知记忆系统 - DAG 压缩 + OpenClaw ContextEngi
 
 LobsterPress 是一个为 OpenClaw 设计的**认知记忆系统**，通过 DAG（有向无环图）压缩、遗忘曲线和语义记忆技术，实现智能上下文管理。
 
-**最新版本**: v3.4.0 (2026-03-19)
+**最新版本**: v3.6.0 (2026-03-19)
 
 **核心特性：**
 - **DAG 压缩** - 有向无环图结构，保留语义关系
@@ -106,6 +106,9 @@ python3 scripts/context-compressor-v5.sh --dry-run abc123
 | `lobster_grep` | 全文搜索历史对话 | v3.2.2+ |
 | `lobster_describe` | 查看 DAG 摘要结构 | v3.2.2+ |
 | `lobster_expand` | 展开摘要节点 | v3.2.2+ |
+| `lobster_assemble` | 按三层记忆模型拼装上下文 | v3.6.0+ |
+| `lobster_correct` | 记忆纠错（修改/删除错误记忆） | v3.6.0+ |
+| `lobster_sweep` | 主动衰减清理（删除低价值记忆） | v3.6.0+ |
 
 ### `lobster_compress` 参数
 
@@ -127,6 +130,69 @@ python3 scripts/context-compressor-v5.sh --dry-run abc123
   "tokens_saved": 40000,
   "token_budget": 128000,
   "attempt": 1
+}
+```
+
+### `lobster_assemble` 参数（v3.6.0+）
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `conversation_id` | string | 是 | 对话 ID |
+| `token_budget` | integer | 否 | token 预算（默认 8000） |
+| `tiers` | array | 否 | 记忆层级列表（默认 ["semantic", "episodic", "working"]） |
+
+**返回值**：
+
+```json
+{
+  "assembled": [
+    {"tier": "semantic", "content": "...", "token_count": 100},
+    {"tier": "episodic", "content": "...", "token_count": 200}
+  ],
+  "total_tokens": 300,
+  "token_budget": 8000,
+  "tier_breakdown": {"semantic": 1, "episodic": 1, "working": 0}
+}
+```
+
+### `lobster_correct` 参数（v3.6.0+）
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `target_type` | string | 是 | 目标类型（"message" 或 "summary"） |
+| `target_id` | string | 是 | 目标 ID |
+| `correction_type` | string | 是 | 纠错类型（"content", "metadata", "delete"） |
+| `old_value` | string | 否 | 旧值 |
+| `new_value` | string | 否 | 新值 |
+| `reason` | string | 否 | 纠错原因 |
+
+**返回值**：
+
+```json
+{
+  "correction_id": "corr_abc123",
+  "target_type": "message",
+  "target_id": "msg_xyz",
+  "correction_type": "content",
+  "applied_at": "2026-03-19T17:00:00Z",
+  "success": true
+}
+```
+
+### `lobster_sweep` 参数（v3.6.0+）
+
+| 参数 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `days_threshold` | integer | 否 | 未访问天数阈值（默认 30） |
+
+**返回值**：
+
+```json
+{
+  "deleted_count": 5,
+  "candidates": 5,
+  "days_threshold": 30,
+  "cutoff_date": "2026-02-17T17:00:00Z"
 }
 ```
 
