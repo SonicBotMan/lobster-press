@@ -5,6 +5,79 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.6.0] - 2026-03-19
+
+### 🎉 MemOS 架构升级（Issue #127）
+
+**四层架构实施完成**：
+
+1. **模块四：命名空间隔离**
+   - 数据库新增 `namespace` 字段（conversations 表）
+   - `LobsterDatabase` 构造函数支持 `namespace` 参数
+   - `search_messages/search_summaries` 支持 `cross_namespace` 参数
+   - MCP Server 支持 `--namespace` 命令行参数
+   - TypeScript 支持 `namespace` 配置
+
+2. **模块一：三层记忆模型**
+   - 数据库新增 `memory_tier` 字段（messages/summaries 表）
+   - `get_context_by_tier()` 方法按层级获取记忆
+   - `lobster_assemble` MCP 工具智能拼装上下文
+   - TypeScript `ContextEngine.assemble()` 调用 Python 层
+
+3. **模块三：记忆纠错系统**
+   - 数据库新增 `corrections` 表
+   - `apply_correction()` 方法应用纠错
+   - `lobster_correct` MCP 工具
+
+4. **模块二：主动衰减调度器**
+   - `sweep_decayed_messages()` 方法清理低价值记忆
+   - `lobster_sweep` MCP 工具
+
+### 🐛 Bug 修复
+
+**Issue #125 问题 3（低）：tiktoken 可选依赖文档** ✅
+- 在 README.md 中添加 tiktoken 安装说明
+- 说明未安装时自动降级为近似计算
+
+**Issue #126 Bug 2（高）：threshold 死代码残留** ✅
+- 删除 `lobster_compress` 中的 `threshold = token_budget * 0.75`
+- 在 description 中明确说明阈值职责
+
+**Issue #126 Bug 3（中）：_row_to_dict 光标竞争** ✅
+- 创建 `_execute_fetch_all` 方法，在 execute 后立即保存 description
+- 重构 `describe_summary` 方法使用安全查询
+
+### 📝 修改的文件
+
+**数据库（src/database.py）**：
+- 新增 `migrate_v30`（memory_tier 字段）
+- 新增 `migrate_v31`（namespace 字段）
+- 新增 `migrate_v32`（corrections 表）
+- 新增 `_execute_fetch_all` 方法（安全查询）
+- 新增 `get_context_by_tier` 方法
+- 新增 `apply_correction` 方法
+- 新增 `sweep_decayed_messages` 方法
+- 重构 `describe_summary` 方法
+- 修改 `search_messages/search_summaries` 支持 namespace 过滤
+
+**MCP Server（mcp_server/lobster_mcp_server.py）**：
+- 新增 `lobster_assemble` 工具
+- 新增 `lobster_correct` 工具
+- 新增 `lobster_sweep` 工具
+- 修改 `lobster_compress` 工具 description
+- 删除 `threshold` 死代码
+- 支持 `--namespace` 命令行参数
+- `_get_db` 传递 namespace 到 LobsterDatabase
+
+**TypeScript（index.ts）**：
+- 支持 `namespace` 配置
+- 实现 `ContextEngine.assemble()` 调用 `lobster_assemble`
+- 传递 `--namespace` 参数到 Python 进程
+
+**文档**：
+- `README.md` - v3.6.0 新特性说明
+- `CHANGELOG.md` - v3.6.0 条目
+
 ## [3.5.1] - 2026-03-19
 
 ### 🐛 Bug 修复（Issue #126）

@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
 
-# 🧠 LobsterPress v3.5.1
+# 🧠 LobsterPress v3.6.0
 
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v3.5.1](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.5.1) · [更新日志](CHANGELOG.md)
+**最新版本**: [v3.6.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v3.6.0) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -42,6 +42,36 @@ LobsterPress v3.0 是基于认知科学论文实现的 LLM 记忆系统，融合
 | **HiMem (Hierarchical Memory)** | 记忆层次化 | DAG 压缩 + 三级摘要结构 |
 | **Ebbinghaus Forgetting Curve (1885)** | 动态遗忘 | R(t) = base_score × e^(-t/stability) |
 | **Memory Reconsolidation (Nader, 2000)** | 知识更新 | 矛盾检测 + 语义记忆重巩固 |
+
+---
+
+## 🆕 v3.6.0 新特性：MemOS 架构（Issue #127）
+
+**四层架构升级**：
+
+1. **模块四：命名空间隔离** - 多 Agent/项目隔离
+   - 数据库支持 namespace 字段
+   - `search_messages/search_summaries` 支持 `cross_namespace` 参数
+   - MCP Server 支持 `--namespace` 参数
+
+2. **模块一：三层记忆模型** - working/episodic/semantic
+   - 数据库支持 `memory_tier` 字段
+   - `get_context_by_tier()` 方法按层级获取记忆
+   - `lobster_assemble` MCP 工具智能拼装上下文
+
+3. **模块三：记忆纠错系统** - 修改/删除错误记忆
+   - 数据库新增 `corrections` 表
+   - `apply_correction()` 方法应用纠错
+   - `lobster_correct` MCP 工具
+
+4. **模块二：主动衰减调度器** - 基于遗忘曲线清理
+   - `sweep_decayed_messages()` 方法清理低价值记忆
+   - `lobster_sweep` MCP 工具
+
+**Bug 修复**：
+- Issue #125: tiktoken 可选依赖文档
+- Issue #126 Bug 2: 删除 threshold 死代码
+- Issue #126 Bug 3: 重构 `_row_to_dict` 方法（光标竞争问题）
 
 ---
 
@@ -303,6 +333,11 @@ git clone https://github.com/SonicBotMan/lobster-press.git
 cd lobster-press
 pip install -r requirements.txt
 ```
+
+**可选依赖**：
+- `tiktoken>=0.5.0` - 高精度 token 计数（推荐）
+  - 安装：`pip install tiktoken`
+  - 未安装时自动降级为近似计算（基于字符数 × 0.3）
 
 ```python
 from src.database import LobsterDatabase

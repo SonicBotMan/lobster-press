@@ -20,14 +20,18 @@ from datetime import datetime
 
 class LobsterDatabase:
     """LobsterPress 数据库 - 无损存储层"""
-    
-    def __init__(self, db_path: str = "lobster_press.db"):
+
+    def __init__(self, db_path: str = "lobster_press.db", namespace: str = "default"):
         """初始化数据库
-        
+
+        v3.6.0: 新增 namespace 参数（Issue #127 模块四）
+
         Args:
             db_path: 数据库文件路径
+            namespace: 记忆命名空间（用于多 Agent/项目隔离）
         """
         self.db_path = db_path
+        self.namespace = namespace  # v3.6.0 新增
         self.conn = None
         self.cursor = None
         self._init_database()
@@ -173,9 +177,14 @@ class LobsterDatabase:
         
         # v2.5.0 迁移
         self.migrate_v25()
-        
+
         # v2.6.0 迁移
         self.migrate_v26()
+
+        # v3.6.0 迁移
+        self.migrate_v30()  # 三层记忆模型
+        self.migrate_v31()  # 命名空间隔离
+        self.migrate_v32()  # 记忆纠错系统
     
     def migrate_v25(self):
         """v2.5.0 schema 迁移
@@ -220,7 +229,78 @@ class LobsterDatabase:
                 pass
         
         self.conn.commit()
-    
+
+    def migrate_v32(self):
+        """v3.6.0 schema 迁移：记忆纠错系统（Issue #127 模块三）
+
+        新增表：
+        - corrections: 记忆纠错记录
+        """
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS corrections (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                correction_id TEXT UNIQUE NOT NULL,
+                target_type TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                correction_type TEXT NOT NULL,
+                old_value TEXT,
+                new_value TEXT,
+                reason TEXT,
+                created_at TEXT NOT NULL,
+                applied_at TEXT
+            )
+        """)
+        
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_corrections_target 
+            ON corrections(target_type, target_id)
+        """)
+        
+        self.conn.commit()
+
+    def migrate_v30(self):
+        """v3.6.0 schema 迁移：三层记忆模型（Issue #127 模块一）
+
+        新增字段：
+        - memory_tier: 记忆层级（working/episodic/semantic）
+        """
+        migrations = [
+            "ALTER TABLE summaries ADD COLUMN memory_tier TEXT DEFAULT 'episodic'",
+            "ALTER TABLE messages ADD COLUMN memory_tier TEXT DEFAULT 'working'",
+        ]
+
+        for sql in migrations:
+            try:
+                self.cursor.execute(sql)
+            except sqlite3.OperationalError:
+                # 字段已存在，跳过
+                pass
+
+        self.conn.commit()
+
+    def migrate_v31(self):
+        """v3.6.0 schema 迁移：命名空间隔离（Issue #127 模块四）
+
+        新增字段：
+        - namespace: 记忆命名空间（用于多 Agent/项目隔离）
+
+        新增索引：
+        - idx_conversations_namespace: 加速按命名空间查询
+        """
+        migrations = [
+            "ALTER TABLE conversations ADD COLUMN namespace TEXT DEFAULT 'default'",
+            "CREATE INDEX IF NOT EXISTS idx_conversations_namespace ON conversations(namespace)",
+        ]
+
+        for sql in migrations:
+            try:
+                self.cursor.execute(sql)
+            except sqlite3.OperationalError:
+                # 字段或索引已存在，跳过
+                pass
+
+        self.conn.commit()
+
     # ==================== 消息操作 ====================
     
     def save_message(self, message: Dict) -> str:
@@ -535,120 +615,316 @@ class LobsterDatabase:
         return [self._row_to_dict(row, 'summaries') for row in rows]
     
     # ==================== 搜索操作 ====================
-    
-    def search_messages(self, query: str, conversation_id: str = None, limit: int = 50) -> List[Dict]:
+
+    def search_messages(self, query: str, conversation_id: str = None, limit: int = 50,
+                       cross_namespace: bool = False) -> List[Dict]:
         """搜索消息 - 借鉴 lcm_grep
+
+        v3.6.0: 新增 cross_namespace 参数（Issue #127 模块四）
 
         Args:
             query: 搜索查询
             conversation_id: 可选，限定搜索范围的会话 ID（v3.5.0 新增）
             limit: 最大结果数
+            cross_namespace: 是否跨命名空间搜索（默认 False）
 
         Returns:
             匹配的消息列表
         """
         if conversation_id:
-            # v3.5.0: 按 conversation_id 过滤
+            # v3.6.0: 按 conversation_id 和 namespace 过滤
             self.cursor.execute("""
                 SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
                 FROM messages m
                 JOIN messages_fts fts ON m.id = fts.rowid
-                WHERE messages_fts MATCH ? AND m.conversation_id = ?
-                ORDER BY rank
-                LIMIT ?
-            """, (query, conversation_id, limit))
-        else:
-            # 原有逻辑（不过滤 conversation_id）
-            self.cursor.execute("""
-                SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
-                FROM messages m
-                JOIN messages_fts fts ON m.id = fts.rowid
+                JOIN conversations c ON m.conversation_id = c.conversation_id
                 WHERE messages_fts MATCH ?
+                  AND m.conversation_id = ?
+                  AND (? OR c.namespace = ?)
                 ORDER BY rank
                 LIMIT ?
-            """, (query, limit))
+            """, (query, conversation_id, cross_namespace, self.namespace, limit))
+        else:
+            # v3.6.0: 按 namespace 过滤
+            self.cursor.execute("""
+                SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                FROM messages m
+                JOIN messages_fts fts ON m.id = fts.rowid
+                JOIN conversations c ON m.conversation_id = c.conversation_id
+                WHERE messages_fts MATCH ?
+                  AND (? OR c.namespace = ?)
+                ORDER BY rank
+                LIMIT ?
+            """, (query, cross_namespace, self.namespace, limit))
 
         rows = self.cursor.fetchall()
         return [self._row_to_dict(row, 'messages') for row in rows]
-    
-    def search_summaries(self, query: str, conversation_id: str = None, limit: int = 50) -> List[Dict]:
+
+    def search_summaries(self, query: str, conversation_id: str = None, limit: int = 50,
+                        cross_namespace: bool = False) -> List[Dict]:
         """搜索摘要 - 借鉴 lcm_grep
+
+        v3.6.0: 新增 cross_namespace 参数（Issue #127 模块四）
 
         Args:
             query: 搜索查询
             conversation_id: 可选，限定搜索范围的会话 ID（v3.5.0 新增）
             limit: 最大结果数
+            cross_namespace: 是否跨命名空间搜索（默认 False）
 
         Returns:
             匹配的摘要列表
         """
         if conversation_id:
-            # v3.5.0: 按 conversation_id 过滤
+            # v3.6.0: 按 conversation_id 和 namespace 过滤
             self.cursor.execute("""
                 SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
                 FROM summaries s
                 JOIN summaries_fts fts ON s.id = fts.rowid
-                WHERE summaries_fts MATCH ? AND s.conversation_id = ?
-                ORDER BY rank
-                LIMIT ?
-            """, (query, conversation_id, limit))
-        else:
-            # 原有逻辑（不过滤 conversation_id）
-            self.cursor.execute("""
-                SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
-                FROM summaries s
-                JOIN summaries_fts fts ON s.id = fts.rowid
+                JOIN conversations c ON s.conversation_id = c.conversation_id
                 WHERE summaries_fts MATCH ?
+                  AND s.conversation_id = ?
+                  AND (? OR c.namespace = ?)
                 ORDER BY rank
                 LIMIT ?
-            """, (query, limit))
+            """, (query, conversation_id, cross_namespace, self.namespace, limit))
+        else:
+            # v3.6.0: 按 namespace 过滤
+            self.cursor.execute("""
+                SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                FROM summaries s
+                JOIN summaries_fts fts ON s.id = fts.rowid
+                JOIN conversations c ON s.conversation_id = c.conversation_id
+                WHERE summaries_fts MATCH ?
+                  AND (? OR c.namespace = ?)
+                ORDER BY rank
+                LIMIT ?
+            """, (query, cross_namespace, self.namespace, limit))
 
         rows = self.cursor.fetchall()
         return [self._row_to_dict(row, 'summaries') for row in rows]
-    
+
+    def get_context_by_tier(
+        self,
+        conversation_id: str,
+        tiers: list = None
+    ) -> dict:
+        """v3.6.0: 按记忆层级获取上下文内容（Issue #127 模块一）
+
+        Args:
+            conversation_id: 对话 ID
+            tiers: 要获取的层级列表（默认 ['working', 'episodic', 'semantic']）
+
+        Returns:
+            {
+                'working': [最近 N 条原始消息],
+                'episodic': [DAG 叶节点摘要],
+                'semantic': [condensed 高层摘要]
+            }
+        """
+        tiers = tiers or ['working', 'episodic', 'semantic']
+        result = {}
+
+        if 'working' in tiers:
+            # 最近 20 条未被压缩的消息（working 层）
+            working = self._execute_fetch_all(
+                """SELECT * FROM messages
+                   WHERE conversation_id = ? AND memory_tier = 'working'
+                   ORDER BY seq DESC LIMIT 20""",
+                (conversation_id,),
+                table='messages'
+            )
+            result['working'] = working
+
+        if 'episodic' in tiers:
+            # DAG 叶节点摘要（episodic 层）
+            episodic = self._execute_fetch_all(
+                """SELECT * FROM summaries
+                   WHERE conversation_id = ? AND memory_tier = 'episodic'
+                   ORDER BY created_at DESC LIMIT 10""",
+                (conversation_id,),
+                table='summaries'
+            )
+            result['episodic'] = episodic
+
+        if 'semantic' in tiers:
+            # condensed 高层摘要（semantic 层）
+            semantic = self._execute_fetch_all(
+                """SELECT * FROM summaries
+                   WHERE conversation_id = ? AND memory_tier = 'semantic'
+                   ORDER BY created_at DESC LIMIT 5""",
+                (conversation_id,),
+                table='summaries'
+            )
+            result['semantic'] = semantic
+
+        return result
+
+    def apply_correction(
+        self,
+        target_type: str,
+        target_id: str,
+        correction_type: str,
+        old_value: str,
+        new_value: str,
+        reason: str = None
+    ) -> dict:
+        """v3.6.0: 应用记忆纠错（Issue #127 模块三）
+
+        Args:
+            target_type: 目标类型（'message' 或 'summary'）
+            target_id: 目标 ID
+            correction_type: 纠错类型（'content', 'metadata', 'delete'）
+            old_value: 旧值
+            new_value: 新值
+            reason: 纠错原因
+
+        Returns:
+            纠错结果
+        """
+        import uuid
+        from datetime import datetime
+
+        # 生成纠错 ID
+        correction_id = f"corr_{uuid.uuid4().hex[:16]}"
+        created_at = datetime.utcnow().isoformat()
+
+        # 记录纠错
+        self.cursor.execute("""
+            INSERT INTO corrections 
+            (correction_id, target_type, target_id, correction_type, old_value, new_value, reason, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (correction_id, target_type, target_id, correction_type, old_value, new_value, reason, created_at))
+
+        # 应用纠错
+        table = 'messages' if target_type == 'message' else 'summaries'
+        id_field = 'message_id' if target_type == 'message' else 'summary_id'
+
+        if correction_type == 'delete':
+            # 删除记录
+            self.cursor.execute(f"DELETE FROM {table} WHERE {id_field} = ?", (target_id,))
+        elif correction_type == 'content':
+            # 修改内容
+            self.cursor.execute(f"UPDATE {table} SET content = ? WHERE {id_field} = ?", (new_value, target_id))
+        elif correction_type == 'metadata':
+            # 修改元数据
+            self.cursor.execute(f"UPDATE {table} SET metadata = ? WHERE {id_field} = ?", (new_value, target_id))
+
+        # 更新 applied_at
+        applied_at = datetime.utcnow().isoformat()
+        self.cursor.execute("""
+            UPDATE corrections SET applied_at = ? WHERE correction_id = ?
+        """, (applied_at, correction_id))
+
+        self.conn.commit()
+
+        return {
+            "correction_id": correction_id,
+            "target_type": target_type,
+            "target_id": target_id,
+            "correction_type": correction_type,
+            "applied_at": applied_at,
+            "success": True
+        }
+
+    def sweep_decayed_messages(self, days_threshold: int = 30) -> dict:
+        """v3.6.0: 清理衰减消息（Issue #127 模块二）
+
+        基于遗忘曲线，删除低价值、长期未访问的消息。
+
+        Args:
+            days_threshold: 未访问天数阈值（默认 30 天）
+
+        Returns:
+            清理统计
+        """
+        from datetime import datetime, timedelta
+
+        cutoff_date = (datetime.utcnow() - timedelta(days=days_threshold)).isoformat()
+
+        # 查找符合衰减条件的消息
+        self.cursor.execute("""
+            SELECT message_id, tfidf_score, access_count, last_accessed_at
+            FROM messages
+            WHERE last_accessed_at < ?
+              AND compression_exempt = 0
+              AND tfidf_score < 0.1
+            ORDER BY tfidf_score ASC, last_accessed_at ASC
+            LIMIT 100
+        """, (cutoff_date,))
+
+        candidates = self.cursor.fetchall()
+
+        # 删除消息
+        deleted_count = 0
+        for msg in candidates:
+            message_id = msg[0]
+            # 从 FTS 索引删除
+            self.cursor.execute("DELETE FROM messages_fts WHERE message_id = ?", (message_id,))
+            # 从 summary_messages 关系删除
+            self.cursor.execute("DELETE FROM summary_messages WHERE message_id = ?", (message_id,))
+            # 删除消息本身
+            self.cursor.execute("DELETE FROM messages WHERE message_id = ?", (message_id,))
+            deleted_count += 1
+
+        self.conn.commit()
+
+        return {
+            "deleted_count": deleted_count,
+            "candidates": len(candidates),
+            "days_threshold": days_threshold,
+            "cutoff_date": cutoff_date
+        }
+
     # ==================== 工具操作 ====================
-    
+
     def describe_summary(self, summary_id: str) -> Optional[Dict]:
         """查看摘要详情 - 借鉴 lcm_describe
-        
+
+        v3.6.0: 修复 Issue #126 Bug 3（光标竞争）
+        使用 _execute_fetch_all 避免递归调用时列名错位。
+
         Args:
             summary_id: 摘要 ID
-        
+
         Returns:
             摘要详情
         """
-        # 获取摘要
-        self.cursor.execute("""
-            SELECT * FROM summaries WHERE summary_id = ?
-        """, (summary_id,))
-        row = self.cursor.fetchone()
-        
-        if not row:
+        # 获取摘要（使用安全方法）
+        summaries = self._execute_fetch_all(
+            "SELECT * FROM summaries WHERE summary_id = ?",
+            (summary_id,),
+            table='summaries'
+        )
+
+        if not summaries:
             return None
-        
-        summary = self._row_to_dict(row, 'summaries')
-        
-        # 获取子节点
+
+        summary = summaries[0]
+
+        # 获取子节点（使用安全方法）
         if summary['kind'] == 'leaf':
-            self.cursor.execute("""
-                SELECT m.* FROM messages m
-                JOIN summary_messages sm ON m.message_id = sm.message_id
-                WHERE sm.summary_id = ?
-                ORDER BY m.seq ASC
-            """, (summary_id,))
-            children = [self._row_to_dict(r, 'messages') for r in self.cursor.fetchall()]
+            children = self._execute_fetch_all(
+                """SELECT m.* FROM messages m
+                   JOIN summary_messages sm ON m.message_id = sm.message_id
+                   WHERE sm.summary_id = ?
+                   ORDER BY m.seq ASC""",
+                (summary_id,),
+                table='messages'
+            )
         else:
-            self.cursor.execute("""
-                SELECT s.* FROM summaries s
-                JOIN summary_parents sp ON s.summary_id = sp.parent_summary_id
-                WHERE sp.summary_id = ?
-                ORDER BY s.created_at ASC
-            """, (summary_id,))
-            children = [self._row_to_dict(r, 'summaries') for r in self.cursor.fetchall()]
-        
+            children = self._execute_fetch_all(
+                """SELECT s.* FROM summaries s
+                   JOIN summary_parents sp ON s.summary_id = sp.parent_summary_id
+                   WHERE sp.summary_id = ?
+                   ORDER BY s.created_at ASC""",
+                (summary_id,),
+                table='summaries'
+            )
+
         summary['children'] = children
         summary['children_count'] = len(children)
-        
+
         return summary
     
     def expand_summary(self, summary_id: str) -> List[Dict]:
@@ -732,10 +1008,60 @@ class LobsterDatabase:
         char_count = len(text)
         chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
         english_chars = char_count - chinese_chars
-        
+
         tokens = (english_chars / 4) + (chinese_chars / 1.5)
         return int(tokens)
-    
+
+    def _execute_fetch_all(self, sql: str, params: tuple = (), table: str = None) -> List[Dict]:
+        """v3.6.0: 安全的查询方法，修复 Issue #126 Bug 3
+        
+        在 execute 后立即保存 description，避免递归调用时光标竞争。
+        
+        Args:
+            sql: SQL 查询语句
+            params: 查询参数
+            table: 表名（仅用于 fallback）
+        
+        Returns:
+            字典列表
+        """
+        self.cursor.execute(sql, params)
+        
+        # 立即保存 description（关键修复！）
+        if hasattr(self.cursor, 'description') and self.cursor.description:
+            columns = [desc[0] for desc in self.cursor.description]
+        else:
+            # Fallback: 使用硬编码列表
+            if table == 'messages':
+                columns = ['id', 'message_id', 'conversation_id', 'seq', 'role',
+                          'content', 'token_count', 'created_at', 'metadata',
+                          'msg_type', 'tfidf_score', 'structural_bonus', 'compression_exempt',
+                          'last_accessed_at', 'access_count', 'stability']
+            elif table == 'summaries':
+                columns = ['id', 'summary_id', 'conversation_id', 'kind', 'depth',
+                          'content', 'token_count', 'earliest_at', 'latest_at',
+                          'descendant_count', 'created_at']
+            else:
+                columns = []
+        
+        rows = self.cursor.fetchall()
+        
+        if not columns:
+            return [dict(row) for row in rows]
+        
+        result = []
+        for row in rows:
+            item = dict(zip(columns, row))
+            # 解析 JSON 字段
+            if 'metadata' in item and item['metadata']:
+                try:
+                    item['metadata'] = json.loads(item['metadata'])
+                except:
+                    pass
+            result.append(item)
+        
+        return result
+
     def _row_to_dict(self, row: tuple, table: str) -> Dict:
         """将数据库行转换为字典
         
