@@ -51,18 +51,15 @@ def lobster_grep(db: LobsterDatabase,
     
     # v2.5.0: 初始化 TF-IDF 评分器
     scorer = TFIDFScorer() if use_tfidf_rerank else None
-    
+
     # 缺陷 2 修复：计算查询的 TF 向量
     query_tokens = scorer.tokenize(query) if scorer else []
-    
+
     # 搜索消息
     if search_messages:
-        messages = db.search_messages(query, limit * 2)  # 多获取一些，然后过滤
-        
-        # 过滤 conversation_id
-        if conversation_id:
-            messages = [m for m in messages if m.get('conversation_id') == conversation_id]
-        
+        # v3.5.0: 直接在 SQL 中过滤 conversation_id（更高效）
+        messages = db.search_messages(query, conversation_id=conversation_id, limit=limit * 2)
+
         for rank_pos, msg in enumerate(messages[:limit], 1):
             # 缺陷 2 修复：实际计算查询与结果的余弦相似度
             query_relevance = 0.0
@@ -97,12 +94,9 @@ def lobster_grep(db: LobsterDatabase,
     
     # 搜索摘要
     if search_summaries:
-        summaries = db.search_summaries(query, limit * 2)  # 多获取一些，然后过滤
-        
-        # 过滤 conversation_id
-        if conversation_id:
-            summaries = [s for s in summaries if s.get('conversation_id') == conversation_id]
-        
+        # v3.5.0: 直接在 SQL 中过滤 conversation_id（更高效）
+        summaries = db.search_summaries(query, conversation_id=conversation_id, limit=limit * 2)
+
         for rank_pos, summary in enumerate(summaries[:limit], 1):
             # 缺陷 2 修复：计算查询与摘要的余弦相似度
             query_relevance = 0.0

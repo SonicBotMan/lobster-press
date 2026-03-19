@@ -536,47 +536,73 @@ class LobsterDatabase:
     
     # ==================== 搜索操作 ====================
     
-    def search_messages(self, query: str, limit: int = 50) -> List[Dict]:
+    def search_messages(self, query: str, conversation_id: str = None, limit: int = 50) -> List[Dict]:
         """搜索消息 - 借鉴 lcm_grep
-        
+
         Args:
             query: 搜索查询
+            conversation_id: 可选，限定搜索范围的会话 ID（v3.5.0 新增）
             limit: 最大结果数
-        
+
         Returns:
             匹配的消息列表
         """
-        self.cursor.execute("""
-            SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
-            FROM messages m
-            JOIN messages_fts fts ON m.id = fts.rowid
-            WHERE messages_fts MATCH ?
-            ORDER BY rank
-            LIMIT ?
-        """, (query, limit))
-        
+        if conversation_id:
+            # v3.5.0: 按 conversation_id 过滤
+            self.cursor.execute("""
+                SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                FROM messages m
+                JOIN messages_fts fts ON m.id = fts.rowid
+                WHERE messages_fts MATCH ? AND m.conversation_id = ?
+                ORDER BY rank
+                LIMIT ?
+            """, (query, conversation_id, limit))
+        else:
+            # 原有逻辑（不过滤 conversation_id）
+            self.cursor.execute("""
+                SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                FROM messages m
+                JOIN messages_fts fts ON m.id = fts.rowid
+                WHERE messages_fts MATCH ?
+                ORDER BY rank
+                LIMIT ?
+            """, (query, limit))
+
         rows = self.cursor.fetchall()
         return [self._row_to_dict(row, 'messages') for row in rows]
     
-    def search_summaries(self, query: str, limit: int = 50) -> List[Dict]:
+    def search_summaries(self, query: str, conversation_id: str = None, limit: int = 50) -> List[Dict]:
         """搜索摘要 - 借鉴 lcm_grep
-        
+
         Args:
             query: 搜索查询
+            conversation_id: 可选，限定搜索范围的会话 ID（v3.5.0 新增）
             limit: 最大结果数
-        
+
         Returns:
             匹配的摘要列表
         """
-        self.cursor.execute("""
-            SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
-            FROM summaries s
-            JOIN summaries_fts fts ON s.id = fts.rowid
-            WHERE summaries_fts MATCH ?
-            ORDER BY rank
-            LIMIT ?
-        """, (query, limit))
-        
+        if conversation_id:
+            # v3.5.0: 按 conversation_id 过滤
+            self.cursor.execute("""
+                SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                FROM summaries s
+                JOIN summaries_fts fts ON s.id = fts.rowid
+                WHERE summaries_fts MATCH ? AND s.conversation_id = ?
+                ORDER BY rank
+                LIMIT ?
+            """, (query, conversation_id, limit))
+        else:
+            # 原有逻辑（不过滤 conversation_id）
+            self.cursor.execute("""
+                SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                FROM summaries s
+                JOIN summaries_fts fts ON s.id = fts.rowid
+                WHERE summaries_fts MATCH ?
+                ORDER BY rank
+                LIMIT ?
+            """, (query, limit))
+
         rows = self.cursor.fetchall()
         return [self._row_to_dict(row, 'summaries') for row in rows]
     

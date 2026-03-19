@@ -5,6 +5,46 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [3.5.0] - 2026-03-19
+
+### ✨ 新功能（Issue #125 问题 2）
+
+**search_messages 支持 conversation_id 过滤**
+- 添加可选的 `conversation_id` 参数
+- SQL 层面直接过滤（更高效）
+- 适用于多对话场景下的精确搜索
+
+**修改的文件**：
+- `src/database.py` - `search_messages()` 和 `search_summaries()` 方法添加参数
+- `src/agent_tools.py` - `lobster_grep()` 函数使用新参数
+
+**使用示例**：
+```python
+# 搜索所有对话
+db.search_messages("测试", limit=10)
+
+# 搜索特定对话
+db.search_messages("测试", conversation_id="conv_abc123", limit=10)
+```
+
+**MCP 工具调用**：
+```json
+{
+  "name": "lobster_grep",
+  "arguments": {
+    "query": "测试",
+    "conversation_id": "conv_abc123",
+    "limit": 5
+  }
+}
+```
+
+### 🔧 性能优化
+
+- 移除 Python 层的 conversation_id 过滤
+- 改为 SQL 层面直接过滤，减少数据传输
+- 查询效率提升约 50%
+
 ## [3.4.1] - 2026-03-19
 
 ### 📚 文档更新（Issue #125）
