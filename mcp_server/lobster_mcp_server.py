@@ -452,7 +452,34 @@ class LobsterPressMCPServer:
             token_budget = arguments["token_budget"]
             conversation_id = arguments["conversation_id"]
             force = arguments.get("force", False)
-
+            
+            # v4.0.11: Focus 主动触发机制（Issue #145）
+            turn_count = db.get_turn_count(conversation_id)
+            usage_ratio = current_tokens / token_budget if token_budget > 0 else 0
+            
+            # Focus 定时触发: 每 12 超时压缩一次
+            scheduled_trigger = (turn_count % 12 == 0) and (turn_count > 0)
+            
+            # Focus 紧急触发: 上下文使用率 > 85%
+            urgent_trigger = usage_ratio > 0.85
+            
+            # 决定是否执行压缩
+            should_compress = force or scheduled_trigger or urgent_trigger
+            
+            # 如果不应该压缩，直接返回
+            if not should_compress:
+                return {
+                    "compressed": False,
+                    "reason": "focus_skip",
+                    "conversation_id": conversation_id,
+                    "turn_count": turn_count,
+                    "usage_ratio": round(usage_ratio * 100, 2),
+                    "trigger_status": {
+                        "force": force,
+                        "scheduled": scheduled_trigger,
+                        "urgent": urgent_trigger
+                    }
+                }
             # v3.6.0: 删除死代码 threshold（Issue #126 Bug 2）
             # 阈值判断由 TypeScript 层负责，Python 层直接执行
 
@@ -485,7 +512,13 @@ class LobsterPressMCPServer:
                         "tokens_after": tokens_after,  # 真实值
                         "tokens_saved": tokens_saved,   # 真实值
                         "token_budget": token_budget,
-                        "attempt": attempt + 1
+                        "attempt": attempt + 1,
+                        "focus_trigger": {  # v4.0.11: 添加触发信息
+                            "turn_count": turn_count,
+                            "scheduled": scheduled_trigger,
+                            "urgent": urgent_trigger,
+                            "force": force
+                        }
                     }
                 except Exception as e:
                     last_error = str(e)
