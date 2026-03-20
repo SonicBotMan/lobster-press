@@ -5,6 +5,12 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.2] - 2026-03-20
+
+### Fixed
+- 修复 GitHub Actions release workflow 的 NPM_TOKEN secret 配置
+- 显式设置 .npmrc 文件以确保 npm publish 认证成功
+
 ## [4.0.1] - 2026-03-20
 
 ### Fixed
@@ -2344,9 +2350,3 @@ python incremental_compressor.py session.jsonl --progress
 - [GitHub Releases](https://github.com/SonicBotMan/lobster-press/releases)
 - [问题跟踪](https://github.com/SonicBotMan/lobster-press/issues)
 - [更新日志](https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md)
-
-## [4.0.2] - 2026-03-20
-
-### Fixed
-- 修复 GitHub Actions release workflow 的 NPM_TOKEN secret 配置
-- 显式设置 .npmrc 文件以确保 npm publish 认证成功
