@@ -19,7 +19,41 @@
 
 **最新版本**: [v4.0.11](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.11) · [更新日志](CHANGELOG.md)
 
-</div>
+---
+
+## 📦 安装
+
+> ⚠️ **重要**: LobsterPress 作为 OpenClaw 插件时，**必须全局安装**才能被 OpenClaw 发现。
+
+### OpenClaw 插件安装（推荐）
+
+```bash
+# 全局安装（必须）
+npm install -g @sonicbotman/lobster-press
+
+# 验证安装
+lobster-press --version
+```
+
+### 独立使用（Python 包）
+
+```bash
+# 本地安装
+pip install @sonicbotman/lobster-press
+
+# 或从源码安装
+git clone https://github.com/SonicBotMan/lobster-press.git
+cd lobster-press
+pip install -e .
+```
+
+### 故障排除
+
+**问题**: Gateway 启动失败，提示 `plugin not found: lobster-press`
+
+**解决**: 确保使用 `npm install -g` 全局安装，而不是在 workspace 中安装。OpenClaw 插件发现机制优先查找全局 node_modules。
+
+---
 
 ---
 
