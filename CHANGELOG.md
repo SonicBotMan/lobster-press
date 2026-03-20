@@ -5,6 +5,20 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.3] - 2026-03-20
+
+### Fixed
+- 修复 `save_summary` 未写入 `r3_layer` 和 `memory_tier` 字段（Issue #136 Bug 1）
+- 修复 `_row_to_dict`/`_execute_fetch_all` fallback 列表缺少 `r3_layer`（Issue #136 Bug 2）
+- 修复 `upsert_entity` 实体 ID 碰撞风险，改用 uuid4（Issue #136 Bug 3）
+- 修复 `sweep_decayed_messages` 误标未评分新消息，增加 7 天保护期（Issue #136 Bug 5）
+
+### Docs
+- 更新 `database.py` 文件头版本号为 v4.0.2（Issue #136 Bug 4）
+
+### Refactor
+- `migrate_v40` 移除重复字段，迁移链职责清晰化（Issue #136 Bug 6）
+
 ## [4.0.2] - 2026-03-20
 
 ### Fixed
