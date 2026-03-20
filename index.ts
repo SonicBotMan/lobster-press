@@ -241,6 +241,12 @@ const LobsterExpandSchema = Type.Object({
   max_depth: Type.Optional(Type.Number({ description: "最大展开层数，默认 2", default: 2 })),
 });
 
+// v4.0.6: 手动上下文检查工具（Issue #141 降级方案）
+const LobsterCheckContextSchema = Type.Object({
+  conversation_id: Type.Optional(Type.String({ description: "会话 ID" })),
+  force_compress: Type.Optional(Type.Boolean({ description: "是否强制压缩", default: false })),
+});
+
 // ─── Plugin Definition ────────────────────────────────────────────────────────
 
 const lobsterPlugin = {
@@ -303,6 +309,70 @@ const lobsterPlugin = {
       },
     });
 
+    // ── lobster_check_context (v4.0.6) ───────────────────────────────────────
+    // Issue #141 降级方案：手动检查上下文并触发压缩
+    api.registerTool({
+      name: "lobster_check_context",
+      label: "Lobster Check Context",
+      description:
+        "手动检查上下文使用率并触发压缩（降级方案）。" +
+        "当 OpenClaw Gateway 不支持 ContextEngine.afterTurn 钩子时使用。" +
+        "建议每隔几轮对话调用一次。",
+      parameters: LobsterCheckContextSchema,
+      execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+        // 获取当前上下文状态
+        const describeResult = await callMcp(pluginConfig, "lobster_describe", {
+          conversation_id: params.conversation_id,
+        });
+        
+        const stats = (describeResult.details as any)?.result;
+        const messageCount = stats?.message_count ?? 0;
+        const summaryCount = stats?.summary_count ?? 0;
+        
+        // 如果消息数太少，不需要压缩
+        if (messageCount < 10) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `📊 上下文检查：${messageCount} 条消息，无需压缩（< 10 条）`,
+              },
+            ],
+          };
+        }
+        
+        // 如果强制压缩或消息数较多，触发压缩
+        if (params.force_compress || messageCount > 50) {
+          api.logger.info(`[lobster-press] Manual context check: ${messageCount} messages, triggering compress`);
+          
+          const compressResult = await callMcp(pluginConfig, "lobster_compress", {
+            conversation_id: params.conversation_id,
+            force: true,
+          });
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: `✅ 上下文检查：${messageCount} 条消息，已触发压缩\n\n${JSON.stringify(compressResult.details, null, 2)}`,
+              },
+            ],
+          };
+        }
+        
+        // 否则只返回状态
+        return {
+          content: [
+            {
+              type: "text",
+              text: `📊 上下文检查：${messageCount} 条消息，${summaryCount} 条摘要\n\n` +
+                `建议：当消息数超过 50 条时，可设置 force_compress=true 触发压缩`,
+            },
+          ],
+        };
+      },
+    });
+
     // ── ContextEngine Registration (v3.3.0) ────────────────────────────────────
     // 参考 lossless-claw 的实现，注册为 ContextEngine，实现自动压缩
     const lobsterEngine = {
@@ -316,6 +386,9 @@ const lobsterPlugin = {
       // 关键：每次 turn 后自动检查上下文使用率
       // v4.0.0: Focus 主动压缩触发（定时 + 紧急 + 被动三策略）
       async afterTurn(params: any) {
+        // v4.0.6: 调试日志 - 确认 afterTurn 被调用（Issue #141 诊断）
+        api.logger.info(`[lobster-press] afterTurn called (sessionId=${params?.sessionId ?? "unknown"})`);
+
         // v4.0.0: Focus 主动压缩触发常量
         const FOCUS_COMPRESSION_INTERVAL = 12;  // 论文建议 10-15，取 12
         const FOCUS_URGENT_THRESHOLD = 0.85;    // 上下文使用率超过 85% 时立即触发
@@ -486,12 +559,18 @@ const lobsterPlugin = {
     // 注册为 ContextEngine
     api.registerContextEngine("lobster-press", () => lobsterEngine);
 
-    api.logger.info(
-      `[lobster-press] Plugin loaded (db=${pluginConfig.dbPath ?? "~/.openclaw/lobster.db"}, ` +
-      `provider=${pluginConfig.llmProvider ?? "none (extractive fallback)"})`
-    );
+    // v4.0.6: 调试日志 - 确认 ContextEngine 注册（Issue #141 诊断）
+    api.logger.info(`[lobster-press] Plugin loaded (db=${pluginConfig.dbPath ?? "~/.openclaw/lobster.db"}, ` +
+      `provider=${pluginConfig.llmProvider ?? "none (extractive fallback)"})`);
     api.logger.info(
       `[lobster-press] ContextEngine registered (threshold=${(pluginConfig.contextThreshold as number) ?? 0.8})`
+    );
+    api.logger.info(
+      `[lobster-press] DEBUG: ContextEngine.afterTurn should be called after each turn`
+    );
+    api.logger.warn(
+      `[lobster-press] DEBUG: If you don't see "[lobster-press] afterTurn called" logs, ` +
+      `your OpenClaw Gateway may not support ContextEngine.afterTurn hook`
     );
   },
 };
