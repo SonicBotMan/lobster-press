@@ -5,7 +5,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: v3.6.1
+Version: v4.0.2
 """
 
 import sqlite3
@@ -272,15 +272,15 @@ class LobsterDatabase:
     def migrate_v40(self):
         """v4.0.0 schema 迁移：R³Mem 可逆三层压缩
         
+        v4.0.2 修订：移除 v3.x 已处理的字段（memory_tier, namespace），
+        只保留 v4.0.0 真正新增的表和字段（Issue #136 Bug 6）
+        
         新增表：
         - entities: 实体追踪（人名、文件名、概念等）
         - entity_mentions: 实体-消息关联
         
         新增字段：
         - summaries.r3_layer: R³Mem 层级（1=document, 2=paragraph, 3=entity）
-        - summaries.memory_tier: 记忆层级（working/episodic/semantic）
-        - messages.memory_tier: 记忆层级（working/episodic/semantic）
-        - conversations.namespace: 命名空间
         
         Ref: arXiv:2502.15957 — R³Mem: Bridging Memory Retention and Retrieval
         """
@@ -308,18 +308,12 @@ class LobsterDatabase:
                 PRIMARY KEY (entity_id, message_id)
             );
             """,
-            # summaries 表增加 r3_layer 字段
+            # summaries 表增加 r3_layer 字段（仅 v4.0.0 新增）
             "ALTER TABLE summaries ADD COLUMN r3_layer INTEGER DEFAULT 1",
-            # summaries 表增加 memory_tier 字段
-            "ALTER TABLE summaries ADD COLUMN memory_tier TEXT DEFAULT 'episodic'",
-            # messages 表增加 memory_tier 字段
-            "ALTER TABLE messages ADD COLUMN memory_tier TEXT DEFAULT 'working'",
-            # conversations 表增加 namespace 字段
-            "ALTER TABLE conversations ADD COLUMN namespace TEXT DEFAULT 'default'",
             # 创建索引
             "CREATE INDEX IF NOT EXISTS idx_entities_conversation ON entities(conversation_id)",
             "CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(entity_name)",
-            "CREATE INDEX IF NOT EXISTS idx_conv_namespace ON conversations(namespace)",
+            # 注意：memory_tier 已由 migrate_v30 处理，namespace 已由 migrate_v31 处理
         ]
         
         for sql in migrations:
@@ -682,6 +676,8 @@ class LobsterDatabase:
         latest_at = summary.get('latest_at')
         descendant_count = summary.get('descendant_count', 0)
         created_at = datetime.utcnow().isoformat()
+        r3_layer = summary.get('r3_layer', 1)  # v4.0.0: R³Mem 层级
+        memory_tier = summary.get('memory_tier', 'episodic')  # v3.6.0: 记忆层级
         
         # Bug 1 修复：查询是否已存在
         self.cursor.execute(
@@ -690,14 +686,16 @@ class LobsterDatabase:
         existing = self.cursor.fetchone()
         old_rowid = existing[0] if existing else None
         
-        # 执行 UPSERT
+        # 执行 UPSERT（v4.0.2: 补充 r3_layer 和 memory_tier）
         self.cursor.execute("""
             INSERT OR REPLACE INTO summaries 
             (summary_id, conversation_id, kind, depth, content, token_count, 
-             earliest_at, latest_at, descendant_count, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             earliest_at, latest_at, descendant_count, created_at,
+             r3_layer, memory_tier)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (summary_id, conversation_id, kind, depth, content, token_count,
-              earliest_at, latest_at, descendant_count, created_at))
+              earliest_at, latest_at, descendant_count, created_at,
+              r3_layer, memory_tier))
         
         new_rowid = self.cursor.lastrowid
         
@@ -1018,7 +1016,8 @@ class LobsterDatabase:
         Ref: arXiv:2502.15957 — R³Mem: Bridging Memory Retention and Retrieval
         """
         now = datetime.utcnow().isoformat()
-        entity_id = f"ent_{hashlib.md5((conversation_id + entity_name).encode()).hexdigest()[:12]}"
+        # v4.0.2: 改用 uuid4 避免碰撞（Issue #136 Bug 3）
+        entity_id = f"ent_{uuid.uuid4().hex[:16]}"
         
         # 插入或更新实体
         self.cursor.execute("""
@@ -1058,18 +1057,21 @@ class LobsterDatabase:
         from datetime import datetime, timedelta
 
         cutoff_date = (datetime.utcnow() - timedelta(days=days_threshold)).isoformat()
+        # v4.0.2: 增加近期消息保护期（7 天），避免误标未评分的新消息（Issue #136 Bug 5）
+        protect_cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
 
-        # 查找符合衰减条件的消息（增加 conversation_id 过滤）
+        # 查找符合衰减条件的消息（增加 conversation_id 过滤 + 近期保护）
         self.cursor.execute("""
             SELECT message_id, tfidf_score, access_count, last_accessed_at
             FROM messages
             WHERE conversation_id = ?
               AND COALESCE(last_accessed_at, created_at) < ?
+              AND created_at < ?
               AND compression_exempt = 0
               AND tfidf_score < 0.1
             ORDER BY tfidf_score ASC, last_accessed_at ASC
             LIMIT 100
-        """, (conversation_id, cutoff_date))
+        """, (conversation_id, cutoff_date, protect_cutoff))
 
         candidates = [row[0] for row in self.cursor.fetchall()]
 
@@ -1322,7 +1324,8 @@ class LobsterDatabase:
                 columns = ['id', 'summary_id', 'conversation_id', 'kind', 'depth',
                           'content', 'token_count', 'earliest_at', 'latest_at',
                           'descendant_count', 'created_at',
-                          'memory_tier']  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
+                          'memory_tier',  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
+                          'r3_layer']     # v4.0.2: 添加 r3_layer（Issue #136 Bug 2）
             else:
                 columns = []
         
@@ -1369,7 +1372,8 @@ class LobsterDatabase:
                 columns = ['id', 'summary_id', 'conversation_id', 'kind', 'depth',
                           'content', 'token_count', 'earliest_at', 'latest_at',
                           'descendant_count', 'created_at',
-                          'memory_tier']  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
+                          'memory_tier',  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
+                          'r3_layer']     # v4.0.2: 添加 r3_layer（Issue #136 Bug 2）
             else:
                 return dict(row)
         
