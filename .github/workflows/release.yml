@@ -79,7 +79,7 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" > ~/.npmrc
+          npm config set //registry.npmjs.org/:_authToken $NPM_TOKEN
           npm publish --access public
 
   publish-gpr:
@@ -110,7 +110,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "//npm.pkg.github.com/:_authToken=$GITHUB_TOKEN" > ~/.npmrc
+          npm config set //npm.pkg.github.com/:_authToken $GITHUB_TOKEN
           npm publish
 
   notify:
