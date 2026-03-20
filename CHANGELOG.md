@@ -5,6 +5,15 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.5] - 2026-03-20
+
+### Fixed
+- 修复 database.py 文件头版本号持续滞后问题（Issue #138）
+
+### Added
+- 增加 version-check.yml workflow，自动校验版本号一致性
+- 更新 CONTRIBUTING.md，增加发布 Checklist
+
 ## [4.0.4] - 2026-03-20
 
 ### Fixed
