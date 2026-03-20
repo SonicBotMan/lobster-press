@@ -23,6 +23,13 @@
 
 ## 📦 安装
 
+### 系统要求
+
+- **OpenClaw Gateway**: 2026.3.9+（推荐，支持 afterTurn 钩子）
+- **ContextEngine.afterTurn**: 需要 2026.3.9+ 支持
+- **Node.js**: 18+
+- **Python**: 3.10+
+
 > ⚠️ **重要**: LobsterPress 作为 OpenClaw 插件时，**必须全局安装**才能被 OpenClaw 发现。
 
 ### OpenClaw 插件安装（推荐）
@@ -52,8 +59,6 @@ pip install -e .
 **问题**: Gateway 启动失败，提示 `plugin not found: lobster-press`
 
 **解决**: 确保使用 `npm install -g` 全局安装，而不是在 workspace 中安装。OpenClaw 插件发现机制优先查找全局 node_modules。
-
----
 
 ---
 
