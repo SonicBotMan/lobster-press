@@ -38,7 +38,7 @@ def test_deepseek():
         print(f"✅ 客户端创建成功")
         print(f"   Provider: DeepSeek")
         print(f"   Model: deepseek-chat")
-        print(f"   API Key: {DEEPSEEK_API_KEY[:10]}...")
+        # v4.0.9: 移除 API Key 打印（CodeQL 安全警告）
         
         # 调用 API
         print(f"\n📤 发送请求...")
@@ -82,7 +82,7 @@ def test_zhipu():
         print(f"✅ 客户端创建成功")
         print(f"   Provider: 智谱 GLM")
         print(f"   Model: glm-4-flash")
-        print(f"   API Key: {ZHIPU_API_KEY[:10]}...")
+        # v4.0.9: 移除 API Key 打印（CodeQL 安全警告）
         
         # 调用 API
         print(f"\n📤 发送请求...")
