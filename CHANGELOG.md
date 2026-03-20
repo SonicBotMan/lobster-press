@@ -5,6 +5,22 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.9] - 2026-03-20
+
+### Fixed
+- **P0-1**: 修复紧急压缩策略只打日志不执行压缩（Issue #142）
+- **P0-2**: 修复 prepareContext 防御线失效（latest_summary 字段不存在）
+- **P1**: 改进中文 Token 估算（中文字符按 1.5 token/字计算）
+
+### Changed
+- 紧急压缩现在会实际调用 callMcp 执行压缩
+- prepareContext 改用两步调用（先获取摘要结构，再获取摘要详情）
+- Token 估算更准确，压缩触发时机更及时
+
+---
+
+**影响**：Issue #141 在中文场景下现在能正确工作
+
 ## [4.0.8] - 2026-03-20
 
 ### Fixed
