@@ -5,6 +5,20 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.10] - 2026-03-20
+
+### Security
+- 修复 CodeQL 安全警告（敏感信息泄露 + 最小权限原则）
+- 移除 `test_real_llm.py` 中的 API Key 打印
+- 为所有 workflow 添加 `permissions` 声明
+
+### Changed
+- `test.yml`: 添加 `permissions: contents: read`
+- `version-check.yml`: 添加 `permissions: contents: read`
+- `release.yml`: 为所有 job 添加 permissions（最小权限原则）
+
+---
+
 ## [4.0.9] - 2026-03-20
 
 ### Fixed
