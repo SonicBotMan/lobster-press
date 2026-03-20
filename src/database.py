@@ -5,7 +5,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: v4.0.2
+Version: v4.0.3
 """
 
 import sqlite3
@@ -679,53 +679,54 @@ class LobsterDatabase:
         r3_layer = summary.get('r3_layer', 1)  # v4.0.0: R³Mem 层级
         memory_tier = summary.get('memory_tier', 'episodic')  # v3.6.0: 记忆层级
         
-        # Bug 1 修复：查询是否已存在
-        self.cursor.execute(
-            "SELECT id FROM summaries WHERE summary_id = ?", (summary_id,)
-        )
-        existing = self.cursor.fetchone()
-        old_rowid = existing[0] if existing else None
-        
-        # 执行 UPSERT（v4.0.2: 补充 r3_layer 和 memory_tier）
-        self.cursor.execute("""
-            INSERT OR REPLACE INTO summaries 
-            (summary_id, conversation_id, kind, depth, content, token_count, 
-             earliest_at, latest_at, descendant_count, created_at,
-             r3_layer, memory_tier)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (summary_id, conversation_id, kind, depth, content, token_count,
-              earliest_at, latest_at, descendant_count, created_at,
-              r3_layer, memory_tier))
-        
-        new_rowid = self.cursor.lastrowid
-        
-        # 维护 FTS5 索引：先删旧，再插新
-        if old_rowid is not None:
+        # v4.0.3: 使用事务保护，确保 FTS 与主表写入原子性（Issue #137 New Bug 2）
+        with self.conn:
+            # Bug 1 修复：查询是否已存在
             self.cursor.execute(
-                "DELETE FROM summaries_fts WHERE rowid = ?", (old_rowid,)
+                "SELECT id FROM summaries WHERE summary_id = ?", (summary_id,)
             )
-        self.cursor.execute(
-            "INSERT INTO summaries_fts (rowid, summary_id, content) VALUES (?, ?, ?)",
-            (new_rowid, summary_id, content)
-        )
+            existing = self.cursor.fetchone()
+            old_rowid = existing[0] if existing else None
+            
+            # 执行 UPSERT（v4.0.2: 补充 r3_layer 和 memory_tier）
+            self.cursor.execute("""
+                INSERT OR REPLACE INTO summaries 
+                (summary_id, conversation_id, kind, depth, content, token_count, 
+                 earliest_at, latest_at, descendant_count, created_at,
+                 r3_layer, memory_tier)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (summary_id, conversation_id, kind, depth, content, token_count,
+                  earliest_at, latest_at, descendant_count, created_at,
+                  r3_layer, memory_tier))
+            
+            new_rowid = self.cursor.lastrowid
+            
+            # 维护 FTS5 索引：先删旧，再插新
+            if old_rowid is not None:
+                self.cursor.execute(
+                    "DELETE FROM summaries_fts WHERE rowid = ?", (old_rowid,)
+                )
+            self.cursor.execute(
+                "INSERT INTO summaries_fts (rowid, summary_id, content) VALUES (?, ?, ?)",
+                (new_rowid, summary_id, content)
+            )
+            
+            # 保存关系
+            if kind == 'leaf':
+                # 叶子摘要：关联消息
+                for msg_id in summary.get('source_messages', []):
+                    self.cursor.execute("""
+                        INSERT OR IGNORE INTO summary_messages (summary_id, message_id)
+                        VALUES (?, ?)
+                    """, (summary_id, msg_id))
+            else:
+                # 压缩摘要：关联父摘要
+                for parent_id in summary.get('parent_summaries', []):
+                    self.cursor.execute("""
+                        INSERT OR IGNORE INTO summary_parents (summary_id, parent_summary_id)
+                        VALUES (?, ?)
+                    """, (summary_id, parent_id))
         
-        # 保存关系
-        if kind == 'leaf':
-            # 叶子摘要：关联消息
-            for msg_id in summary.get('source_messages', []):
-                self.cursor.execute("""
-                    INSERT OR IGNORE INTO summary_messages (summary_id, message_id)
-                    VALUES (?, ?)
-                """, (summary_id, msg_id))
-        else:
-            # 压缩摘要：关联父摘要
-            for parent_id in summary.get('parent_summaries', []):
-                self.cursor.execute("""
-                    INSERT OR IGNORE INTO summary_parents (summary_id, parent_summary_id)
-                    VALUES (?, ?)
-                """, (summary_id, parent_id))
-        
-        self.conn.commit()
         return summary_id
     
     def get_summaries(self, conversation_id: str, depth: int = None) -> List[Dict]:
@@ -928,59 +929,54 @@ class LobsterDatabase:
         # 生成纠错 ID
         correction_id = f"corr_{uuid.uuid4().hex[:16]}"
         created_at = datetime.utcnow().isoformat()
-
-        # 记录纠错
-        self.cursor.execute("""
-            INSERT INTO corrections 
-            (correction_id, target_type, target_id, correction_type, old_value, new_value, reason, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (correction_id, target_type, target_id, correction_type, old_value, new_value, reason, created_at))
-
-        # 应用纠错
-        table = 'messages' if target_type == 'message' else 'summaries'
-        id_field = 'message_id' if target_type == 'message' else 'summary_id'
-        fts_table = 'messages_fts' if target_type == 'message' else 'summaries_fts'
-
-        if correction_type == 'delete':
-            # 先查 rowid（Issue #129 Bug 3 修复）
-            self.cursor.execute(f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,))
-            row = self.cursor.fetchone()
-            if row:
-                # 删除 FTS 索引
-                self.cursor.execute(f"DELETE FROM {fts_table} WHERE rowid = ?", (row[0],))
-            # 删除主表记录
-            self.cursor.execute(f"DELETE FROM {table} WHERE {id_field} = ?", (target_id,))
-        elif correction_type == 'content':
-            # 先查 rowid（Issue #129 Bug 4 修复）
-            self.cursor.execute(f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,))
-            row = self.cursor.fetchone()
-            if row:
-                old_rowid = row[0]
-                # 更新主表内容
-                self.cursor.execute(f"UPDATE {table} SET content = ? WHERE {id_field} = ?",
-                                    (new_value, target_id))
-                # 同步 FTS：删除旧记录
-                self.cursor.execute(f"DELETE FROM {fts_table} WHERE rowid = ?", (old_rowid,))
-                # 插入新记录
-                self.cursor.execute(
-                    f"INSERT INTO {fts_table} (rowid, {id_field}, content) VALUES (?, ?, ?)",
-                    (old_rowid, target_id, new_value)
-                )
-            else:
-                # 如果记录不存在，只更新主表
-                self.cursor.execute(f"UPDATE {table} SET content = ? WHERE {id_field} = ?",
-                                    (new_value, target_id))
-        elif correction_type == 'metadata':
-            # 修改元数据
-            self.cursor.execute(f"UPDATE {table} SET metadata = ? WHERE {id_field} = ?", (new_value, target_id))
-
-        # 更新 applied_at
         applied_at = datetime.utcnow().isoformat()
-        self.cursor.execute("""
-            UPDATE corrections SET applied_at = ? WHERE correction_id = ?
-        """, (applied_at, correction_id))
 
-        self.conn.commit()
+        # v4.0.3: 使用整体事务保护，纠错日志与修改原子提交（Issue #137 New Bug 3）
+        with self.conn:
+            # 记录纠错（直接带 applied_at，避免两次 UPDATE）
+            self.cursor.execute("""
+                INSERT INTO corrections 
+                (correction_id, target_type, target_id, correction_type, old_value, new_value, reason, created_at, applied_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (correction_id, target_type, target_id, correction_type, old_value, new_value, reason, created_at, applied_at))
+
+            # 应用纠错
+            table = 'messages' if target_type == 'message' else 'summaries'
+            id_field = 'message_id' if target_type == 'message' else 'summary_id'
+            fts_table = 'messages_fts' if target_type == 'message' else 'summaries_fts'
+
+            if correction_type == 'delete':
+                # 先查 rowid（Issue #129 Bug 3 修复）
+                self.cursor.execute(f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,))
+                row = self.cursor.fetchone()
+                if row:
+                    # 删除 FTS 索引
+                    self.cursor.execute(f"DELETE FROM {fts_table} WHERE rowid = ?", (row[0],))
+                # 删除主表记录
+                self.cursor.execute(f"DELETE FROM {table} WHERE {id_field} = ?", (target_id,))
+            elif correction_type == 'content':
+                # 先查 rowid（Issue #129 Bug 4 修复）
+                self.cursor.execute(f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,))
+                row = self.cursor.fetchone()
+                if row:
+                    old_rowid = row[0]
+                    # 更新主表内容
+                    self.cursor.execute(f"UPDATE {table} SET content = ? WHERE {id_field} = ?",
+                                        (new_value, target_id))
+                    # 同步 FTS：删除旧记录
+                    self.cursor.execute(f"DELETE FROM {fts_table} WHERE rowid = ?", (old_rowid,))
+                    # 插入新记录
+                    self.cursor.execute(
+                        f"INSERT INTO {fts_table} (rowid, {id_field}, content) VALUES (?, ?, ?)",
+                        (old_rowid, target_id, new_value)
+                    )
+                else:
+                    # 如果记录不存在，只更新主表
+                    self.cursor.execute(f"UPDATE {table} SET content = ? WHERE {id_field} = ?",
+                                        (new_value, target_id))
+            elif correction_type == 'metadata':
+                # 修改元数据
+                self.cursor.execute(f"UPDATE {table} SET metadata = ? WHERE {id_field} = ?", (new_value, target_id))
 
         return {
             "correction_id": correction_id,
@@ -1016,8 +1012,9 @@ class LobsterDatabase:
         Ref: arXiv:2502.15957 — R³Mem: Bridging Memory Retention and Retrieval
         """
         now = datetime.utcnow().isoformat()
-        # v4.0.2: 改用 uuid4 避免碰撞（Issue #136 Bug 3）
-        entity_id = f"ent_{uuid.uuid4().hex[:16]}"
+        # v4.0.3: 改用 SHA-256[:24] 恢复幂等性（Issue #137 New Bug 1）
+        # 兼顾无碰撞（96 bit）和幂等性（相同输入产生相同 ID）
+        entity_id = f"ent_{hashlib.sha256((namespace + conversation_id + entity_name).encode()).hexdigest()[:24]}"
         
         # 插入或更新实体
         self.cursor.execute("""
