@@ -20,6 +20,14 @@
     "freshTailCount": {
       "label": "Fresh Tail Count",
       "help": "受保护、不参与压缩的最近消息条数（默认 32）"
+    },
+    "namespace": {
+      "label": "Namespace",
+      "help": "记忆命名空间（用于多 Agent/项目隔离，默认：default）"
+    },
+    "maxContextTokens": {
+      "label": "Max Context Tokens",
+      "help": "最大上下文 token 数（默认 128000，Claude=200000，Gemini=1000000）"
     }
   },
   "configSchema": {
@@ -33,7 +41,9 @@
       "dbPath":           { "type": "string" },
       "contextThreshold": { "type": "number", "minimum": 0, "maximum": 1 },
       "freshTailCount":   { "type": "integer", "minimum": 1 },
-      "leafChunkTokens":  { "type": "integer", "minimum": 1000 }
+      "leafChunkTokens":  { "type": "integer", "minimum": 1000 },
+      "namespace":        { "type": "string", "default": "default" },
+      "maxContextTokens": { "type": "integer", "minimum": 10000, "default": 128000 }
     }
   }
 }
