@@ -53,27 +53,6 @@ jobs:
             htmlcov/
             coverage.xml
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        if: matrix.python-version == '3.11'
-        with:
-          files: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  test-node:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: ['18', '20', '22']
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}

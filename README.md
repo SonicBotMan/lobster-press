@@ -14,7 +14,6 @@
 
 [![Test](https://github.com/SonicBotMan/lobster-press/workflows/Test/badge.svg)](https://github.com/SonicBotMan/lobster-press/actions/workflows/test.yml)
 [![Release](https://github.com/SonicBotMan/lobster-press/workflows/Release/badge.svg)](https://github.com/SonicBotMan/lobster-press/actions/workflows/release.yml)
-[![codecov](https://codecov.io/gh/SonicBotMan/lobster-press/branch/master/graph/badge.svg)](https://codecov.io/gh/SonicBotMan/lobster-press)
 
 **中文** | [English](README_EN.md)
 
