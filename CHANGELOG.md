@@ -5,6 +5,11 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.8] - 2026-03-20
+
+### Fixed
+- 修复 `lobster_check_context` 返回类型，添加 `details` 属性（修复 CI 编译错误）
+
 ## [4.0.7] - 2026-03-20
 
 ### Fixed
