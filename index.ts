@@ -375,6 +375,7 @@ const lobsterPlugin = {
 
     // ── ContextEngine Registration (v3.3.0) ────────────────────────────────────
     // 参考 lossless-claw 的实现，注册为 ContextEngine，实现自动压缩
+    // v4.0.7: 必须同时注册 "default"，阻止 OpenClaw 内置压缩抢先运行（Issue #141 评论）
     const lobsterEngine = {
       info: {
         id: "lobster-press",
@@ -554,10 +555,39 @@ const lobsterPlugin = {
           return { messages: p.messages as any[], estimatedTokens: 0 };
         }
       },
+
+      // v4.0.7: prepareContext 防御线（Issue #141 评论）
+      // 每轮对话开始前，OpenClaw 自动调用，将最新摘要注入 system prompt
+      async prepareContext(params: { sessionId?: string; sessionKey?: string }) {
+        const sessionId = params.sessionId || params.sessionKey;
+        if (!sessionId) {
+          return null;
+        }
+
+        try {
+          // 调用 lobster_describe 获取最新摘要
+          const result = await callMcp(pluginConfig, "lobster_describe", {
+            conversation_id: sessionId,
+          });
+
+          const summaryText = (result.details as any)?.result?.latest_summary;
+          if (!summaryText) {
+            return null;
+          }
+
+          // 返回摘要内容，注入到 system prompt
+          return `[Memory Context]\n${summaryText}`;
+        } catch (error) {
+          api.logger.error(`[lobster-press] prepareContext failed: ${error}`);
+          return null;
+        }
+      },
     };
 
     // 注册为 ContextEngine
+    // v4.0.7: 必须同时注册 "default"，阻止 OpenClaw 内置压缩抢先运行（Issue #141 评论）
     api.registerContextEngine("lobster-press", () => lobsterEngine);
+    api.registerContextEngine("default", () => lobsterEngine);  // ← 关键：抢占 default
 
     // v4.0.6: 调试日志 - 确认 ContextEngine 注册（Issue #141 诊断）
     api.logger.info(`[lobster-press] Plugin loaded (db=${pluginConfig.dbPath ?? "~/.openclaw/lobster.db"}, ` +
