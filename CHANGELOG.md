@@ -5,6 +5,22 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.1] - 2026-03-20
+
+### Fixed
+- 修复 GitHub Actions 工作流 YAML 语法错误（缺少 `- name:`）
+- 修复 Node.js 依赖安装问题（`npm ci` → `npm install`）
+- 添加 `package.json` test 脚本（解决 `npm test` 失败）
+- 暂时移除 Python 3.12 测试（tiktoken 兼容性问题）
+
+### CI/CD
+- 添加完整的 GitHub Actions CI/CD 流程
+  - Test workflow: Python 单元测试 + 集成测试 + Node.js 测试
+  - Release workflow: 自动发布到 npm
+  - Dependabot: 自动依赖更新
+- 测试覆盖率：44.62%（56 个测试通过）
+- 添加 CI/CD 徽章到 README
+
 ## [4.0.0] - 2026-03-19 -「深海」版本
 
 ### 🎯 核心目标
