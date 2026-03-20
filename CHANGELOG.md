@@ -5,6 +5,16 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.4] - 2026-03-20
+
+### Fixed
+- 修复 `upsert_entity` 改用 uuid4 后 ON CONFLICT 幂等性失效，改用 SHA-256[:24]（Issue #137 New Bug 1）
+- 修复 `save_summary` 缺少事务保护，FTS 与主表写入不原子（Issue #137 New Bug 2）
+- 修复 `apply_correction` 缺少整体事务，纠错日志与修改原子提交（Issue #137 New Bug 3）
+
+### Docs
+- 更新 `database.py` 文件头版本号为 v4.0.3（Issue #137 遗留 Bug）
+
 ## [4.0.3] - 2026-03-20
 
 ### Fixed
