@@ -63,7 +63,9 @@ class DAGCompressor:
     
     # ==================== 叶子压缩 ====================
     
-    def leaf_compact(self, conversation_id: str, max_tokens: int = None, skip_message_ids: List[str] = None) -> Optional[Dict]:
+    def leaf_compact(self, conversation_id: str, max_tokens: int = None, 
+                     skip_message_ids: List[str] = None,
+                     preprocessed_messages: List[Dict] = None) -> Optional[Dict]:
         """叶子压缩：消息 → 叶子摘要
         
         借鉴 lossless-claw 的 leaf pass：
@@ -77,6 +79,7 @@ class DAGCompressor:
             conversation_id: 对话 ID
             max_tokens: 最大 token 数（默认 leaf_chunk_tokens）
             skip_message_ids: 要跳过的消息 ID 列表（Bug 6 修复：支持 compression_exempt）
+            preprocessed_messages: v4.0.12 预处理后的消息（ThreePassTrimmer 结果）
         
         Returns:
             最后一个情节的摘要（v2.6.0 改为多情节分割），
@@ -88,8 +91,12 @@ class DAGCompressor:
         
         skip_message_ids = set(skip_message_ids or [])  # Bug 6: 转为 set 提高查询效率
         
-        # 1. 获取所有消息
-        messages = self.db.get_messages(conversation_id)
+        # v4.0.12: 优先使用传入的预处理消息，否则从数据库读（Issue #150 Bug #2）
+        if preprocessed_messages is not None:
+            messages = preprocessed_messages
+        else:
+            # 1. 获取所有消息
+            messages = self.db.get_messages(conversation_id)
         
         if len(messages) <= self.fresh_tail_count:
             print(f"⚠️ 消息数 ({len(messages)}) ≤ fresh tail ({self.fresh_tail_count})，无需压缩")
@@ -449,14 +456,20 @@ class DAGCompressor:
             return False
         
         # v4.0.0: 压缩前先执行 CMV 三遍无损压缩
+        # v4.0.12: 修复 trimmer 结果被丢弃的 bug（Issue #150 Bug #2）
         trimmed, stats = self.db.trimmer.trim(messages)
+        messages_for_compress = None  # 预处理后的消息
+        
         if stats['reduction_pct'] > 0:
             print(f"[ThreePassTrimmer] reduction: {stats['reduction_pct']}%", file=sys.stderr)
-            messages = trimmed  # 用压缩后的版本做摘要
+            messages_for_compress = trimmed  # 用压缩后的版本做摘要
         
-        # 2. 执行叶子压缩
+        # 2. 执行叶子压缩（传递预处理消息）
         print(f"\n🚀 开始叶子压缩...")
-        leaf_summary = self.leaf_compact(conversation_id)
+        leaf_summary = self.leaf_compact(
+            conversation_id,
+            preprocessed_messages=messages_for_compress
+        )
         
         if not leaf_summary:
             return False

@@ -1399,11 +1399,13 @@ class LobsterDatabase:
         conversation_id = self._generate_id('conv')
         created_at = datetime.utcnow().isoformat()
         
-        # 插入对话记录
-        self.cursor.execute("""
-            INSERT OR IGNORE INTO conversations (conversation_id, created_at, updated_at, metadata)
-            VALUES (?, ?, ?, ?)
-        """, (conversation_id, created_at, created_at, json.dumps(metadata or {})))
+        # v4.0.12: 添加事务保护（Issue #150 Bug #3）
+        with self.conn:
+            # 插入对话记录
+            self.cursor.execute("""
+                INSERT OR IGNORE INTO conversations (conversation_id, created_at, updated_at, metadata)
+                VALUES (?, ?, ?, ?)
+            """, (conversation_id, created_at, created_at, json.dumps(metadata or {})))
         
         return conversation_id
     

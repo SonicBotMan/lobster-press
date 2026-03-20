@@ -73,6 +73,9 @@ class LobsterPressMCPServer:
         self.namespace = namespace  # v3.6.0 新增
         self._db = None  # 懒加载数据库连接
         
+        # v4.0.12: Focus 定时触发的会话轮次计数器（Issue #150 Bug #5）
+        self._turn_counters: dict = {}  # conversation_id -> turn_count_since_last_compress
+        
         # 统计数据
         self.stats = {
             "total_compressions": 0,
@@ -453,12 +456,15 @@ class LobsterPressMCPServer:
             conversation_id = arguments["conversation_id"]
             force = arguments.get("force", False)
             
-            # v4.0.11: Focus 主动触发机制（Issue #145）
-            turn_count = db.get_turn_count(conversation_id)
+            # v4.0.12: Focus 主动触发机制（Issue #145, #150 Bug #5）
+            # 使用内存计数器而非数据库历史总数
+            conv_turns = self._turn_counters.get(conversation_id, 0) + 1
+            self._turn_counters[conversation_id] = conv_turns
+            
             usage_ratio = current_tokens / token_budget if token_budget > 0 else 0
             
-            # Focus 定时触发: 每 12 超时压缩一次
-            scheduled_trigger = (turn_count % 12 == 0) and (turn_count > 0)
+            # Focus 定时触发: 每 12 轮主动压缩一次（修复注释笔误）
+            scheduled_trigger = (conv_turns % 12 == 0)
             
             # Focus 紧急触发: 上下文使用率 > 85%
             urgent_trigger = usage_ratio > 0.85
@@ -472,7 +478,7 @@ class LobsterPressMCPServer:
                     "compressed": False,
                     "reason": "focus_skip",
                     "conversation_id": conversation_id,
-                    "turn_count": turn_count,
+                    "turn_count": conv_turns,
                     "usage_ratio": round(usage_ratio * 100, 2),
                     "trigger_status": {
                         "force": force,
@@ -505,6 +511,10 @@ class LobsterPressMCPServer:
                     tokens_after = sum(m.get('token_count', 0) for m in messages_after)
                     tokens_saved = current_tokens - tokens_after
 
+                    # v4.0.12: 巻加触发信息 + 重置计数器
+                    if did_compress:
+                        self._turn_counters[conversation_id] = 0  # 重置计数器
+                    
                     return {
                         "compressed": did_compress,
                         "conversation_id": conversation_id,
@@ -513,8 +523,8 @@ class LobsterPressMCPServer:
                         "tokens_saved": tokens_saved,   # 真实值
                         "token_budget": token_budget,
                         "attempt": attempt + 1,
-                        "focus_trigger": {  # v4.0.11: 添加触发信息
-                            "turn_count": turn_count,
+                        "focus_trigger": {
+                            "turn_count": conv_turns,
                             "scheduled": scheduled_trigger,
                             "urgent": urgent_trigger,
                             "force": force
@@ -627,11 +637,19 @@ class LobsterPressMCPServer:
                 db.cursor.execute("SELECT COUNT(*) FROM entities")
             entity_count = db.cursor.fetchone()[0]
 
-            # 纠错记录数（使用参数化查询）
+            # 纠错记录数（v4.0.12: 修复字段不存在问题，Issue #150 Bug #4）
             correction_count = 0
             try:
                 if conv_id:
-                    db.cursor.execute("SELECT COUNT(*) FROM corrections WHERE conversation_id = ?", (conv_id,))
+                    # corrections 表无 conversation_id，需通过 target_id 关联查询
+                    db.cursor.execute("""
+                        SELECT COUNT(*) FROM corrections
+                        WHERE target_id IN (
+                            SELECT message_id FROM messages WHERE conversation_id = ?
+                            UNION
+                            SELECT summary_id FROM summaries WHERE conversation_id = ?
+                        )
+                    """, (conv_id, conv_id))
                 else:
                     db.cursor.execute("SELECT COUNT(*) FROM corrections")
                 correction_count = db.cursor.fetchone()[0]
@@ -672,10 +690,18 @@ class LobsterPressMCPServer:
                 }
 
             # 实际删除
+            # v4.0.12: 修复 FTS 删除使用 rowid 而非 message_id（Issue #150 Bug #1）
             deleted_count = 0
             for msg_id, _ in decayed_messages:
+                # 先查 rowid
+                db.cursor.execute("SELECT id FROM messages WHERE message_id = ?", (msg_id,))
+                row = db.cursor.fetchone()
+                if row:
+                    rowid = row[0]
+                    # 用 rowid 删除 FTS 记录
+                    db.cursor.execute("DELETE FROM messages_fts WHERE rowid = ?", (rowid,))
+                # 删除主表记录
                 db.cursor.execute("DELETE FROM messages WHERE message_id = ?", (msg_id,))
-                db.cursor.execute("DELETE FROM messages_fts WHERE message_id = ?", (msg_id,))
                 deleted_count += 1
             db.conn.commit()
 
