@@ -2344,3 +2344,9 @@ python incremental_compressor.py session.jsonl --progress
 - [GitHub Releases](https://github.com/SonicBotMan/lobster-press/releases)
 - [问题跟踪](https://github.com/SonicBotMan/lobster-press/issues)
 - [更新日志](https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md)
+
+## [4.0.2] - 2026-03-20
+
+### Fixed
+- 修复 GitHub Actions release workflow 的 NPM_TOKEN secret 配置
+- 显式设置 .npmrc 文件以确保 npm publish 认证成功
