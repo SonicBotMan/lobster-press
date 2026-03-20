@@ -5,6 +5,19 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.6] - 2026-03-20
+
+### Added
+- 新增 `lobster_check_context` 手动检查工具（Issue #141 降级方案）
+- 在 register 和 afterTurn 入口添加调试日志
+
+### Debug
+- 添加警告日志，提示用户检查 OpenClaw Gateway 版本
+- 如果 afterTurn 未被调用，可使用 lobster_check_context 手动触发
+
+### Fixed
+- 诊断 afterTurn 钩子未被调用的问题
+
 ## [4.0.5] - 2026-03-20
 
 ### Fixed
