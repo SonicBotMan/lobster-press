@@ -5,7 +5,7 @@ LobsterPress 增量压缩管理器
 借鉴 lossless-claw 的增量压缩机制
 
 Author: LobsterPress Team
-Version: v3.0.0
+Version: v4.0.12
 """
 
 import sys
