@@ -404,7 +404,7 @@ const lobsterPlugin = {
         // v4.0.0: 获取轮次数
         const turnCount = await this._getTurnCount(params.sessionId);
 
-        // 估算当前 token 数量（从 messages 中）
+        // v4.0.9: 改进估算 - 中文字符按 1.5 token/字计算（Issue #142 P1）
         const currentTokenCount = (params.messages || []).reduce((total: number, msg: any) => {
           let content = "";
           if (typeof msg.content === "string") {
@@ -412,8 +412,13 @@ const lobsterPlugin = {
           } else if (Array.isArray(msg.content)) {
             content = msg.content.map((c: any) => c.text || "").join("");
           }
-          // 粗略估算：1 token ≈ 4 字符
-          return total + Math.ceil(content.length / 4);
+          
+          // 改进估算：中文字符按 1.5 token/字计算
+          const chineseCharCount = (content.match(/[\u4e00-\u9fff]/g) || []).length;
+          const otherCharCount = content.length - chineseCharCount;
+          const estimated = Math.ceil(chineseCharCount * 1.5 + otherCharCount / 4);
+          
+          return total + estimated;
         }, 0);
 
         const ratio = currentTokenCount / tokenBudget;
@@ -439,10 +444,17 @@ const lobsterPlugin = {
         // ── Focus 策略二：紧急触发（上下文使用率过高）──
         if (ratio > FOCUS_URGENT_THRESHOLD) {
           api.logger.warn(
-            `[lobster-press] URGENT: Context at ${(ratio * 100).toFixed(1)}% capacity - manual compression recommended`
+            `[lobster-press] URGENT compression triggered: context at ${(ratio * 100).toFixed(1)}%`
           );
-
-          // v4.0.0: 紧急警告，但不强制中断（让 Agent 决定是否压缩）
+          
+          // v4.0.9: 修复 P0-1 - 紧急压缩必须执行，不能只打日志（Issue #142）
+          await callMcp(pluginConfig, "lobster_compress", {
+            conversation_id: params.sessionId,
+            current_tokens: currentTokenCount,
+            token_budget: tokenBudget,
+            strategy: "urgent",
+            force: true,
+          });
           return;
         }
 
@@ -560,6 +572,7 @@ const lobsterPlugin = {
       },
 
       // v4.0.7: prepareContext 防御线（Issue #141 评论）
+      // v4.0.9: 修复 P0-2 - latest_summary 字段不存在，改用两步调用（Issue #142）
       // 每轮对话开始前，OpenClaw 自动调用，将最新摘要注入 system prompt
       async prepareContext(params: { sessionId?: string; sessionKey?: string }) {
         const sessionId = params.sessionId || params.sessionKey;
@@ -568,18 +581,33 @@ const lobsterPlugin = {
         }
 
         try {
-          // 调用 lobster_describe 获取最新摘要
-          const result = await callMcp(pluginConfig, "lobster_describe", {
+          // 第一步：调用 lobster_describe 获取摘要结构
+          const describe = await callMcp(pluginConfig, "lobster_describe", {
             conversation_id: sessionId,
           });
-
-          const summaryText = (result.details as any)?.result?.latest_summary;
-          if (!summaryText) {
+          
+          const byDepth = (describe.details as any)?.result?.by_depth ?? {};
+          const depths = Object.keys(byDepth).map(Number).sort((a, b) => b - a);
+          
+          // 如果没有摘要，返回 null
+          if (depths.length === 0) {
             return null;
           }
-
-          // 返回摘要内容，注入到 system prompt
-          return `[Memory Context]\n${summaryText}`;
+          
+          // 获取最高深度的第一个摘要的 summary_id
+          const topSummaryId = byDepth[depths[0]]?.[0]?.summary_id;
+          if (!topSummaryId) {
+            return null;
+          }
+          
+          // 第二步：调用 lobster_describe 获取摘要详情
+          const detail = await callMcp(pluginConfig, "lobster_describe", {
+            conversation_id: sessionId,
+            summary_id: topSummaryId,
+          });
+          
+          const content = (detail.details as any)?.result?.content;
+          return content ? `[Memory Context]\n${content}` : null;
         } catch (error) {
           api.logger.error(`[lobster-press] prepareContext failed: ${error}`);
           return null;
