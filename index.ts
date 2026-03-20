@@ -338,6 +338,7 @@ const lobsterPlugin = {
                 text: `📊 上下文检查：${messageCount} 条消息，无需压缩（< 10 条）`,
               },
             ],
+            details: { message_count: messageCount, action: "none" },
           };
         }
         
@@ -357,6 +358,7 @@ const lobsterPlugin = {
                 text: `✅ 上下文检查：${messageCount} 条消息，已触发压缩\n\n${JSON.stringify(compressResult.details, null, 2)}`,
               },
             ],
+            details: { message_count: messageCount, action: "compressed", compress_result: compressResult.details },
           };
         }
         
@@ -369,6 +371,7 @@ const lobsterPlugin = {
                 `建议：当消息数超过 50 条时，可设置 force_compress=true 触发压缩`,
             },
           ],
+          details: { message_count: messageCount, summary_count: summaryCount, action: "none" },
         };
       },
     });
