@@ -161,6 +161,49 @@ Dependabot 每周自动检查依赖更新：
 - [ ] 提交信息清晰
 - [ ] 没有引入新的 lint 错误
 
+## 📦 发布 Checklist
+
+发布新版本前，请确保完成以下检查：
+
+### 版本号一致性检查
+
+- [ ] **package.json**: `version` 字段已更新
+- [ ] **README.md**: 版本号引用已更新
+- [ ] **CHANGELOG.md**: 新版本变更记录已添加
+- [ ] **src/database.py**: 文件头 `Version:` 已更新为当前版本（**重要！**）
+
+### 自动化检查
+
+CI 会自动检查版本号一致性（`.github/workflows/version-check.yml`）：
+
+- Tag 触发时，检查 `database.py` 文件头版本号与 tag 是否一致
+- 检查 `package.json` 与 `database.py` 版本号是否一致
+
+### 常见错误
+
+**❌ 错误做法**：将版本号改为「提 Issue 时的基准版本」
+
+```python
+# 错误示例：当前发布 v4.0.4，但文件头写 v4.0.3
+Version: v4.0.3  # ❌ 滞后一格
+```
+
+**✅ 正确做法**：将版本号改为「当前正在发布的版本」
+
+```python
+# 正确示例：当前发布 v4.0.4，文件头也写 v4.0.4
+Version: v4.0.4  # ✅ 与 tag 一致
+```
+
+### 发布流程
+
+1. 更新所有版本号（package.json, README.md, CHANGELOG.md, database.py）
+2. 提交代码：`git commit -m "chore: 发布 vX.Y.Z"`
+3. 创建 tag：`git tag vX.Y.Z`
+4. 推送：`git push origin master --tags`
+5. 创建 GitHub Release
+6. 等待 CI 自动发布到 npm
+
 ## 📚 相关资源
 
 - [GitHub Actions 文档](https://docs.github.com/en/actions)

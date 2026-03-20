@@ -1,0 +1,51 @@
+name: Version Check
+
+on:
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [master]
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Check database.py version matches tag
+        run: |
+          # 从文件头提取版本号
+          FILE_VER=$(grep '^Version:' src/database.py | awk '{print $2}')
+          
+          # 从 git tag 获取当前版本（仅 tag 触发时）
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            GIT_TAG=${GITHUB_REF#refs/tags/}
+            if [ "$FILE_VER" != "$GIT_TAG" ]; then
+              echo "❌ 版本号不一致：database.py=$FILE_VER, tag=$GIT_TAG"
+              echo "请更新 src/database.py 文件头的 Version: 字段为 $GIT_TAG"
+              exit 1
+            fi
+            echo "✅ 版本号一致：$FILE_VER"
+          else
+            echo "ℹ️  非 tag 触发，跳过版本号检查"
+            echo "当前 database.py 版本号：$FILE_VER"
+          fi
+      
+      - name: Check package.json version consistency
+        run: |
+          # 从 package.json 提取版本号
+          PKG_VER=$(node -p "require('./package.json').version")
+          
+          # 从文件头提取版本号
+          FILE_VER=$(grep '^Version:' src/database.py | awk '{print $2}')
+          
+          # 去掉 v 前缀比较
+          FILE_VER_NUM=${FILE_VER#v}
+          
+          if [ "$PKG_VER" != "$FILE_VER_NUM" ]; then
+            echo "⚠️  版本号不一致：package.json=$PKG_VER, database.py=$FILE_VER"
+            echo "建议统一版本号"
+          else
+            echo "✅ package.json 与 database.py 版本号一致：$PKG_VER"
+          fi
