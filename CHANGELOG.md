@@ -5,6 +5,17 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.7] - 2026-03-20
+
+### Fixed
+- **根本修复**: 同时注册 "default" ContextEngine，阻止 OpenClaw 内置压缩抢先运行（Issue #141 评论）
+- 添加 `prepareContext` 方法，每轮对话前注入最新摘要（防御线）
+
+### Architecture
+- 完整防御体系：
+  - `prepareContext` (对话前) → 注入摘要到 system prompt
+  - `afterTurn` (对话后) → 三级策略触发压缩
+
 ## [4.0.6] - 2026-03-20
 
 ### Added
