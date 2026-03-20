@@ -53,9 +53,10 @@ jobs:
             htmlcov/
             coverage.xml
 
+      - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
