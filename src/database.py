@@ -5,7 +5,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: v4.0.12
+Version: v4.0.13
 """
 
 import sqlite3
@@ -443,10 +443,11 @@ class LobsterDatabase:
             WHERE conversation_id = ? 
             ORDER BY seq ASC
         """
+        # v4.0.13: 修复 SQL 注入风险（Issue #151 Bug #3）
         if limit:
-            query += f" LIMIT {limit}"
-        
-        self.cursor.execute(query, (conversation_id,))
+            self.cursor.execute(query + " LIMIT ?", (conversation_id, int(limit)))
+        else:
+            self.cursor.execute(query, (conversation_id,))
         rows = self.cursor.fetchall()
         
         return [self._row_to_dict(row, 'messages') for row in rows]

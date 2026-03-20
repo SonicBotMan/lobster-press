@@ -4,7 +4,7 @@
 LobsterPress MCP Server
 基于 Model Context Protocol (MCP) 的认知记忆压缩服务
 
-Version: v4.0.11
+Version: v4.0.13
 Changelog: https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md
 
 # lobster-press v4.0.11 MCP 工具集
@@ -37,6 +37,9 @@ from datetime import datetime
 
 # 添加 src/ 目录到 Python 模块搜索路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+# v4.0.13: 统一版本号常量（Issue #151 Bug #8）
+LOBSTERPRESS_VERSION = "v4.0.13"
 
 
 @dataclass
@@ -215,7 +218,9 @@ class LobsterPressMCPServer:
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "conversation_id": {"type": "string", "description": "会话 ID（可选，留空查全局）"}
+                        "conversation_id": {"type": "string", "description": "会话 ID（可选，留空查全局）"},
+                        "summary_id": {"type": "string", "description": "摘要 ID（可选，查看单个摘要详情）"},
+                        "depth": {"type": "integer", "description": "深度过滤（可选，-1 = 所有深度）"}
                     },
                     "required": []
                 }
@@ -233,22 +238,24 @@ class LobsterPressMCPServer:
                 }
             ),
             # v3.3.0: 自动压缩工具（调用真实 DAGCompressor）
+            # v4.0.13: current_tokens 和 token_budget 变为可选（Issue #151 Bug #4）
             MCPTool(
                 name="lobster_compress",
                 description=(
                     "增量压缩：执行 DAG 压缩。\n"
                     "注意：阈值判断由调用方（TypeScript ContextEngine）负责，"
-                    "Python 层总是执行压缩（context_threshold=0.0）。"
+                    "Python 层总是执行压缩（context_threshold=0.0）。\n"
+                    "v4.0.13: current_tokens 和 token_budget 可选，缺少时自动计算。"
                 ),
                 input_schema={
                     "type": "object",
                     "properties": {
                         "conversation_id": {"type": "string", "description": "对话 ID"},
-                        "current_tokens": {"type": "integer", "description": "当前 token 数量"},
-                        "token_budget": {"type": "integer", "description": "token 预算"},
+                        "current_tokens": {"type": "integer", "description": "当前 token 数量（可选，缺少时自动计算）"},
+                        "token_budget": {"type": "integer", "description": "token 预算（可选，默认 128000）"},
                         "force": {"type": "boolean", "description": "是否强制压缩（忽略阈值）", "default": False}
                     },
-                    "required": ["conversation_id", "current_tokens", "token_budget"]
+                    "required": ["conversation_id"]
                 }
             ),
             # v3.6.0: 按三层记忆模型拼装上下文（Issue #127 模块一）
@@ -434,7 +441,13 @@ class LobsterPressMCPServer:
         elif tool_name == "lobster_describe":
             from agent_tools import lobster_describe
             db = self._get_db()
-            return lobster_describe(db, conversation_id=arguments.get("conversation_id"))
+            # v4.0.13: 添加 summary_id 和 depth 参数支持（Issue #151 Bug #1）
+            return lobster_describe(
+                db,
+                summary_id=arguments.get("summary_id"),
+                conversation_id=arguments.get("conversation_id"),
+                depth=arguments.get("depth")
+            )
         
         # v4.0.11: 修复 max_depth 参数未传递（Issue #146）
         elif tool_name == "lobster_expand":
@@ -451,10 +464,18 @@ class LobsterPressMCPServer:
             llm = self._get_llm() if self.llm_provider else None
             compressor = DAGCompressor(db, llm_client=llm)
 
-            current_tokens = arguments["current_tokens"]
-            token_budget = arguments["token_budget"]
             conversation_id = arguments["conversation_id"]
             force = arguments.get("force", False)
+            
+            # v4.0.13: current_tokens 和 token_budget 变为可选，缺少时自动计算（Issue #151 Bug #4）
+            if "current_tokens" in arguments and "token_budget" in arguments:
+                current_tokens = arguments["current_tokens"]
+                token_budget = arguments["token_budget"]
+            else:
+                # 自动计算 current_tokens
+                messages = db.get_messages(conversation_id)
+                current_tokens = sum(m.get('token_count', 0) for m in messages)
+                token_budget = arguments.get("token_budget", 128000)  # 默认 128K
             
             # v4.0.12: Focus 主动触发机制（Issue #145, #150 Bug #5）
             # 使用内存计数器而非数据库历史总数
@@ -657,7 +678,7 @@ class LobsterPressMCPServer:
                 pass
 
             return {
-                "version": "v4.0.0",
+                "version": LOBSTERPRESS_VERSION,  # v4.0.13: 使用常量（Issue #151 Bug #8）
                 "tier_distribution": tier_dist,
                 "entity_count": entity_count,
                 "correction_count": correction_count,

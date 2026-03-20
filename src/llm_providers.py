@@ -8,7 +8,7 @@ LobsterPress LLM Providers - 各 LLM 提供商适配器
 - 国内：DeepSeek, 智谱 GLM, 百度文心, 阿里通义千问
 
 Author: LobsterPress Team
-Version: v4.0.12
+Version: v4.0.13
 """
 
 import os
