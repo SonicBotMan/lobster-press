@@ -7,17 +7,30 @@
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
 
+[![npm version](https://img.shields.io/npm/v/@sonicbotman/lobster-press.svg)](https://www.npmjs.com/package/@sonicbotman/lobster-press)
 [![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press/releases)
-[![GitHub stars](https://img.shields.io/github/stars/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
-[![GitHub license](https://img.shields.io/github/license/SonicBotMan/lobster-press.svg)](https://github.com/SonicBotMan/lobster-press)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
-
 [![Test](https://github.com/SonicBotMan/lobster-press/workflows/Test/badge.svg)](https://github.com/SonicBotMan/lobster-press/actions/workflows/test.yml)
-[![Release](https://github.com/SonicBotMan/lobster-press/workflows/Release/badge.svg)](https://github.com/SonicBotMan/lobster-press/actions/workflows/release.yml)
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
 
 **中文** | [English](README_EN.md)
 
 **最新版本**: [v4.0.16](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.16) · [更新日志](CHANGELOG.md)
+
+</div>
+
+---
+
+## 🎯 核心价值
+
+**问题**：所有 LLM 都受限于上下文窗口。传统方案用滑动窗口截断——旧对话被永久丢弃，AI 陷入"失忆"循环。
+
+**解决方案**：LobsterPress 基于认知科学实现 **DAG 无损压缩 + 遗忘曲线 + 语义记忆**，让 AI Agent 拥有类似人类的记忆系统：
+
+- ✅ **无损压缩**：100% 原始消息可追溯
+- ✅ **智能遗忘**：关键决策永久保留，闲聊自动衰减
+- ✅ **知识提取**：从对话中自动提取结构化知识
+- ✅ **矛盾检测**：自动发现和更新冲突知识
+- ✅ **自动触发**：三种策略（定时/紧急/被动）自动压缩
 
 ---
 
@@ -25,381 +38,25 @@
 
 ### 系统要求
 
-**OpenClaw Gateway**: 2026.3.9+（推荐，支持 afterTurn 钩子）
-**ContextEngine.afterTurn**: 需要 2026.3.9+ 支持
-**Node.js**: 18+
-**Python**: 3.10+
+| 依赖 | 版本 | 说明 |
+|------|------|------|
+| **OpenClaw Gateway** | 2026.3.9+ | 推荐，支持 afterTurn 钩子 |
+| **Node.js** | 18+ | OpenClaw 插件模式 |
+| **Python** | 3.10+ | MCP Server 运行时 |
 
-> ⚠️ **重要**: LobsterPress 作为 OpenClaw 插件时，**必须全局安装**才能被 OpenClaw 发现。
+> ⚠️ **重要**: 作为 OpenClaw 插件时，**必须全局安装**才能被发现。
 
 ### OpenClaw 插件安装（推荐）
 
 ```bash
-# 全局安装（必须）
+# 全局安装
 npm install -g @sonicbotman/lobster-press
 
 # 验证安装
 lobster-press --version
 ```
 
-### 独立使用（Python 包）
-
-```bash
-# 本地安装
-pip install @sonicbotman/lobster-press
-
-# 或从源码安装
-git clone https://github.com/SonicBotMan/lobster-press.git
-cd lobster-press
-pip install -e .
-```
-
-### 故障排除
-
-**问题**: Gateway 启动失败，提示 `plugin not found: lobster-press`
-
-**解决**: 确保使用 `npm install -g` 全局安装，而不是在 workspace 中安装。OpenClaw 插件发现机制优先查找全局 node_modules。
-
----
-
-## 🎯 The Problem: AI 的"阿尔茨海默困境"
-
-所有 LLM 都受限于上下文窗口。当对话超过窗口长度，传统方案采用**滑动窗口截断**——旧对话被永久丢弃，AI Agent 陷入"失忆"循环。
-
-这不仅是工程问题，更是**认知科学问题**：
-- 人类记忆不是 FIFO 队列，而是**层次化、动态遗忘、可重巩固**的认知系统
-- AI Agent 需要类似人类的记忆机制：**保留关键决策，遗忘琐碎对话，动态更新知识**
-
----
-
-## 💡 Our Solution: 认知记忆系统
-
-LobsterPress v4.0「深海」是基于认知科学论文实现的 LLM 记忆系统，融合五大前沿研究：
-
-### 📚 学术基础
-
-| 论文/理论 | 应用 | 实现 |
-|-----------|------|------|
-| **EM-LLM (ICLR 2025)** | 事件分割 | 语义边界检测 + 时间断层分割 |
-| **HiMem (Hierarchical Memory)** | 记忆层次化 | DAG 压缩 + 三级摘要结构 |
-| **Ebbinghaus Forgetting Curve (1885)** | 动态遗忘 | R(t) = base_score × e^(-t/stability) |
-| **Memory Reconsolidation (Nader, 2000)** | 知识更新 | 矛盾检测 + 语义记忆重巩固 |
-| **CMV (Context Maintenance and Retrieval)** | 无损压缩 | 三遍 trimmer（v4.0 新增）|
-| **C-HLR+ (arXiv:2004.11327)** | 自适应遗忘 | 复杂度驱动半衰期（v4.0 新增）|
-| **Focus (arXiv:2502.15957)** | 主动压缩 | 定时 + 紧急 + 被动触发（v4.0 新增）|
-| **R³Mem (arXiv:2502.15957)** | 可逆压缩 | 三层展开 + 实体追踪（v4.0 新增）|
-
----
-
-## 🆕 v4.0.16「深海」新特性
-
-**五大模块重构，超越 lossless-claw**：
-
-### 🔧 模块一：CMV 三遍无损压缩
-- **Pass 1**: 剥离 base64/长 JSON 冗余
-- **Pass 2**: 去重工具结果
-- **Pass 3**: 折叠系统样板代码
-- **无损原则**：user/assistant 消息永不修改
-
-### 🧬 模块二：C-HLR+ 自适应遗忘曲线
-- **复杂度驱动半衰期**：`h = base_h × (1 + α × complexity) × spaced_bonus`
-- **对数稳定性增长**：避免无限膨胀
-- **指数底数优化**：从 `e` 改为 `2`
-
-### ⚡ 模块三：Focus 主动压缩触发
-- **定时触发**：每 12 轮主动压缩
-- **紧急触发**：上下文使用率 > 85%
-- **被动触发**：原有阈值逻辑
-
-### 🔄 模块四：R³Mem 可逆三层压缩
-- **Layer 1**: Document-Level（返回子摘要）
-- **Layer 2**: Paragraph-Level（返回原始消息）
-- **Layer 3**: Entity-Level（按实体过滤）
-- **实体追踪**：人名、文件名、概念自动提取
-
-### 🛠️ 模块五：WMR 框架重构
-- **Write 层**：`lobster_compact` + `lobster_correct`
-- **Manage 层**：`lobster_sweep` + `lobster_assemble` + `lobster_prune`
-- **Read 层**：`lobster_grep` + `lobster_describe` + `lobster_expand` + `lobster_status`
-
----
-
-## 🆕 v3.6.1 新特性：Bug 修复（Issue #129）
-
-**代码审查发现的 7 个 bug 全部修复**：
-
-### 🔴 严重（2个）
-**sweep_decayed_messages 违反无损原则** ✅
-   - 改为标记 `memory_tier='decayed'`，不物理删除
-   - 使用 `remove_messages_from_context` 从上下文移除
-   
-**sweep_decayed_messages 缺少 conversation_id** ✅
-   - 添加必需参数 `conversation_id`
-   - 防止跨 namespace 误删
-
-### 🟠 较严重（3个）
-**apply_correction('delete') 不清理 FTS 索引** ✅
-   - 删除前先查 rowid，同步删除 FTS 记录
-   
-**apply_correction('content') FTS 不同步** ✅
-   - 更新内容后重建 FTS 索引（delete + insert）
-   
-**_row_to_dict fallback 列表缺少 memory_tier** ✅
-   - 补充 `memory_tier` 字段到 fallback 列表
-
-### 🟡 一般（2个）
-**文件头版本号未更新** ✅
-   - 更新为 v3.6.1
-   
-**get_context_by_tier 依赖 Bug 1 修复** ✅
-   - 自动生效（sweep 标记为 decayed，查询已排除）
-
----
-
-## 🆕 v3.6.0 新特性：MemOS 架构（Issue #127）
-
-**四层架构升级**：
-
-**模块四：命名空间隔离** - 多 Agent/项目隔离
-   - 数据库支持 `memory_tier` 字段
-   - `get_context_by_tier()` 方法按层级获取记忆
-   - `lobster_assemble` MCP 工具智能拼装上下文
-
-**模块三：记忆纠错系统** - 修改/删除错误记忆
-   - 数据库新增 `corrections` 表
-   - `apply_correction()` 方法应用纠错
-   - `lobster_correct` MCP 工具
-
-**模块二：主动衰减调度器** - 基于遗忘曲线清理
-   - `sweep_decayed_messages()` 方法清理低价值记忆
-   - `lobster_sweep` MCP 工具
-
-**Bug 修复**：
-- Issue #125: tiktoken 可选依赖文档
-- Issue #126 Bug 2: 删除 threshold 死代码
-- Issue #126 Bug 3: 重构 `_row_to_dict` 方法（光标竞争问题）
-
----
-
-## 🆕 v3.2.1 新特性：LLM 集成与 Prompt 优化
-
-### ✨ Prompt 模块
-
-**集中管理所有 LLM prompt**，提升摘要和知识提取质量：
-
-| Prompt 类型 | 用途 | 优化点 |
-|------------|------|--------|
-| **叶子摘要** | 对话片段压缩 | 结构化输出（决策/细节/行动项），Markdown 格式 |
-| **压缩摘要** | 多层摘要合并 | 层次化压缩，Level 标记，去重提炼 |
-| **Note 提取** | 语义知识抽取 | JSON schema，4 种类别，去重逻辑 |
-| **矛盾检测** | 知识冲突识别 | 语义理解 + 置信度评分（可选） |
-
-### 🔧 核心改进
-
-**DAGCompressor 集成**:
-```python
-# v3.2.1: 使用优化的 prompt 模板
-from src.prompts import build_leaf_summary_prompt
-
-prompt = build_leaf_summary_prompt(messages)
-summary = llm_client.generate(prompt, temperature=0.7, max_tokens=500)
-```
-
-**SemanticMemory 集成**:
-```python
-# v3.2.1: 智能提取语义知识
-from src.prompts import build_note_extraction_prompt
-
-prompt = build_note_extraction_prompt(messages)
-response = llm_client.generate(prompt, temperature=0.5, max_tokens=800)
-notes = json.loads(response.strip())
-```
-
-### 📊 质量提升
-
-| 场景 | v3.2.0 | v3.2.1 | 提升 |
-|------|--------|--------|------|
-| 叶子摘要 | 简单文本 | 结构化 Markdown | ⬆️ 清晰度 +40% |
-| 压缩摘要 | 无层次 | Level 标记 | ⬆️ 可追溯性 +50% |
-| Note 提取 | 无示例 | JSON schema + 示例 | ⬆️ 准确率 +30% |
-| Token 控制 | 无工具 | 估算 + 截断 | ⬆️ 成本控制 |
-
-### 🎯 测试验证
-
-**实际 API 调用成功**:
-- ✅ DeepSeek: 成功生成 Markdown 格式摘要
-- ✅ 智谱 GLM: 正确提取 JSON 格式 notes
-- ✅ Mock 客户端: 智能响应测试
-
----
-
-## 🚀 v3.0 核心特性
-
-### Feature 1: 遗忘曲线动态评分
-**仿人类记忆衰减机制**
-
-基于 Ebbinghaus 遗忘曲线，每条消息按 `msg_type` 分配不同的稳定性参数：
-
-```
-R(t) = base_score × e^(-t/stability)
-
-决策 (decision): 90 天稳定性  → 关键决策长期保留
-配置 (config):   120 天稳定性 → 系统配置最稳定
-代码 (code):     60 天稳定性  → 技术债务中期保留
-错误 (error):    30 天稳定性  → 问题追踪短期保留
-闲聊 (chitchat): 3 天稳定性   → 快速遗忘低价值内容
-```
-
-**Memory Consolidation**: `lobster_grep` 命中时自动刷新记忆，实现"提取即强化"。
-
----
-
-### Feature 2: 事件分割（EM-LLM ICLR 2025）
-**自动识别对话主题边界**
-
-采用 EM-LLM 论文的**认知事件分割**理论，自动划分对话情节：
-
-```
-语义边界检测：TF-IDF 相似度 < 0.25 触发新情节
-时间断层检测：消息间隔 > 1 小时自动分割
-显式信号检测：system 消息触发新情节
-硬上限保护：累计 token > max_episode_tokens 强制分割
-```
-
-**效果**: 对话不再是一维序列，而是**情节化的认知单元**，提升检索精度和上下文组装效率。
-
----
-
-### Feature 3: 语义记忆层 ⭐ NEW
-**独立于对话流的持久知识库**
-
-借鉴人类**语义记忆**（Semantic Memory）机制，从对话中提取持久性知识：
-
-```
-对话: "我们决定使用 PostgreSQL 作为主数据库，考虑到 ACID 事务需求"
-  ↓ (LLM 提取)
-语义记忆:
-  category: decision
-  content: "项目采用 PostgreSQL（ACID 事务需求）"
-  confidence: 0.95
-```
-
-**Schema 设计**:
-```sql
-CREATE TABLE notes (
-    note_id         TEXT UNIQUE NOT NULL,
-    conversation_id TEXT NOT NULL,
-    category        TEXT NOT NULL,  -- preference/decision/constraint/fact
-    content         TEXT NOT NULL,
-    confidence      REAL DEFAULT 1.0,
-    source_msg_ids  TEXT,           -- 溯源链：来自哪些消息
-    superseded_by   TEXT            -- 被哪个新 note 取代
-);
-```
-
-**上下文注入**: 所有生效的 notes 始终在上下文头部注入（<500 tokens），确保 Agent 永远记得关键决策和偏好。
-
----
-
-### Feature 4: 矛盾检测与记忆重巩固 ⭐ NEW
-**自动检测和更新知识库**
-
-基于**记忆重巩固理论**（Memory Reconsolidation, Nader 2000），当新消息与已有知识矛盾时：
-
-```
-旧知识: "使用 PostgreSQL"
-新消息: "改用 MongoDB，因为需要文档灵活性"
-  ↓ (矛盾检测)
-动作:
-  1. 标记旧 note 为 superseded_by = "new_note_id"
-  2. 创建新 note: "项目改用 MongoDB（文档灵活性需求）"
-  3. 保留完整溯源链（不删除旧 note）
-```
-
-**双重检测策略**:
-- **NLI 模型检测**（推荐）: `cross-encoder/nli-deberta-v3-small`
-  - 精度高（冲突阈值 0.85）
-  - 需要 GPU 或大量内存
-  - 安装: `pip install sentence-transformers`
-- **规则降级检测**（备选）: 零依赖
-  - 基于否定词 + 关键词共现
-  - 模式: `不(用|要|采用)`, `改(用|为|成)`, `放弃|弃用|替换`
-  - 未安装 `sentence-transformers` 时自动降级
-
-**学术意义**: 将**记忆重巩固**理论应用于 LLM 记忆管理，实现知识的动态演进。
-
----
-
-## 🔬 技术架构
-
-### 三层压缩策略
-
-```
-上下文使用率        策略              LLM 成本    技术原理
-─────────────────────────────────────────────────────────────
-< 60%              无操作            $0          
-60% – 75%          语义去重          $0          余弦相似度 (Cosine Similarity)
-> 75%              DAG 摘要压缩      $           LLM 生成层级摘要
-```
-
-**TF-IDF 评分 + 自动豁免**:
-```
-"决定采用 React 18"          → decision  → exempt=True  ✅ 永久保留
-"```python\ndef foo(): ..."   → code      → exempt=True  ✅ 永久保留
-"Error: ECONNREFUSED"        → error     → exempt=True  ✅ 永久保留
-"好的，明白了"               → chitchat  → tfidf=2.1    可被压缩
-```
-
-### DAG 结构（无损压缩）
-
-```
-原始消息 seq 1..N
-     ↓  (叶子压缩，每块 ≤ 20K tokens)
-  leaf_A   leaf_B   leaf_C   [fresh tail: 最后 32 条原始消息]
-     ↓  (层级聚合)
-  condensed_1     condensed_2
-     ↓
-  root_summary
-```
-
-**关键特性**:
-- ✅ **无损**: 每一层都可展开到原始消息
-- ✅ **可追溯**: DAG 节点只追加、不修改
-- ✅ **高效**: 100K+ 消息压缩到 <200K tokens
-
----
-
-## 🎓 学术价值
-
-### 与现有工作的对比
-
-| 维度 | LangChain Memory | Mem0 | Letta | LobsterPress v3.0 |
-|------|------------------|------|-------|-------------------|
-| 无损压缩 | 滑动窗口 | 滑动窗口 | DAG 压缩 | DAG 压缩 |
-| 遗忘曲线 | 无 | 无 | 无 | Ebbinghaus 动态衰减 |
-| 事件分割 | 无 | 无 | 无 | EM-LLM ICLR 2025 |
-| 语义记忆 | 无 | 向量检索 | 向量检索 | 结构化 notes 表 |
-| 矛盾检测 | 无 | 无 | 无 | NLI + Memory Reconsolidation |
-| 动态评分 | 无 | 无 | 无 | Time-decay scoring |
-
-> 注：以上对比基于各项目文档（截至 2026-03），如有更新请提 Issue 纠正。
-
-**学术贡献**:
-1. 将 Ebbinghaus 遗忘曲线应用于 LLM 记忆管理
-2. 实现基于 EM-LLM 论文的事件分割机制
-3. 将 Memory Reconsolidation 理论应用于知识更新
-
----
-
-## 🔌 OpenClaw 插件（推荐）
-
-LobsterPress 支持作为 [OpenClaw](https://github.com/openclaw/openclaw) 原生插件使用，无需手动部署 Python 服务，一行命令安装：
-
-```bash
-openclaw plugins install @sonicbotman/lobster-press
-```
-
-安装后在 OpenClaw 配置中启用：
+### 配置示例
 
 ```json
 {
@@ -410,8 +67,10 @@ openclaw plugins install @sonicbotman/lobster-press
         "config": {
           "llmProvider": "deepseek",
           "llmModel": "deepseek-chat",
-          "contextThreshold": 0.75,
-          "freshTailCount": 32
+          "llmApiKey": "${LOBSTER_LLM_API_KEY}",
+          "contextThreshold": 0.8,
+          "freshTailCount": 32,
+          "namespace": "default"
         }
       }
     }
@@ -419,259 +78,226 @@ openclaw plugins install @sonicbotman/lobster-press
 }
 ```
 
-启用后 OpenClaw Agent 将自动获得三个记忆工具：
-- `lobster_grep` — 全文搜索历史记忆（FTS5 + TF-IDF）
-- `lobster_describe` — 查看 DAG 摘要层级结构
-- `lobster_expand` — 无损展开摘要原文
+### 独立使用（Python）
 
-### 与 lossless-claw 共存
+```bash
+pip install -e .
 
-LobsterPress 以**工具插件**身份接入，不占用 `contextEngine` 插槽，可与 [lossless-claw](https://github.com/martian-engineering/lossless-claw) 同时启用：
-- **lossless-claw** 负责上下文窗口的 DAG 压缩
-- **lobster-press** 负责跨会话的长期语义记忆检索
+# 运行 MCP Server
+python -m mcp_server.lobster_mcp_server --db ~/.openclaw/lobster.db
+```
+
+---
+
+## 🏗️ 架构概述
+
+### 五大模块（v4.0「深海」）
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    LobsterPress v4.0                        │
+├─────────────────────────────────────────────────────────────┤
+│  模块一: CMV 三遍无损压缩                                    │
+│  ├── Pass 1: 剥离 base64/长 JSON 冗余                       │
+│  ├── Pass 2: 去重工具结果                                   │
+│  └── Pass 3: 折叠系统样板代码                               │
+├─────────────────────────────────────────────────────────────┤
+│  模块二: C-HLR+ 自适应遗忘曲线                               │
+│  └── h = base_h × (1 + α × complexity) × spaced_bonus       │
+├─────────────────────────────────────────────────────────────┤
+│  模块三: Focus 主动压缩触发                                  │
+│  ├── 定时触发: 每 12 轮                                     │
+│  ├── 紧急触发: 上下文 > 85%                                 │
+│  └── 被动触发: 上下文 > 80%                                 │
+├─────────────────────────────────────────────────────────────┤
+│  模块四: R³Mem 可逆三层压缩                                  │
+│  ├── Layer 1: Document-Level (返回子摘要)                   │
+│  ├── Layer 2: Paragraph-Level (返回原始消息)                │
+│  └── Layer 3: Entity-Level (按实体过滤)                     │
+├─────────────────────────────────────────────────────────────┤
+│  模块五: WMR 工具框架                                        │
+│  ├── Write: compact, correct                                │
+│  ├── Manage: sweep, assemble, prune                         │
+│  └── Read: grep, describe, expand, status                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### ContextEngine 集成
+
+LobsterPress 实现了完整的 OpenClaw ContextEngine 接口：
+
+| 方法 | 触发时机 | 功能 |
+|------|----------|------|
+| `prepareContext` | 每轮对话开始前 | 注入最新摘要到 system prompt |
+| `afterTurn` | 每轮对话结束后 | 检查上下文使用率，自动触发压缩 |
+| `compact` | 手动调用 | 强制执行 DAG 压缩 |
+| `assemble` | 上下文组装时 | 按三层记忆模型拼装最优上下文 |
+
+---
+
+## 🛠️ MCP 工具列表
+
+### Read 层（读取记忆）
+
+| 工具 | 说明 | 必需参数 |
+|------|------|----------|
+| `lobster_grep` | 全文搜索（FTS5 + TF-IDF） | `query` |
+| `lobster_describe` | 查看 DAG 摘要结构 | `conversation_id` 或 `summary_id` |
+| `lobster_expand` | 展开摘要到原始消息 | `summary_id` |
+| `lobster_status` | 系统健康报告 | - |
+
+### Write 层（写入记忆）
+
+| 工具 | 说明 | 必需参数 |
+|------|------|----------|
+| `lobster_compress` | 触发 DAG 压缩 | `conversation_id` |
+| `lobster_correct` | 纠错记忆内容 | `target_type`, `target_id`, `correction_type` |
+
+### Manage 层（管理记忆）
+
+| 工具 | 说明 | 必需参数 |
+|------|------|----------|
+| `lobster_sweep` | 标记衰减消息 | `conversation_id` |
+| `lobster_assemble` | 拼装三层上下文 | `conversation_id` |
+| `lobster_prune` | 删除 decayed 消息 | `conversation_id` |
+
+### 调试工具
+
+| 工具 | 说明 |
+|------|------|
+| `lobster_check_context` | 手动检查上下文（降级方案） |
 
 ---
 
 ## 🚀 快速上手
 
-```bash
-git clone https://github.com/SonicBotMan/lobster-press.git
-cd lobster-press
-pip install -r requirements.txt
-```
-
-**可选依赖**：
-- `tiktoken>=0.5.0` - 高精度 token 计数（推荐）
-  - 安装：`pip install tiktoken`
-  - 未安装时自动降级为近似计算（基于字符数 × 0.3）
+### Python API
 
 ```python
 from src.database import LobsterDatabase
+from src.dag_compressor import DAGCompressor
 from src.incremental_compressor import IncrementalCompressor
 
-db = LobsterDatabase("memory.db")
+# 初始化
+db = LobsterDatabase("~/.openclaw/lobster.db")
+compressor = DAGCompressor(db)
 manager = IncrementalCompressor(
     db,
-    max_context_tokens=200_000,  # Claude=200K, GPT-4o=128K, Gemini=1M
-    context_threshold=0.75,
+    max_context_tokens=200_000,
+    context_threshold=0.8,
     fresh_tail_count=32
 )
 
-# 自动决定压缩策略
-result = manager.on_new_message("conv_id", {
+# 新消息触发压缩检查
+result = manager.on_new_message("conv_123", {
     "id": "msg_001",
     "role": "user",
     "content": "我们决定用 PostgreSQL 作为主数据库",
-    "timestamp": "2026-03-17T10:00:00Z"
+    "timestamp": "2026-03-21T10:00:00Z"
 })
-# result["compression_strategy"] → "none" | "light" | "aggressive"
-# result["notes_extracted"] → [{"category": "decision", "content": "..."}]
+
+print(result["compression_strategy"])  # "none" | "light" | "aggressive"
 ```
 
----
-
-## 🤖 LLM 提供商配置 ⭐ v3.2.0
-
-LobsterPress v3.2.0 支持国内外 8 个主流 LLM 提供商，用于高质量摘要生成。
-
-### 支持的提供商
-
-**国际提供商（4个）**：
-- ✅ **OpenAI** - GPT-4o, GPT-4o-mini
-- ✅ **Anthropic** - Claude 3.5 Sonnet
-- ✅ **Google** - Gemini Pro
-- ✅ **Mistral** - Mistral Small/Medium
-
-**国内提供商（4个）**：
-- ✅ **DeepSeek** - DeepSeek Chat（推荐 ⭐）
-- ✅ **智谱 GLM** - GLM-4-Flash（推荐 ⭐）
-- ✅ **百度文心** - ERNIE Speed
-- ✅ **阿里通义** - Qwen Turbo
-
-### 快速配置
-
-**方式1: 环境变量（推荐）**
-
-```bash
-# DeepSeek（国内推荐）
-export LOBSTER_LLM_PROVIDER=deepseek
-export LOBSTER_LLM_API_KEY=sk-xxx
-export LOBSTER_LLM_MODEL=deepseek-chat
-
-# 智谱 GLM（免费额度大）
-export LOBSTER_LLM_PROVIDER=zhipu
-export LOBSTER_LLM_API_KEY=xxx.xxx
-export LOBSTER_LLM_MODEL=glm-4-flash
-
-# OpenAI（国际推荐）
-export LOBSTER_LLM_PROVIDER=openai
-export LOBSTER_LLM_API_KEY=sk-xxx
-export LOBSTER_LLM_MODEL=gpt-4o-mini
-```
-
-**方式2: 代码配置**
-
-```python
-from src.llm_client import create_llm_client
-from src.dag_compressor import DAGCompressor
-
-# 创建 LLM 客户端
-llm_client = create_llm_client(
-    provider='deepseek',
-    api_key='sk-xxx',
-    model='deepseek-chat'
-)
-
-# 传入 DAGCompressor
-compressor = DAGCompressor(db, llm_client=llm_client)
-```
-
-### 安装依赖
-
-```bash
-# DeepSeek / 阿里通义 / OpenAI（OpenAI 兼容接口）
-pip install openai
-
-# 智谱 GLM
-pip install zhipuai
-
-# Anthropic
-pip install anthropic
-
-# Google Gemini
-pip install google-generativeai
-
-# Mistral
-pip install mistralai
-```
-
-### 推荐配置
-
-| 场景 | 推荐提供商 | 原因 |
-|------|-----------|------|
-| **国内用户，性价比** | DeepSeek | 便宜，质量高 ⭐ |
-| **国内用户，免费测试** | 智谱 GLM | 免费额度大 ⭐ |
-| **国际用户，性价比** | OpenAI GPT-4o-mini | 便宜，稳定 |
-| **国际用户，高质量** | Anthropic Claude 3.5 Sonnet | 质量最高 |
-
-### 优雅降级
-
-- **无 LLM 配置**: 自动使用提取式摘要（无 API 成本）
-- **LLM 调用失败**: 自动降级为提取式摘要
-- **提供商不可用**: 自动降级为 Mock 客户端
-
-### 更多配置
-
-详见 `examples/llm_config.py`，包含所有提供商的详细配置示例。
-
----
-
-## 🛠️ Agent 工具集成
-
-```bash
-# 全文搜索历史（FTS5 + TF-IDF 重排序）
-python -m src.agent_tools grep "PostgreSQL" --db memory.db --conversation conv_123
-
-# 查看 DAG 摘要结构
-python -m src.agent_tools describe --db memory.db --conversation conv_123
-
-# 展开摘要到原始消息
-python -m src.agent_tools expand sum_abc123 --db memory.db --max-depth 2
-```
-
-Python API:
+### Agent 工具调用
 
 ```python
 from src.agent_tools import lobster_grep, lobster_describe, lobster_expand
 
-# 搜索，按 TF-IDF 相关性排序
-results = lobster_grep(db, "数据库选型", conversation_id="conv_123", limit=5)
+# 搜索历史
+results = lobster_grep(db, "PostgreSQL", conversation_id="conv_123", limit=5)
 
-# 查看摘要层级结构
+# 查看摘要结构
 structure = lobster_describe(db, conversation_id="conv_123")
 # → {"total_summaries": 12, "max_depth": 3, "by_depth": {...}}
 
-# 展开摘要，还原原始消息
-detail = lobster_expand(db, "sum_abc123")
+# 展开摘要
+messages = lobster_expand(db, "sum_abc123", max_depth=2)
 # → {"total_messages": 47, "messages": [...]}
 ```
 
 ---
 
-## 📊 性能指标
+## 📚 学术基础
 
-**测试环境**: M1 MacBook Pro, 16GB RAM, Python 3.11
-
-| 操作 | 性能 | 备注 |
-|------|------|------|
-| 消息入库 | <5ms | 含 TF-IDF 评分 + 类型分类 |
-| FTS5 搜索 | <10ms | ⚠️ 待修复：当前版本存在问题（Issue #111）|
-| Light 压缩 | 0ms | 余弦相似度去重，无 LLM 调用 |
-| DAG 压缩 | ~2s/1K tokens | Claude 3.5 Sonnet API |
-| 矛盾检测 | <100ms | 规则降级模式（零依赖） |
-
-**压缩效果**:
-- 实测压缩比 ~3x（1K 消息测试），理论最大值取决于 LLM 摘要质量
-- 保留 100% 原始消息（无损）
-- 关键信息保留率：待验证
+| 论文/理论 | 应用 |
+|-----------|------|
+| **EM-LLM (ICLR 2025)** | 事件分割、语义边界检测 |
+| **HiMem** | DAG 压缩、三级摘要结构 |
+| **Ebbinghaus Forgetting Curve** | 动态遗忘：R(t) = base × e^(-t/stability) |
+| **Memory Reconsolidation (Nader, 2000)** | 矛盾检测、知识重巩固 |
+| **CMV** | 三遍无损压缩 |
+| **C-HLR+ (arXiv:2004.11327)** | 复杂度驱动半衰期 |
+| **Focus (arXiv:2502.15957)** | 主动压缩触发 |
+| **R³Mem (arXiv:2502.15957)** | 可逆三层压缩 |
 
 ---
 
-## 🔧 配置参数
-
-```python
-manager = IncrementalCompressor(
-    db,
-    max_context_tokens=200_000,    # 目标模型上下文窗口
-    context_threshold=0.75,        # 触发压缩的使用率阈值
-    fresh_tail_count=32,           # 受保护的最近消息数
-    leaf_chunk_tokens=20_000,      # 叶子摘要分块大小
-    llm_client=your_llm_client     # 可选：用于语义提取和矛盾检测
-)
-```
+## ⚙️ 配置参数
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `max_context_tokens` | 128,000 | **必须按模型设置**（Claude=200K, Gemini=1M） |
-| `context_threshold` | 0.75 | 触发 DAG 压缩的阈值（0.0–1.0） |
-| `fresh_tail_count` | 32 | 受保护的最近消息数，不参与压缩 |
-| `leaf_chunk_tokens` | 20,000 | 叶子压缩分块大小（影响摘要粒度） |
-| `llm_client` | None | LLM 客户端（用于语义提取，可选） |
+| `max_context_tokens` | 128,000 | 目标模型上下文窗口 |
+| `context_threshold` | 0.8 | 触发压缩的使用率阈值 |
+| `fresh_tail_count` | 32 | 受保护的最近消息数 |
+| `leaf_chunk_tokens` | 20,000 | 叶子压缩分块大小 |
+| `focus_interval` | 12 | Focus 定时触发间隔（轮） |
+| `urgent_threshold` | 0.85 | Focus 紧急触发阈值 |
 
 ---
 
-## 📦 数据迁移
+## 🤖 LLM 提供商
 
-从旧版本或其他格式批量导入：
+支持 8 个主流提供商，用于高质量摘要生成：
+
+**国际**：OpenAI, Anthropic, Google, Mistral
+
+**国内**：DeepSeek ⭐, 智谱 GLM ⭐, 百度文心, 阿里通义
 
 ```bash
-# 从 JSON 导入（自动评分 + 分类 + 语义提取）
-python -m src.pipeline.batch_importer data.json --db memory.db
-
-# 从 CSV 导入
-python -m src.pipeline.batch_importer data.csv --format csv --db memory.db
-
-# 指定批大小
-python -m src.pipeline.batch_importer data.json --db memory.db --batch-size 50
+# 环境变量配置
+export LOBSTER_LLM_PROVIDER=deepseek
+export LOBSTER_LLM_API_KEY=sk-xxx
+export LOBSTER_LLM_MODEL=deepseek-chat
 ```
+
+---
+
+## 📊 压缩策略
+
+```
+上下文使用率        策略              LLM 成本
+─────────────────────────────────────────────────
+< 60%              无操作            $0
+60% – 80%          语义去重          $0
+> 80%              DAG 摘要压缩      $
+```
+
+**无损原则**：user/assistant 消息永不修改，仅 trim 工具输出。
 
 ---
 
 ## 🗂️ 项目结构
 
 ```
-src/
-├── database.py               # SQLite 存储层（消息、摘要、DAG、FTS5、notes）
-├── dag_compressor.py         # DAG 压缩引擎（叶子摘要 + 层级聚合）
-├── incremental_compressor.py # 三层压缩调度器（项目主入口）
-├── semantic_memory.py        # 语义记忆层（Feature 3）⭐ NEW
-├── agent_tools.py            # lobster_grep / lobster_describe / lobster_expand
-└── pipeline/
-    ├── tfidf_scorer.py       # TF-IDF 评分 + 消息类型分类
-    ├── semantic_dedup.py     # 余弦相似度去重（light 策略）
-    ├── batch_importer.py     # 历史数据批量导入
-    ├── event_segmenter.py    # 事件分割（EM-LLM）⭐ v2.6.0
-    └── conflict_detector.py  # 矛盾检测（Feature 4）⭐ NEW
+├── index.ts                    # OpenClaw 插件入口（ContextEngine）
+├── openclaw.plugin.json        # 插件配置
+├── mcp_server/
+│   └── lobster_mcp_server.py   # MCP Server（14 个工具）
+└── src/
+    ├── database.py             # SQLite 存储层
+    ├── dag_compressor.py       # DAG 压缩引擎
+    ├── incremental_compressor.py  # 三层压缩调度器
+    ├── three_pass_trimmer.py   # CMV 三遍无损压缩
+    ├── semantic_memory.py      # 语义记忆层
+    ├── llm_client.py           # LLM 客户端
+    ├── llm_providers.py        # 8 个提供商适配
+    ├── prompts.py              # Prompt 模板
+    ├── agent_tools.py          # Python API
+    └── pipeline/
+        ├── tfidf_scorer.py     # TF-IDF 评分
+        ├── semantic_dedup.py   # 语义去重
+        └── ...
 ```
 
 ---
@@ -680,50 +306,23 @@ src/
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| v1.0.0 ~ v1.5.5 | 2026-03-13~17 | 早期迭代：DAG 压缩基础 |
-| v2.5.0 ~ v2.6.0 | 2026-03-17 | 认知科学重构：EM-LLM + 遗忘曲线 |
-| v3.0.0 ~ v3.2.1 | 2026-03-17 | LLM 集成：多提供商 + Prompt 优化 |
-| v3.2.2 ~ v3.2.9 | 2026-03-17~19 | 工程规范 + Bug 修复 |
-| v3.3.0 ~ v3.4.0 | 2026-03-19 | ContextEngine + afterTurn 钩子 |
-| v3.6.0 ~ v3.6.1 | 2026-03-19 | MemOS 架构：命名空间 + 记忆纠错 |
-| **v4.0.16** ⭐ | 2026-03-21 | 「深海」五大模块重构 + 稳定性修复 |
+| **v4.0.16** ⭐ | 2026-03-21 | 「深海」五大模块 + 稳定性修复 |
+| v4.0.10 | 2026-03-20 | 安全修复（CodeQL） |
+| v4.0.0 | 2026-03-19 | 五大模块重构 |
+| v3.6.1 | 2026-03-19 | Bug 修复（7 个） |
+| v3.6.0 | 2026-03-19 | MemOS 架构 |
+| v3.3.0 | 2026-03-19 | ContextEngine 集成 |
+| v3.0.0 | 2026-03-17 | LLM 多提供商 |
+| v2.6.0 | 2026-03-17 | 认知科学重构 |
+| v1.0.0 | 2026-03-13 | 初始发布 |
 
-<details>
-<summary>查看完整版本详情</summary>
-
-### v3.2.2 (2026-03-17) - 工程规范整改
-- ✅ 添加 CI/CD 工作流 (.github/workflows/test.yml)
-- ✅ 测试结构重组 (unit/integration 分离)
-- ✅ 新增核心模块单元测试
-- ✅ 修复导入路径和源码 bug
-- ✅ 删除虚假文件 (RELEASES.md 等)
-- ✅ README 诚实化改造
-
-### v3.2.1 (2026-03-17) - LLM 集成与 Prompt 优化
-- ✅ 集中管理 Prompt 模板
-- ✅ 优化叶子摘要、压缩摘要、Note 提取
-- ✅ 支持国内外 8 个主流 LLM 提供商
-
-### v2.6.0 (2026-03-17) - 认知科学驱动
-- ✅ EM-LLM 事件分割
-- ✅ Ebbinghaus 遗忘曲线
-- ✅ 语义记忆层 (notes 表)
-- ✅ 矛盾检测与重巩固
-
-### v1.0.0 (2026-03-13) - 初始发布
-- ✅ DAG 无损压缩架构
-- ✅ TF-IDF 评分 + 消息类型分类
-- ✅ 三层压缩策略
-
-</details>
+详见 [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
 ## 🙏 致谢
 
 ### 学术引用
-
-如果 LobsterPress 对你的研究有帮助，请引用以下论文：
 
 ```bibtex
 @inproceedings{emllm2025,
@@ -742,27 +341,14 @@ src/
 
 ### 开源项目
 
-- **[lossless-claw](https://github.com/martian-engineering/lossless-claw)** (Martian Engineering) — DAG 压缩架构参考
-- **[LCM 论文](https://papers.voltropy.com/LCM)** (Voltropy) — 无损上下文管理理论基础
-
-### 核心贡献者
-
-- **罡哥（sonicman0261）** — 项目发起人、架构设计、学术指导
-- **小云（Xiao Yun）** — v3.0 核心开发、论文实现
-
----
-
-## 📄 许可证
-
-[MIT License](LICENSE)
+- **[lossless-claw](https://github.com/martian-engineering/lossless-claw)** — DAG 压缩架构参考
+- **[OpenClaw](https://github.com/openclaw/openclaw)** — 插件平台
 
 ---
 
 <div align="center">
 
 **如果 LobsterPress 对你的项目有帮助，请给个 ⭐ Star！**
-
-![Star History Chart](https://api.star-history.com/svg?repos=SonicBotMan/lobster-press&type=Date)
 
 **Made with 🧠 by SonicBotMan & Xiao Yun**
 
