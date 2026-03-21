@@ -10,9 +10,16 @@
  * - Clean failure on child process exit
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+
+// v4.0.17: 从 package.json 读取版本号（Issue #153 Bug #3）
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const packageJson = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf-8"));
+const LOBSTERPRESS_VERSION = packageJson.version;
 
 // ─── IPC Types ───────────────────────────────────────────────────────────────
 
@@ -32,7 +39,8 @@ let mcpReady = false;
 let bootPromise: Promise<ChildProcess> | null = null;
 // v4.0.14: 移除全局 stdoutBuffer，改为闭包变量（Issue #152 Bug #2）
 // let stdoutBuffer = "";  // ← 移除
-let isCompressing = false;  // v4.0.14: 防重入锁（Issue #152 Bug #1）
+// v4.0.17: 改为 per-session 锁，避免跨会话误阻塞（Issue #153 Bug #2）
+const compressingSessions = new Set<string>();
 
 const pendingRequests = new Map<
   string,
@@ -389,7 +397,7 @@ const lobsterPlugin = {
       info: {
         id: "lobster-press",
         name: "LobsterPress Memory Engine",
-        version: "3.3.0",
+        version: LOBSTERPRESS_VERSION,  // v4.0.17: 从 package.json 读取（Issue #153 Bug #3）
         ownsCompaction: true,
       },
 
@@ -476,14 +484,13 @@ const lobsterPlugin = {
           `[lobster-press] Context ${(ratio * 100).toFixed(1)}% > ${threshold * 100}%, triggering auto-compress`
         );
 
-        // v4.0.14: 修复 P0-1 - 添加 await 和防重入锁（Issue #152 Bug #1）
-        // 避免并发压缩导致 DAG 数据损坏
-        if (isCompressing) {
-          api.logger.warn(`[lobster-press] Compression already in progress, skipping`);
+        // v4.0.17: 改为 per-session 锁，避免跨会话误阻塞（Issue #153 Bug #2）
+        if (compressingSessions.has(params.sessionId)) {
+          api.logger.warn(`[lobster-press] Compression already in progress for session ${params.sessionId}, skipping`);
           return;
         }
         
-        isCompressing = true;
+        compressingSessions.add(params.sessionId);
         try {
           await callMcp(pluginConfig, "lobster_compress", {
             conversation_id: params.sessionId,
@@ -494,7 +501,7 @@ const lobsterPlugin = {
         } catch (err) {
           api.logger.error(`[lobster-press] auto-compress failed: ${err}`);
         } finally {
-          isCompressing = false;
+          compressingSessions.delete(params.sessionId);
         }
       },
 
@@ -622,19 +629,27 @@ const lobsterPlugin = {
             return null;
           }
           
-          // 第二步：调用 lobster_describe 获取摘要详情（传入 summary_id）
-          const detail = await callMcp(pluginConfig, "lobster_describe", {
+          // 第二步：调用 lobster_expand 获取摘要内容（v4.0.17: Issue #153 Bug #1）
+          // lobster_describe 不接受 summary_id 参数，应该用 lobster_expand
+          const detail = await callMcp(pluginConfig, "lobster_expand", {
             summary_id: topSummaryId,
+            max_depth: 1,  // 只展开一层，获取直接子节点
           });
           
-          // v4.0.14: 正确解析 MCP 返回值
-          const detailText = detail.content?.[0]?.text;
-          if (!detailText) {
+          // v4.0.17: 解析 lobster_expand 返回结构
+          const expandResult = (detail.details as any)?.result;
+          const messages = expandResult?.messages ?? [];
+          
+          if (messages.length === 0) {
             return null;
           }
-          const detailResult = JSON.parse(detailText);
           
-          const content = detailResult?.content;
+          // 提取消息内容，构建记忆上下文
+          const content = messages
+            .slice(0, 5)  // 只取前 5 条，避免过长
+            .map((m: any) => `[${m.role}]: ${m.content?.slice(0, 200) ?? ''}`)
+            .join('\n');
+          
           return content ? `[Memory Context]\n${content}` : null;
         } catch (error) {
           api.logger.error(`[lobster-press] prepareContext failed: ${error}`);
