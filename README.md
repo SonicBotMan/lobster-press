@@ -25,10 +25,10 @@
 
 ### 系统要求
 
-- **OpenClaw Gateway**: 2026.3.9+（推荐，支持 afterTurn 钩子）
-- **ContextEngine.afterTurn**: 需要 2026.3.9+ 支持
-- **Node.js**: 18+
-- **Python**: 3.10+
+**OpenClaw Gateway**: 2026.3.9+（推荐，支持 afterTurn 钩子）
+**ContextEngine.afterTurn**: 需要 2026.3.9+ 支持
+**Node.js**: 18+
+**Python**: 3.10+
 
 > ⚠️ **重要**: LobsterPress 作为 OpenClaw 插件时，**必须全局安装**才能被 OpenClaw 发现。
 
