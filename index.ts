@@ -756,7 +756,7 @@ const lobsterPlugin = {
         try {
           const result = await callMcp(pluginConfig, "lobster_assemble", {
             conversation_id: p.sessionId,
-            token_budget: p.tokenBudget ?? 8000,
+            token_budget: p.tokenBudget ?? 128000,
           });
 
           // v4.0.19: 统一解析路径（Issue #155 Bug #4）

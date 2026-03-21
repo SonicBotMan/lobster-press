@@ -4,7 +4,7 @@
 LobsterPress MCP Server
 基于 Model Context Protocol (MCP) 的认知记忆压缩服务
 
-Version: v4.0.16
+Version: v4.0.25
 Changelog: https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md
 
 # lobster-press v4.0.11 MCP 工具集
