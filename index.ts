@@ -514,6 +514,15 @@ const lobsterPlugin = {
 
       // 关键：每次 turn 后自动检查上下文使用率
       // v4.0.0: Focus 主动压缩触发（定时 + 紧急 + 被动三策略）
+      // v4.0.23: 异常处理策略文档化（Issue #160 建议 #2）
+      //
+      // ── 异常处理设计决策 ──
+      // 策略一（定时）和策略二（紧急）有意不捕获异常，让异常向上冒泡：
+      // 1. 压缩失败是严重问题，需要上层知道
+      // 2. 不应该静默忽略压缩失败，否则会导致上下文溢出
+      // 3. 让 OpenClaw 决定如何处理异常（记录日志、通知用户等）
+      //
+      // 策略三（被动）同样不捕获异常，保持一致性
       async afterTurn(params: any) {
         // v4.0.6: 调试日志 - 确认 afterTurn 被调用（Issue #141 诊断）
         api.logger.info(`[lobster-press] afterTurn called (sessionId=${params?.sessionId ?? "unknown"})`);
@@ -751,12 +760,11 @@ const lobsterPlugin = {
           });
 
           // v4.0.19: 统一解析路径（Issue #155 Bug #4）
-          // v4.0.22: 注意 assemble 返回结构有 .result 中间层，与 compact 不同（Issue #158 Bug #2）
-          // TODO: Python 层应统一返回结构，将有效载荷置于顶层
+          // v4.0.23: 移除多余的 .result 中间层（Issue #160 建议 #1）
           const text = result.content?.[0]?.text;
           const data = text ? JSON.parse(text) : {};
-          const assembled = data?.result?.assembled ?? [];
-          const totalTokens = data?.result?.total_tokens ?? 0;
+          const assembled = data?.assembled ?? [];
+          const totalTokens = data?.total_tokens ?? 0;
 
           // 将三层记忆转为 messages 格式
           const messages = assembled.map((item: any) => ({

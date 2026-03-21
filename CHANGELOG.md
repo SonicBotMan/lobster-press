@@ -5,6 +5,25 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.23] - 2026-03-21
+
+### Fixed
+- **🟡 P2**: `compact` 方法透传 McpEnvelope 内部字段（Issue #158 同类问题）
+  - `details: result.details` 改为 `details: compressResult`
+- **🟡 P2**: `assemble` 方法解析路径有多余的 `.result` 中间层（Issue #160 建议 #1）
+  - Python 层直接返回业务数据，移除 TS 层多余的 `data?.result`
+  - `data?.result?.assembled` 改为 `data?.assembled`
+
+### Added
+- **🟢 P3**: `afterTurn` 异常处理策略文档化（Issue #160 建议 #2）
+  - 添加注释说明策略一/二/三有意让异常向上冒泡的设计决策
+
+### CI
+- MCP parsing consistency check 修复误报（排除 `compress_result` 合法字段）
+
+### Thanks
+- 感谢 @Comet 的审查报告和后续建议
+
 ## [4.0.22] - 2026-03-21
 
 ### Fixed
