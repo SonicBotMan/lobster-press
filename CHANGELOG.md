@@ -5,6 +5,18 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.19] - 2026-03-21
+
+### Fixed
+- **🔴 P0**: `__dirname` 作用域错误导致 100% 启动崩溃（Issue #155 Bug #1）
+  - 将 `__dirname` 提升到模块顶层，修复 ESM 环境下 `ReferenceError`
+- **🟠 P1**: `assemble` 方法解析路径与项目惯例不一致（Issue #155 Bug #4）
+  - 改用 `content[0].text` 解析
+
+### Known Issues
+- `ingest` 仍为空实现（Issue #155 Bug #2）- 需要添加 `lobster_ingest` MCP 工具
+- `prepareContext` 的 `maxContextTokens` 配置字段未声明（Issue #155 Bug #3）
+
 ## [4.0.18] - 2026-03-21
 
 ### Fixed

@@ -16,10 +16,13 @@ import { readFileSync } from "node:fs";
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 
-// v4.0.18: 从 package.json 读取版本号，添加 try/catch 降级（Issue #154 Bug #1）
+// v4.0.19: 修复 __dirname 作用域问题（Issue #155 Bug #1）
+// __dirname 必须在模块顶层定义，ensureMcpServer 需要使用它
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 let LOBSTERPRESS_VERSION = "unknown";
 try {
-  const __dirname = dirname(fileURLToPath(import.meta.url));
   const packageJson = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf-8"));
   LOBSTERPRESS_VERSION = packageJson.version ?? "unknown";
 } catch {
@@ -692,8 +695,11 @@ const lobsterPlugin = {
             token_budget: p.tokenBudget ?? 8000,
           });
 
-          const assembled = (result.details as any)?.result?.assembled ?? [];
-          const totalTokens = (result.details as any)?.result?.total_tokens ?? 0;
+          // v4.0.19: 统一解析路径（Issue #155 Bug #4）
+          const text = result.content?.[0]?.text;
+          const data = text ? JSON.parse(text) : {};
+          const assembled = data?.result?.assembled ?? [];
+          const totalTokens = data?.result?.total_tokens ?? 0;
 
           // 将三层记忆转为 messages 格式
           const messages = assembled.map((item: any) => ({
