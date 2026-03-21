@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
 
-# 🧠 LobsterPress v4.0.19「深海」
+# 🧠 LobsterPress v4.0.20「深海」
 
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v4.0.19](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.19) · [更新日志](CHANGELOG.md)
+**最新版本**: [v4.0.20](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.20) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -306,17 +306,17 @@ export LOBSTER_LLM_MODEL=deepseek-chat
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| **v4.0.19** ⭐ | 2026-03-21 | Issue #154 修复（ESM 兼容 + 截断逻辑） |
-| **v4.0.17** | 2026-03-21 | Issue #153 修复（per-session 锁 + 版本动态） |
-| **v4.0.16** | 2026-03-21 | README 重写 + 学术引用 |
-| v4.0.10 | 2026-03-20 | 安全修复（CodeQL） |
-| v4.0.0 | 2026-03-19 | 五大模块重构 |
-| v3.6.1 | 2026-03-19 | Bug 修复（7 个） |
-| v3.6.0 | 2026-03-19 | MemOS 架构 |
-| v3.3.0 | 2026-03-19 | ContextEngine 集成 |
-| v3.0.0 | 2026-03-17 | LLM 多提供商 |
-| v2.6.0 | 2026-03-17 | 认知科学重构 |
-| v1.0.0 | 2026-03-13 | 初始发布 |
+| **v4.0.20** ⭐ | 2026-03-21 | Issue #154 修复（ESM 兼容 + 截断逻辑） |
+| **v4.0.20** | 2026-03-21 | Issue #153 修复（per-session 锁 + 版本动态） |
+| **v4.0.20** | 2026-03-21 | README 重写 + 学术引用 |
+| v4.0.20 | 2026-03-20 | 安全修复（CodeQL） |
+| v4.0.20 | 2026-03-19 | 五大模块重构 |
+| v4.0.20 | 2026-03-19 | Bug 修复（7 个） |
+| v4.0.20 | 2026-03-19 | MemOS 架构 |
+| v4.0.20 | 2026-03-19 | ContextEngine 集成 |
+| v4.0.20 | 2026-03-17 | LLM 多提供商 |
+| v4.0.20 | 2026-03-17 | 认知科学重构 |
+| v4.0.20 | 2026-03-13 | 初始发布 |
 
 详见 [CHANGELOG.md](CHANGELOG.md)
 

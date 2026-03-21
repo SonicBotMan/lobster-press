@@ -39,7 +39,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # v4.0.13: 统一版本号常量（Issue #151 Bug #8）
-LOBSTERPRESS_VERSION = "v4.0.16"
+LOBSTERPRESS_VERSION = "v4.0.20"
 
 
 @dataclass
@@ -354,6 +354,26 @@ class LobsterPressMCPServer:
                         }
                     },
                     "required": ["conversation_id"]
+                }
+            ),
+            # v4.0.20: 消息入库工具（Issue #156 Bug #2）
+            MCPTool(
+                name="lobster_ingest",
+                description="将原始消息写入 SQLite 数据库，供后续压缩使用",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "conversation_id": {
+                            "type": "string",
+                            "description": "对话 ID"
+                        },
+                        "messages": {
+                            "type": "array",
+                            "items": {"type": "object"},
+                            "description": "消息列表（每个消息包含 role, content, timestamp 等字段）"
+                        }
+                    },
+                    "required": ["conversation_id", "messages"]
                 }
             )
         ]
@@ -744,6 +764,41 @@ class LobsterPressMCPServer:
                 "dry_run": False,
                 "deleted_count": deleted_count,
                 "warning": f"Permanently deleted {deleted_count} decayed messages."
+            }
+
+        # v4.0.20: 消息入库（Issue #156 Bug #2）
+        elif tool_name == "lobster_ingest":
+            conversation_id = arguments.get("conversation_id")
+            messages = arguments.get("messages", [])
+            
+            if not conversation_id:
+                raise ValueError("conversation_id is required for lobster_ingest")
+            
+            if not messages:
+                return {"ingested": 0, "message": "No messages to ingest"}
+            
+            db = self._get_db()
+            ingested_count = 0
+            
+            for msg in messages:
+                # 构建 message 对象
+                message_obj = {
+                    "id": msg.get("id"),
+                    "conversationId": conversation_id,
+                    "role": msg.get("role", "user"),
+                    "content": msg.get("content", ""),
+                    "timestamp": msg.get("timestamp"),
+                    "seq": msg.get("seq"),
+                }
+                
+                # 使用 save_message 存入数据库
+                db.save_message(message_obj)
+                ingested_count += 1
+            
+            return {
+                "ingested": ingested_count,
+                "conversation_id": conversation_id,
+                "message": f"Successfully ingested {ingested_count} messages"
             }
 
         else:

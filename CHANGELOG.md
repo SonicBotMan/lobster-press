@@ -5,6 +5,22 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.20] - 2026-03-21
+
+### Fixed
+- **🔴 P0**: `prepareContext` 解析 `lobster_expand` 返回值仍使用旧路径（Issue #156 Bug #1）
+  - 统一使用 `content[0].text` → `JSON.parse` 解析路径
+- **🟠 P1**: `ingest` 空实现导致消息从未写入 SQLite（Issue #156 Bug #2）
+  - 添加 `lobster_ingest` MCP 工具
+  - TypeScript 端调用该工具存储消息
+- **🟠 P1**: `maxContextTokens` 配置字段未在 `configSchema` 中声明（Issue #156 Bug #3）
+  - 添加字段校验和类型转换
+
+### Added
+- `lobster_ingest` MCP 工具：将原始消息写入 SQLite 数据库
+- `PUBLISH_CHECKLIST.md`: 更新发布检查清单（15 项）
+- `scripts/release.sh`: 自动化发布脚本
+
 ## [4.0.19] - 2026-03-21
 
 ### Fixed

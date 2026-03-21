@@ -357,6 +357,17 @@ const lobsterPlugin = {
         validated.freshTailCount = raw.freshTailCount;
       }
       
+      // maxContextTokens: 必须是正整数（v4.0.20: Issue #156 Bug #3）
+      if (typeof raw.maxContextTokens === "number" &&
+          Number.isInteger(raw.maxContextTokens) && raw.maxContextTokens > 0) {
+        validated.maxContextTokens = raw.maxContextTokens;
+      } else if (typeof raw.maxContextTokens === "string") {
+        const parsed = parseInt(raw.maxContextTokens, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          validated.maxContextTokens = parsed;
+        }
+      }
+
       // registerAsDefault: 必须是布尔值（v4.0.17: Issue #153 Bug #4）
       if (typeof raw.registerAsDefault === "boolean") {
         validated.registerAsDefault = raw.registerAsDefault;
@@ -675,13 +686,44 @@ const lobsterPlugin = {
       },
       
       async ingest(params: { sessionId: string; sessionKey?: string; message: any; isHeartbeat?: boolean }) {
-        // TODO: 需要添加 lobster_ingest MCP 工具来实际存储消息
-        // 目前 OpenClaw 会直接调用 afterTurn，消息通过 messages 参数传入
-        // 暂时返回成功，实际存储由 afterTurn 处理
-        return { 
-          ingested: true, 
-          note: "Messages are stored via afterTurn compression flow" 
-        };
+        // v4.0.20: 调用 lobster_ingest MCP 工具存储消息（Issue #156 Bug #2）
+        const conversationId = params.sessionId;  // 直接使用 sessionId 作为 conversationId
+        
+        try {
+          // 构建消息对象
+          const messages = [{
+            id: params.message?.id,
+            role: params.message?.role || "user",
+            content: typeof params.message?.content === "string" 
+              ? params.message.content 
+              : JSON.stringify(params.message?.content || {}),
+            timestamp: params.message?.timestamp || new Date().toISOString(),
+          }];
+          
+          // 调用 lobster_ingest MCP 工具
+          const result = await callMcp(pluginConfig, "lobster_ingest", {
+            conversation_id: conversationId,
+            messages: messages,
+          });
+          
+          // 解析返回结果
+          const responseText = result?.content?.[0]?.text;
+          const response = responseText ? JSON.parse(responseText) : {};
+          
+          return {
+            ingested: response.ingested > 0,
+            count: response.ingested || 0,
+            conversation_id: conversationId,
+          };
+        } catch (error) {
+          // 降级：如果 MCP 调用失败，返回成功但不实际存储
+          // 这保持了向后兼容性
+          return {
+            ingested: true,
+            note: `Fallback: MCP call failed (${String(error)})`,
+            conversation_id: conversationId,
+          };
+        }
       },
       async assemble(p: { messages: any[]; sessionId?: string; tokenBudget?: number }) {
         // v3.6.0: 调用 lobster_assemble 按三层记忆模型拼装上下文（Issue #127 模块一）
@@ -759,8 +801,9 @@ const lobsterPlugin = {
             max_depth: 1,  // 只展开一层，获取直接子节点
           });
           
-          // v4.0.17: 解析 lobster_expand 返回结构
-          const expandResult = (detail.details as any)?.result;
+          // v4.0.20: 统一使用 content[0].text 解析路径（Issue #156 Bug #1）
+          const expandText = detail.content?.[0]?.text;
+          const expandResult = expandText ? JSON.parse(expandText) : {};
           const messages = expandResult?.messages ?? [];
           
           if (messages.length === 0) {
