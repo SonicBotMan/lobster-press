@@ -6,7 +6,7 @@ LobsterPress Prompt Templates - Prompt 模板库
 集中管理所有 LLM prompt，便于优化和维护。
 
 Author: LobsterPress Team
-Version: v4.0.13
+Version: v4.0.14
 """
 
 from typing import List, Dict

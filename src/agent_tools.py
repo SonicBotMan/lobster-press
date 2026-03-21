@@ -5,7 +5,7 @@ LobsterPress Agent Tools - Agent 工具集
 借鉴 lossless-claw 的 LCM Agent Tools
 
 Author: LobsterPress Team
-Version: v4.0.13
+Version: v4.0.14
 """
 
 import sys

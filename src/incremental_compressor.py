@@ -5,7 +5,7 @@ LobsterPress 增量压缩管理器
 借鉴 lossless-claw 的增量压缩机制
 
 Author: LobsterPress Team
-Version: v4.0.13
+Version: v4.0.14
 """
 
 import sys
@@ -307,22 +307,22 @@ class IncrementalCompressor:
             conversation_id: 对话 ID
             message_id: 消息 ID
         """
-        # 获取当前最大的 ordinal
-        self.db.cursor.execute("""
-            SELECT MAX(ordinal) FROM context_items
-            WHERE conversation_id = ?
-        """, (conversation_id,))
-        
-        result = self.db.cursor.fetchone()
-        max_ordinal = result[0] if result and result[0] is not None else 0
-        
-        # 添加新消息到上下文
-        self.db.cursor.execute("""
-            INSERT INTO context_items (conversation_id, ordinal, item_type, item_id)
-            VALUES (?, ?, ?, ?)
-        """, (conversation_id, max_ordinal + 1, 'message', message_id))
-        
-        self.db.conn.commit()
+        # v4.0.13: 添加事务保护（Issue #151 Bug #5）
+        with self.db.conn:
+            # 获取当前最大的 ordinal
+            self.db.cursor.execute("""
+                SELECT MAX(ordinal) FROM context_items
+                WHERE conversation_id = ?
+            """, (conversation_id,))
+            
+            result = self.db.cursor.fetchone()
+            max_ordinal = result[0] if result and result[0] is not None else 0
+            
+            # 添加新消息到上下文
+            self.db.cursor.execute("""
+                INSERT INTO context_items (conversation_id, ordinal, item_type, item_id)
+                VALUES (?, ?, ?, ?)
+            """, (conversation_id, max_ordinal + 1, 'message', message_id))
     
     def get_stats(self) -> Dict:
         """获取压缩统计

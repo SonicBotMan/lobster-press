@@ -4,7 +4,7 @@
 LobsterPress MCP Server
 基于 Model Context Protocol (MCP) 的认知记忆压缩服务
 
-Version: v4.0.13
+Version: v4.0.14
 Changelog: https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md
 
 # lobster-press v4.0.11 MCP 工具集
@@ -39,7 +39,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # v4.0.13: 统一版本号常量（Issue #151 Bug #8）
-LOBSTERPRESS_VERSION = "v4.0.13"
+LOBSTERPRESS_VERSION = "v4.0.14"
 
 
 @dataclass
@@ -477,21 +477,30 @@ class LobsterPressMCPServer:
                 current_tokens = sum(m.get('token_count', 0) for m in messages)
                 token_budget = arguments.get("token_budget", 128000)  # 默认 128K
             
-            # v4.0.12: Focus 主动触发机制（Issue #145, #150 Bug #5）
-            # 使用内存计数器而非数据库历史总数
-            conv_turns = self._turn_counters.get(conversation_id, 0) + 1
-            self._turn_counters[conversation_id] = conv_turns
-            
-            usage_ratio = current_tokens / token_budget if token_budget > 0 else 0
-            
-            # Focus 定时触发: 每 12 轮主动压缩一次（修复注释笔误）
-            scheduled_trigger = (conv_turns % 12 == 0)
-            
-            # Focus 紧急触发: 上下文使用率 > 85%
-            urgent_trigger = usage_ratio > 0.85
-            
-            # 决定是否执行压缩
-            should_compress = force or scheduled_trigger or urgent_trigger
+            # v4.0.13: 修复双层计数不一致（Issue #151 Bug #2）
+            # 当 force=true 时，跳过所有阈值判断，直接执行压缩
+            # 当 force=false 时，使用 Python 层的 Focus 触发逻辑
+            if force:
+                # TS 层已决定要压缩，Python 层直接执行
+                should_compress = True
+                conv_turns = 0
+                scheduled_trigger = False
+                urgent_trigger = False
+            else:
+                # Python 层自主判断是否需要压缩
+                conv_turns = self._turn_counters.get(conversation_id, 0) + 1
+                self._turn_counters[conversation_id] = conv_turns
+                
+                usage_ratio = current_tokens / token_budget if token_budget > 0 else 0
+                
+                # Focus 定时触发: 每 12 轮主动压缩一次
+                scheduled_trigger = (conv_turns % 12 == 0)
+                
+                # Focus 紧急触发: 上下文使用率 > 85%
+                urgent_trigger = usage_ratio > 0.85
+                
+                # 决定是否执行压缩
+                should_compress = scheduled_trigger or urgent_trigger
             
             # 如果不应该压缩，直接返回
             if not should_compress:
@@ -569,29 +578,34 @@ class LobsterPressMCPServer:
 
         # v3.6.0: 按三层记忆模型拼装上下文（Issue #127 模块一）
         # v4.0.11: 修复 break 逻辑错误（Issue #144）
+        # v4.0.13: 改为按比例分配预算，避免硬截断（Issue #151 Bug #7）
         elif tool_name == "lobster_assemble":
             db = self._get_db()
             conversation_id = arguments["conversation_id"]
             token_budget = arguments.get("token_budget", 8000)
             tiers = arguments.get("tiers", ["semantic", "episodic", "working"])
+            
+            # 按比例分配预算：semantic:episodic:working = 30%:30%:40%
+            tier_ratios = {"semantic": 0.30, "episodic": 0.30, "working": 0.40}
+            tier_budgets = {t: int(token_budget * tier_ratios.get(t, 0.33)) for t in tiers}
 
             # 获取三层记忆
             context = db.get_context_by_tier(conversation_id, tiers)
             assembled = []
             used_tokens = 0
-            budget_exceeded = False  # 标志变量：跳出双层循环
 
-            # 优先级：semantic（压缩最多）> episodic > working（最新）
+            # 每层独立处理，互不影响
             for tier in tiers:
-                if budget_exceeded:
-                    break
+                tier_used = 0
+                tier_budget = tier_budgets[tier]
                 for item in context.get(tier, []):
                     item_tokens = item.get('token_count', 0)
-                    if used_tokens + item_tokens > token_budget:
-                        budget_exceeded = True
+                    if tier_used + item_tokens > tier_budget:
+                        # 当前层预算用完，继续下一层
                         break
                     assembled.append({"tier": tier, **item})
-                    used_tokens += item_tokens
+                    tier_used += item_tokens
+                used_tokens += tier_used
 
             return {
                 "assembled": assembled,
