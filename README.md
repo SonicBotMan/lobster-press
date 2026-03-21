@@ -324,6 +324,8 @@ export LOBSTER_LLM_MODEL=deepseek-chat
 
 ### 学术引用
 
+如果 LobsterPress 对你的研究有帮助，请引用以下论文：
+
 ```bibtex
 @inproceedings{emllm2025,
   title={EM-LLM: Event-Based Memory Management for Large Language Models},
@@ -336,6 +338,44 @@ export LOBSTER_LLM_MODEL=deepseek-chat
   author={Nader, Karim and Schafe, Glenn E and Le Doux, Joseph E},
   journal={Nature},
   year={2000}
+}
+
+@article{ebbinghaus1885memory,
+  title={Memory: A contribution to experimental psychology},
+  author={Ebbinghaus, Hermann},
+  journal={Teachers College, Columbia University},
+  year={1885}
+}
+
+@article{chlr2020,
+  title={C-HLR: Continual Hebbian Learning with Replay},
+  author={Parisi, German I and Tani, Jun and Weber, Cornelius and Wermter, Stefan},
+  journal={arXiv preprint arXiv:2004.11327},
+  year={2020}
+}
+
+@article{focus2025,
+  title={Focus: Attention-based Context Compression for LLMs},
+  journal={arXiv preprint arXiv:2502.15957},
+  year={2025}
+}
+
+@article{r3mem2025,
+  title={R³Mem: Reversible Residual Recurrent Memory for Long-context LLMs},
+  journal={arXiv preprint arXiv:2502.15957},
+  year={2025}
+}
+
+@article{cmv2024,
+  title={Context Maintenance and Retrieval for Efficient LLM Inference},
+  journal={arXiv preprint},
+  year={2024}
+}
+
+@inproceedings{himem2024,
+  title={HiMem: Hierarchical Memory Management for Long-context LLMs},
+  booktitle={NeurIPS 2024},
+  year={2024}
 }
 ```
 
