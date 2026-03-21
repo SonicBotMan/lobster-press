@@ -5,7 +5,40 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [4.0.10] - 2026-03-20
+## [4.0.18] - 2026-03-21
+
+### Fixed
+- **P0-1**: `readFileSync` 在模块顶层崩溃 → 添加 try/catch 降级处理（Issue #154 Bug #1）
+- **P0-2**: `prepareContext` 截断取前 5 条而非最新 5 条 → 改用 `slice(-5)` + tokenBudget 自适应（Issue #154 Bug #2）
+- **P1-1**: `lobster_check_context` 解析路径遗漏 → 修复为 `content[0].text` 解析（Issue #154 Bug #3）
+- **P1-2**: `bootstrap()` 永远返回 false → 调用 `lobster_status` 验证数据库（Issue #154 Bug #4）
+
+## [4.0.17] - 2026-03-21
+
+### Fixed
+- **P0**: `afterTurn` 缺少 await 导致压缩未完成就返回（Issue #153 Bug #1）
+- **P0**: `stdoutBuffer` 竞态条件导致缓冲区内容错乱（Issue #153 Bug #2）
+- **P1**: 版本号硬编码 → 改为从 package.json 动态读取（Issue #153 Bug #3）
+- **P1**: 全局 `isCompressing` 锁 → 改为 per-session 锁（Issue #153 Bug #4）
+- **P1**: 添加 `registerAsDefault` 配置选项（Issue #153 Bug #5）
+- **P1**: Token 估算系数按 provider 区分（Issue #153 Bug #6）
+
+## [4.0.16] - 2026-03-21
+
+### Changed
+- README 重写，添加 6 个学术引用
+- 改进文档结构和示例
+
+## [4.0.11] - 2026-03-20
+
+### Fixed
+- **P0**: SQL 注入风险 → 参数化查询（Issue #143）
+- **P1**: `lobster_assemble` break 逻辑 → 添加 budget 超出标志（Issue #144）
+- **P1**: `lobster_expand` max_depth 未传递 → 传递参数到数据库调用（Issue #146）
+- **P1**: Focus trigger 机制 → 实现 turn counter 检查（Issue #145）
+- **P2**: turn_count=0 初始化（Issue #147/148）
+
+---
 
 ### Security
 - 修复 CodeQL 安全警告（敏感信息泄露 + 最小权限原则）
