@@ -9,62 +9,114 @@
 python3 scripts/publish_checklist.py
 ```
 
-## 检查清单（11 项）
+## 检查清单（15 项）
 
 ### Phase 1: 代码准备
 - [ ] 1. 所有修改已提交到 Git
-- [ ] 2. `package.json` 版本号已更新
-- [ ] 3. `README.md` 版本号已同步
-- [ ] 4. `CHANGELOG.md` 已添加新版本记录
+- [ ] 2. **代码审查**（变量作用域、解析路径一致性）
+- [ ] 3. TypeScript 编译通过 (`npx tsc --noEmit`)
 
-### Phase 2: Git 发布
-- [ ] 5. Git commit 已创建
-- [ ] 6. Git tag 已创建（vX.Y.Z）
-- [ ] 7. Git tag 已推送到远程
+### Phase 2: 版本号同步（4 个文件必须一致！）
+- [ ] 4. `package.json` 版本号已更新
+- [ ] 5. `src/database.py` 文件头 Version: 已更新 ⚠️ v4.0.18 忘记同步！
+- [ ] 6. `README.md` 版本引用已更新
+- [ ] 7. `CHANGELOG.md` 已添加新版本记录
 
-### Phase 3: npm 发布
-- [ ] 8. **npm publish 已执行** ⚠️ 最容易遗漏！
-- [ ] 9. npm 上版本号已验证
+### Phase 3: Git 发布
+- [ ] 8. Git commit 已创建
+- [ ] 9. Git tag 已创建（vX.Y.Z）
+- [ ] 10. Git tag 已推送到远程
 
-### Phase 4: GitHub 发布
-- [ ] 10. **GitHub Release 已创建** ⚠️ 容易遗漏！
-- [ ] 11. Issues 已关闭并添加完成评论
+### Phase 4: 双仓库发布
+- [ ] 11. **npm registry 发布** (`npm publish`)
+- [ ] 12. **GitHub Packages 发布** (`npm publish --registry=https://npm.pkg.github.com`) ⚠️ v4.0.12-4.0.18 遗漏！
+- [ ] 13. npm 上版本号已验证
+- [ ] 14. GitHub Packages 版本号已验证
+
+### Phase 5: GitHub Release
+- [ ] 15. **GitHub Release 已创建** ⚠️ 容易遗漏！
+- [ ] 16. Issues 已关闭并添加完成评论
+
+---
+
+## 代码审查要点
+
+每次发布前必须检查：
+
+| 检查项 | 说明 |
+|--------|------|
+| 变量作用域 | try/catch 内定义的变量是否在外部使用？ |
+| 解析路径一致性 | 所有 MCP 调用是否统一使用 `content[0].text`？ |
+| 新增配置字段 | configSchema 是否声明了所有使用的配置？ |
+| 空实现注释 | TODO 注释是否明确标注了遗留问题？ |
 
 ---
 
 ## 发布命令速查
 
 ```bash
-# 1. 更新版本号
-# 手动编辑 package.json
+# === 版本号同步（4 个文件）===
+VERSION="4.0.20"
+sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+sed -i "s/Version: v.*/Version: v$VERSION/" src/database.py
+sed -i "s/v4\.0\.[0-9]*/v$VERSION/g" README.md
+# 手动编辑 CHANGELOG.md
 
-# 2. 提交
-git add -A && git commit -m "chore: vX.Y.Z 发布"
-
-# 3. 创建并推送 tag
-git tag vX.Y.Z
+# === 提交 ===
+git add -A && git commit -m "chore: v$VERSION 发布"
+git tag v$VERSION
 git push origin master
-git push origin vX.Y.Z
+git push origin v$VERSION
 
-# 4. npm 发布
+# === 双仓库发布 ===
+# npm registry
 npm publish
 
-# 5. 验证 npm
-npm view @sonicbotman/lobster-press version
+# GitHub Packages
+npm publish --registry=https://npm.pkg.github.com --access public
 
-# 6. GitHub Release（通过 API）
+# === 验证 ===
+npm view @sonicbotman/lobster-press version
+curl -s -H "Authorization: token $GITHUB_TOKEN" \
+  "https://api.github.com/users/SonicBotMan/packages/npm/lobster-press/versions" | head
+
+# === GitHub Release ===
 curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
   "https://api.github.com/repos/SonicBotMan/lobster-press/releases" \
-  -d '{"tag_name":"vX.Y.Z","name":"vX.Y.Z","body":"..."}'
+  -d '{"tag_name":"v'$VERSION'","name":"v'$VERSION'","body":"..."}'
 ```
 
 ---
 
 ## 历史教训
 
-| 版本 | 遗漏项 | 后果 |
-|------|--------|------|
-| v4.0.15 | npm publish | npm 仍显示 4.0.11 |
-| v4.0.17 | 整个发布流程 | 需要用户提醒才执行 |
+| 版本 | 遗漏项 | 后果 | 修复版本 |
+|------|--------|------|---------|
+| v4.0.15 | npm publish | npm 仍显示 4.0.11 | - |
+| v4.0.17 | 整个发布流程 | 需要用户提醒才执行 | - |
+| v4.0.18 | database.py 版本号 | CI version-check 失败 | v4.0.19 |
+| v4.0.18 | `__dirname` 作用域 | 100% 启动崩溃 | v4.0.19 |
+| v4.0.12-4.0.18 | GitHub Packages | 用户看到旧版本 | v4.0.19 手动补发 |
 
 **结论**：必须建立强制检查机制，不能依赖记忆。
+
+---
+
+## 自动化脚本（TODO）
+
+创建 `scripts/release.sh` 自动化发布流程：
+
+```bash
+#!/bin/bash
+# 用法: ./scripts/release.sh 4.0.20 "发布说明"
+
+VERSION=$1
+NOTES=$2
+
+# 1. 同步版本号
+# 2. 编译检查
+# 3. Git commit + tag
+# 4. 双仓库发布
+# 5. 验证
+# 6. GitHub Release
+```
