@@ -30,7 +30,9 @@ type McpEnvelope = {
 let mcpProcess: ChildProcess | null = null;
 let mcpReady = false;
 let bootPromise: Promise<ChildProcess> | null = null;
-let stdoutBuffer = "";
+// v4.0.14: 移除全局 stdoutBuffer，改为闭包变量（Issue #152 Bug #2）
+// let stdoutBuffer = "";  // ← 移除
+let isCompressing = false;  // v4.0.14: 防重入锁（Issue #152 Bug #1）
 
 const pendingRequests = new Map<
   string,
@@ -86,10 +88,13 @@ function attachStdoutDispatcher(proc: ChildProcess): void {
 
   (proc.stdout as { __lobsterDispatcherAttached?: boolean }).__lobsterDispatcherAttached = true;
 
+  // v4.0.14: 改为闭包变量，避免多进程/多会话数据串流（Issue #152 Bug #2）
+  let localBuffer = "";
+
   proc.stdout.on("data", (chunk: Buffer) => {
-    stdoutBuffer += chunk.toString("utf8");
-    const lines = stdoutBuffer.split("\n");
-    stdoutBuffer = lines.pop() ?? "";
+    localBuffer += chunk.toString("utf8");
+    const lines = localBuffer.split("\n");
+    localBuffer = lines.pop() ?? "";
 
     for (const raw of lines) {
       const line = raw.trim();
@@ -183,7 +188,8 @@ async function ensureMcpServer(config: Record<string, unknown>): Promise<ChildPr
   try {
     return await bootPromise;
   } finally {
-    if (mcpReady) bootPromise = null;
+    // v4.0.14: 无条件清除 bootPromise，避免竞态（Issue #152 Bug #3）
+    bootPromise = null;
   }
 }
 
@@ -397,7 +403,7 @@ const lobsterPlugin = {
         const FOCUS_COMPRESSION_INTERVAL = 12;  // 论文建议 10-15，取 12
         const FOCUS_URGENT_THRESHOLD = 0.85;    // 上下文使用率超过 85% 时立即触发
 
-        const db = await this._getDb();
+        // v4.0.14: 删除无用的 _getDb() 调用（Issue #152 Bug #5）
         const threshold = (pluginConfig.contextThreshold as number) ?? 0.8;
         const tokenBudget = params.tokenBudget ?? 128000;
 
@@ -470,15 +476,26 @@ const lobsterPlugin = {
           `[lobster-press] Context ${(ratio * 100).toFixed(1)}% > ${threshold * 100}%, triggering auto-compress`
         );
 
-        // v3.4.0: 修复 Bug #124 - afterTurn 触发时传 force: true
-        callMcp(pluginConfig, "lobster_compress", {
-          conversation_id: params.sessionId,
-          current_tokens: currentTokenCount,
-          token_budget: tokenBudget,
-          force: true,  // v3.4.0: TS 层已判断，Python 层直接执行
-        }).catch((err) =>
-          api.logger.error(`[lobster-press] auto-compress failed: ${err}`)
-        );
+        // v4.0.14: 修复 P0-1 - 添加 await 和防重入锁（Issue #152 Bug #1）
+        // 避免并发压缩导致 DAG 数据损坏
+        if (isCompressing) {
+          api.logger.warn(`[lobster-press] Compression already in progress, skipping`);
+          return;
+        }
+        
+        isCompressing = true;
+        try {
+          await callMcp(pluginConfig, "lobster_compress", {
+            conversation_id: params.sessionId,
+            current_tokens: currentTokenCount,
+            token_budget: tokenBudget,
+            force: true,  // v3.4.0: TS 层已判断，Python 层直接执行
+          });
+        } catch (err) {
+          api.logger.error(`[lobster-press] auto-compress failed: ${err}`);
+        } finally {
+          isCompressing = false;
+        }
       },
 
       // v4.0.0: 辅助方法 - 获取轮次数
@@ -487,18 +504,15 @@ const lobsterPlugin = {
           const result = await callMcp(pluginConfig, "lobster_describe", {
             conversation_id: sessionId
           });
-          // lobster_describe 返回 turn_count（如果数据库实现了 get_turn_count）
-          return (result.details as any)?.turn_count ?? 0;
+          // v4.0.14: 正确解析 MCP 返回值
+          const text = result.content?.[0]?.text;
+          if (!text) return 0;
+          const data = JSON.parse(text);
+          return data?.turn_count ?? 0;
         } catch (err) {
           api.logger.error(`[lobster-press] _getTurnCount failed: ${err}`);
           return 0;
         }
-      },
-
-      // v4.0.0: 辅助方法 - 获取数据库实例
-      async _getDb(): Promise<any> {
-        // 返回空对象，实际调用在 Python 层
-        return {};
       },
 
       // ContextEngine 必需方法：compact
@@ -573,6 +587,7 @@ const lobsterPlugin = {
 
       // v4.0.7: prepareContext 防御线（Issue #141 评论）
       // v4.0.9: 修复 P0-2 - latest_summary 字段不存在，改用两步调用（Issue #142）
+      // v4.0.14: 修复 P1-4 - MCP 返回结构解析错误（Issue #152 Bug #4）
       // 每轮对话开始前，OpenClaw 自动调用，将最新摘要注入 system prompt
       async prepareContext(params: { sessionId?: string; sessionKey?: string }) {
         const sessionId = params.sessionId || params.sessionKey;
@@ -586,7 +601,14 @@ const lobsterPlugin = {
             conversation_id: sessionId,
           });
           
-          const byDepth = (describe.details as any)?.result?.by_depth ?? {};
+          // v4.0.14: 正确解析 MCP 返回值（从 content[0].text 解析 JSON）
+          const describeText = describe.content?.[0]?.text;
+          if (!describeText) {
+            return null;
+          }
+          const describeResult = JSON.parse(describeText);
+          
+          const byDepth = describeResult?.by_depth ?? {};
           const depths = Object.keys(byDepth).map(Number).sort((a, b) => b - a);
           
           // 如果没有摘要，返回 null
@@ -600,13 +622,19 @@ const lobsterPlugin = {
             return null;
           }
           
-          // 第二步：调用 lobster_describe 获取摘要详情
+          // 第二步：调用 lobster_describe 获取摘要详情（传入 summary_id）
           const detail = await callMcp(pluginConfig, "lobster_describe", {
-            conversation_id: sessionId,
             summary_id: topSummaryId,
           });
           
-          const content = (detail.details as any)?.result?.content;
+          // v4.0.14: 正确解析 MCP 返回值
+          const detailText = detail.content?.[0]?.text;
+          if (!detailText) {
+            return null;
+          }
+          const detailResult = JSON.parse(detailText);
+          
+          const content = detailResult?.content;
           return content ? `[Memory Context]\n${content}` : null;
         } catch (error) {
           api.logger.error(`[lobster-press] prepareContext failed: ${error}`);
