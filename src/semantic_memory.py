@@ -7,7 +7,7 @@ Semantic Memory Layer - 语义记忆层
 每轮对话的上下文组装时，Notes 层始终注入在最前面。
 
 Author: LobsterPress Team
-Version: v4.0.14
+Version: v4.0.16
 """
 
 import json

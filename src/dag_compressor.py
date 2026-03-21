@@ -5,7 +5,7 @@ LobsterPress DAG Compressor - DAG 压缩器
 借鉴 lossless-claw 的压缩策略
 
 Author: LobsterPress Team
-Version: v4.0.14
+Version: v4.0.16
 """
 
 import sys

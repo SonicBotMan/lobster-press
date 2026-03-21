@@ -4,7 +4,7 @@
 LobsterPress MCP Server
 基于 Model Context Protocol (MCP) 的认知记忆压缩服务
 
-Version: v4.0.15
+Version: v4.0.16
 Changelog: https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md
 
 # lobster-press v4.0.11 MCP 工具集
@@ -39,7 +39,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # v4.0.13: 统一版本号常量（Issue #151 Bug #8）
-LOBSTERPRESS_VERSION = "v4.0.15"
+LOBSTERPRESS_VERSION = "v4.0.16"
 
 
 @dataclass
