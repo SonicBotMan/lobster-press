@@ -231,11 +231,15 @@ def lobster_describe(db: LobsterDatabase,
                 'latest_at': summary.get('latest_at', '')
             })
         
+        # v4.0.24: 添加 turn_count 字段（Issue #161 Bug #2）
+        turn_count = db.get_turn_count(conversation_id)
+        
         return {
             'conversation_id': conversation_id,
             'total_summaries': len(summaries),
             'max_depth': max(by_depth.keys()) if by_depth else 0,
-            'by_depth': by_depth
+            'by_depth': by_depth,
+            'turn_count': turn_count
         }
     
     return None

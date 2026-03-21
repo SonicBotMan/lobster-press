@@ -5,6 +5,19 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.24] - 2026-03-21
+
+### Fixed
+- **🔴 P0**: `lobster_describe` 不返回 `turn_count`，导致 Focus 定时压缩永不触发（Issue #161 Bug #2）
+  - 在 `lobster_describe` 返回结构中添加 `turn_count` 字段
+  - 调用 `db.get_turn_count(conversation_id)` 获取轮次数
+
+### Note
+- Issue #161 Bug #1（assemble 解析路径）已在 v4.0.23 修复
+
+### Thanks
+- 感谢 @Comet 的 P0 级别审查报告
+
 ## [4.0.23] - 2026-03-21
 
 ### Fixed
