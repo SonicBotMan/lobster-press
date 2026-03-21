@@ -2,40 +2,48 @@
 
 **⚠️ 每次发布必须逐项勾选，不得跳过！**
 
-## 发布前检查
+## 自动化发布（推荐）
+
+```bash
+# 一键发布（自动执行 15 步流程）
+./scripts/release.sh 4.0.22
+```
+
+## 或手动执行检查清单
 
 ```bash
 # 运行此命令启动交互式检查清单
 python3 scripts/publish_checklist.py
 ```
 
-## 检查清单（15 项）
+## 检查清单（16 项）
 
 ### Phase 1: 代码准备
 - [ ] 1. 所有修改已提交到 Git
 - [ ] 2. **代码审查**（变量作用域、解析路径一致性）
 - [ ] 3. TypeScript 编译通过 (`npx tsc --noEmit`)
+- [ ] 4. **CI 检查通过**（MCP 解析一致性、空实现检测）
 
 ### Phase 2: 版本号同步（4 个文件必须一致！）
-- [ ] 4. `package.json` 版本号已更新
-- [ ] 5. `src/database.py` 文件头 Version: 已更新 ⚠️ v4.0.18 忘记同步！
-- [ ] 6. `README.md` 版本引用已更新
-- [ ] 7. `CHANGELOG.md` 已添加新版本记录
+- [ ] 5. `package.json` 版本号已更新
+- [ ] 6. `src/database.py` 文件头 Version: 已更新 ⚠️ v4.0.18 忘记同步！
+- [ ] 7. `README.md` 版本引用已更新
+- [ ] 8. `CHANGELOG.md` 已添加新版本记录
 
 ### Phase 3: Git 发布
-- [ ] 8. Git commit 已创建
-- [ ] 9. Git tag 已创建（vX.Y.Z）
-- [ ] 10. Git tag 已推送到远程
+- [ ] 9. Git commit 已创建
+- [ ] 10. Git tag 已创建（vX.Y.Z）
+- [ ] 11. Git tag 已推送到远程
 
 ### Phase 4: 双仓库发布
-- [ ] 11. **npm registry 发布** (`npm publish`)
-- [ ] 12. **GitHub Packages 发布** (`npm publish --registry=https://npm.pkg.github.com`) ⚠️ v4.0.12-4.0.18 遗漏！
-- [ ] 13. npm 上版本号已验证
-- [ ] 14. GitHub Packages 版本号已验证
+- [ ] 12. **npm registry 发布** (`npm publish`)
+- [ ] 13. **GitHub Packages 发布** (`npm publish --registry=https://npm.pkg.github.com`) ⚠️ v4.0.12-4.0.18 遗漏！
+- [ ] 14. npm 上版本号已验证
+- [ ] 15. GitHub Packages 版本号已验证
 
 ### Phase 5: GitHub Release
-- [ ] 15. **GitHub Release 已创建** ⚠️ 容易遗漏！
-- [ ] 16. Issues 已关闭并添加完成评论
+- [ ] 16. **GitHub Release 已创建** ⚠️ 容易遗漏！
+- [ ] 17. Issues 已关闭并添加完成评论
 
 ---
 
@@ -48,7 +56,21 @@ python3 scripts/publish_checklist.py
 | 变量作用域 | try/catch 内定义的变量是否在外部使用？ |
 | 解析路径一致性 | 所有 MCP 调用是否统一使用 `content[0].text`？ |
 | 新增配置字段 | configSchema 是否声明了所有使用的配置？ |
-| 空实现注释 | TODO 注释是否明确标注了遗留问题？ |
+| 空实现检测 | `return { xxx: true }` 是否有实际实现？ |
+| 降级逻辑 | 失败时是否返回 `xxx: false`？ |
+
+---
+
+## CI 检查（自动化）
+
+以下检查在 GitHub Actions 中自动执行：
+
+| 检查项 | 触发条件 | 失败后果 |
+|--------|----------|----------|
+| TypeScript 编译 | push/PR | ❌ 阻止合并 |
+| MCP 解析一致性 | push/PR | ❌ 阻止合并 |
+| 空实现检测 | push/PR | ⚠️ 警告 |
+| 版本号同步 | push/PR | ❌ 阻止合并 |
 
 ---
 

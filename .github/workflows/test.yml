@@ -120,4 +120,67 @@ jobs:
 
       - name: Run TypeScript type check
         run: npx tsc --noEmit
-        continue-on-error: true
+
+  # v4.0.22: 新增代码质量检查（Issue 改进计划）
+  code-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      # P0: TypeScript 编译强制检查
+      - name: TypeScript compilation check
+        run: npx tsc --noEmit
+
+      # P0: MCP 解析路径一致性检查
+      - name: MCP parsing consistency check
+        run: |
+          echo "Checking for deprecated MCP parsing patterns..."
+          # 检查是否使用了旧的 details.result 路径
+          if grep -n "details.*result\|\.result\?" index.ts | grep -v "content\[0\]\.text" | grep -v "// "; then
+            echo "❌ Found deprecated MCP parsing pattern (details.result)"
+            echo "   Use: result.content[0].text → JSON.parse"
+            exit 1
+          fi
+          echo "✅ MCP parsing patterns are consistent"
+
+      # P2: 空实现检测
+      - name: Empty implementation detection
+        run: |
+          echo "Checking for empty implementations..."
+          # 检查 TODO 后面紧跟 return 的情况
+          if grep -n "// TODO" index.ts -A 2 | grep "return {"; then
+            echo "⚠️  Found potential empty implementation after TODO"
+            echo "   Consider implementing or throwing NotImplementedError"
+          fi
+          # 检查只有 return { xxx: true } 的方法
+          if grep -n "return {$" index.ts -A 3 | grep -E "^\s+[a-z]+: true,$" | grep -v "count\|error\|reason"; then
+            echo "⚠️  Found suspicious return { xxx: true } pattern"
+            echo "   Make sure this is not an empty implementation"
+          fi
+          echo "✅ Empty implementation check complete"
+
+      # P1: 版本号同步检查
+      - name: Version sync check
+        run: |
+          echo "Checking version sync across files..."
+          PACKAGE_VERSION=$(grep '"version"' package.json | head -1 | sed 's/.*"version": "\([^"]*\)".*/\1/')
+          echo "package.json version: $PACKAGE_VERSION"
+          
+          # 检查 database.py
+          DB_VERSION=$(grep "Version:" src/database.py | sed 's/.*Version: v\([0-9.]*\).*/\1/')
+          echo "database.py version: $DB_VERSION"
+          
+          if [ "$PACKAGE_VERSION" != "$DB_VERSION" ]; then
+            echo "❌ Version mismatch between package.json and database.py"
+            exit 1
+          fi
+          echo "✅ Version sync check passed"
