@@ -140,9 +140,9 @@ jobs:
       - name: MCP parsing consistency check
         run: |
           echo "Checking for deprecated MCP parsing patterns..."
-          # 检查是否使用了旧的 details.result 路径
-          # 排除 data?.result（Python 层 assemble 工具的特殊返回结构）
-          if grep -n "details.*result\|detail\.details" index.ts | grep -v "// "; then
+          # 检查是否使用了旧的 details.result 或 detail.details 路径
+          # 排除 compress_result（合法字段名）和 data?.result（Python 层 assemble 工具特殊结构）
+          if grep -n "details.*result\|detail\.details" index.ts | grep -v "compress_result" | grep -v "// "; then
             echo "❌ Found deprecated MCP parsing pattern (details.result or detail.details)"
             echo "   Use: result.content[0].text → JSON.parse"
             exit 1

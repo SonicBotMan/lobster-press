@@ -653,6 +653,7 @@ const lobsterPlugin = {
         });
 
         // v4.0.21: 统一使用 content[0].text 解析路径（Issue #157 Bug #1）
+        // v4.0.22: 不透传 McpEnvelope 内部字段（Issue #158 Bug #1 同类问题）
         const compressText = result.content?.[0]?.text;
         const compressResult = compressText ? JSON.parse(compressText) : {};
         const tokensAfter = compressResult?.tokens_after ?? 0;
@@ -665,7 +666,7 @@ const lobsterPlugin = {
             tokensBefore: p.currentTokenCount ?? 0,
             tokensAfter: tokensAfter,  // v3.4.0: 真实值
             tokensSaved: tokensSaved,  // v3.4.0: 真实值
-            details: result.details,
+            details: compressResult,   // v4.0.22: 使用实际压缩结果
           },
         };
       },
