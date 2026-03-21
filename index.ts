@@ -57,6 +57,33 @@ function generateRequestId(): string {
   return `lobster-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+// v4.0.17: 根据 LLM provider 获取 token 估算系数（Issue #153 Bug #5）
+function getTokenEstimationCoefficients(provider?: string): { chinese: number; other: number } {
+  switch (provider?.toLowerCase()) {
+    case "deepseek":
+    case "zhipu":
+    case "glm":
+    case "wenxin":
+    case "qwen":
+      // 中文优化模型：中文字符约 1-1.2 tokens
+      return { chinese: 1.2, other: 4 };
+    case "claude":
+    case "anthropic":
+      // Claude: 中文字符约 2 tokens
+      return { chinese: 2.0, other: 4 };
+    case "gemini":
+    case "google":
+      // Gemini: 中文字符约 1-1.5 tokens
+      return { chinese: 1.5, other: 4 };
+    case "openai":
+    case "gpt":
+    case "mistral":
+    default:
+      // GPT/默认: 中文字符约 1.5 tokens
+      return { chinese: 1.5, other: 4 };
+  }
+}
+
 function handleStdoutLine(line: string): void {
   let msg: McpEnvelope;
   try {
@@ -275,7 +302,66 @@ const lobsterPlugin = {
         value && typeof value === "object" && !Array.isArray(value)
           ? (value as Record<string, unknown>)
           : {};
-      return raw;
+      
+      // v4.0.17: 添加字段校验（Issue #153 Bug #6）
+      const validated: Record<string, unknown> = {};
+      
+      // dbPath: 必须是字符串
+      if (typeof raw.dbPath === "string") {
+        validated.dbPath = raw.dbPath;
+      }
+      
+      // contextThreshold: 必须是数字，且在 0-1 之间
+      if (typeof raw.contextThreshold === "number" && 
+          raw.contextThreshold >= 0 && raw.contextThreshold <= 1) {
+        validated.contextThreshold = raw.contextThreshold;
+      } else if (typeof raw.contextThreshold === "string") {
+        // 尝试解析字符串
+        const parsed = parseFloat(raw.contextThreshold);
+        if (!isNaN(parsed) && parsed >= 0 && parsed <= 1) {
+          validated.contextThreshold = parsed;
+        }
+      }
+      
+      // llmProvider: 必须是字符串
+      if (typeof raw.llmProvider === "string") {
+        validated.llmProvider = raw.llmProvider;
+      }
+      
+      // llmModel: 必须是字符串
+      if (typeof raw.llmModel === "string") {
+        validated.llmModel = raw.llmModel;
+      }
+      
+      // llmApiKey: 必须是字符串
+      if (typeof raw.llmApiKey === "string") {
+        validated.llmApiKey = raw.llmApiKey;
+      }
+      
+      // namespace: 必须是字符串
+      if (typeof raw.namespace === "string") {
+        validated.namespace = raw.namespace;
+      }
+      
+      // freshTailCount: 必须是正整数
+      if (typeof raw.freshTailCount === "number" && 
+          Number.isInteger(raw.freshTailCount) && raw.freshTailCount > 0) {
+        validated.freshTailCount = raw.freshTailCount;
+      }
+      
+      // registerAsDefault: 必须是布尔值（v4.0.17: Issue #153 Bug #4）
+      if (typeof raw.registerAsDefault === "boolean") {
+        validated.registerAsDefault = raw.registerAsDefault;
+      }
+      
+      // 其他字段直接透传
+      for (const key of Object.keys(raw)) {
+        if (!(key in validated)) {
+          validated[key] = raw[key];
+        }
+      }
+      
+      return validated;
     },
   },
 
@@ -418,7 +504,9 @@ const lobsterPlugin = {
         // v4.0.0: 获取轮次数
         const turnCount = await this._getTurnCount(params.sessionId);
 
-        // v4.0.9: 改进估算 - 中文字符按 1.5 token/字计算（Issue #142 P1）
+        // v4.0.17: 根据 llmProvider 动态调整 token 估算系数（Issue #153 Bug #5）
+        const coef = getTokenEstimationCoefficients(pluginConfig.llmProvider as string);
+        
         const currentTokenCount = (params.messages || []).reduce((total: number, msg: any) => {
           let content = "";
           if (typeof msg.content === "string") {
@@ -427,10 +515,10 @@ const lobsterPlugin = {
             content = msg.content.map((c: any) => c.text || "").join("");
           }
           
-          // 改进估算：中文字符按 1.5 token/字计算
+          // 根据 provider 动态调整估算系数
           const chineseCharCount = (content.match(/[\u4e00-\u9fff]/g) || []).length;
           const otherCharCount = content.length - chineseCharCount;
-          const estimated = Math.ceil(chineseCharCount * 1.5 + otherCharCount / 4);
+          const estimated = Math.ceil(chineseCharCount * coef.chinese + otherCharCount / coef.other);
           
           return total + estimated;
         }, 0);
@@ -659,9 +747,16 @@ const lobsterPlugin = {
     };
 
     // 注册为 ContextEngine
-    // v4.0.7: 必须同时注册 "default"，阻止 OpenClaw 内置压缩抢先运行（Issue #141 评论）
+    // v4.0.17: 添加配置选项控制是否抢占 default（Issue #153 Bug #4）
     api.registerContextEngine("lobster-press", () => lobsterEngine);
-    api.registerContextEngine("default", () => lobsterEngine);  // ← 关键：抢占 default
+    
+    const registerAsDefault = pluginConfig.registerAsDefault !== false;  // 默认 true
+    if (registerAsDefault) {
+      api.registerContextEngine("default", () => lobsterEngine);
+      api.logger.info(`[lobster-press] Registered as both "lobster-press" and "default" ContextEngine`);
+    } else {
+      api.logger.info(`[lobster-press] Registered as "lobster-press" ContextEngine only`);
+    }
 
     // v4.0.6: 调试日志 - 确认 ContextEngine 注册（Issue #141 诊断）
     api.logger.info(`[lobster-press] Plugin loaded (db=${pluginConfig.dbPath ?? "~/.openclaw/lobster.db"}, ` +
