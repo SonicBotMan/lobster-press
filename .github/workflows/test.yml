@@ -111,12 +111,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install Node.js linting tools
-        run: npm install -g eslint typescript
-
-      - name: Run ESLint
-        run: eslint *.ts --ext .ts || true
-        continue-on-error: true
+      - name: Install dependencies
+        run: npm install
 
       - name: Run TypeScript type check
         run: npx tsc --noEmit
@@ -145,8 +141,9 @@ jobs:
         run: |
           echo "Checking for deprecated MCP parsing patterns..."
           # 检查是否使用了旧的 details.result 路径
-          if grep -n "details.*result\|\.result\?" index.ts | grep -v "content\[0\]\.text" | grep -v "// "; then
-            echo "❌ Found deprecated MCP parsing pattern (details.result)"
+          # 排除 data?.result（Python 层 assemble 工具的特殊返回结构）
+          if grep -n "details.*result\|detail\.details" index.ts | grep -v "// "; then
+            echo "❌ Found deprecated MCP parsing pattern (details.result or detail.details)"
             echo "   Use: result.content[0].text → JSON.parse"
             exit 1
           fi
