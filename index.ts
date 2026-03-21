@@ -648,8 +648,9 @@ const lobsterPlugin = {
           force: p.force ?? false,
         });
 
-        // v3.5.1: 修复 Bug #126 - 正确的取值路径（tokens_after 在 details.result 里）
-        const compressResult = (result.details as any)?.result;
+        // v4.0.21: 统一使用 content[0].text 解析路径（Issue #157 Bug #1）
+        const compressText = result.content?.[0]?.text;
+        const compressResult = compressText ? JSON.parse(compressText) : {};
         const tokensAfter = compressResult?.tokens_after ?? 0;
         const tokensSaved = compressResult?.tokens_saved ?? 0;
 
@@ -675,10 +676,16 @@ const lobsterPlugin = {
           const text = statusResult.content?.[0]?.text;
           const status = text ? JSON.parse(text) : {};
           
-          if (status.error && status.error.includes("not found")) {
-            // 数据库正常，只是没有这个 conversation
-            return { bootstrapped: true };
+          // v4.0.21: 修复 if 判断逻辑（Issue #157 Bug #3）
+          if (status.error) {
+            if (status.error.includes("not found")) {
+              // 数据库正常，只是没有这个 conversation
+              return { bootstrapped: true };
+            }
+            // 真实错误
+            return { bootstrapped: false, reason: status.error };
           }
+          // 无错误，数据库正常
           return { bootstrapped: true };
         } catch (error) {
           return { bootstrapped: false, reason: String(error) };
@@ -716,11 +723,11 @@ const lobsterPlugin = {
             conversation_id: conversationId,
           };
         } catch (error) {
-          // 降级：如果 MCP 调用失败，返回成功但不实际存储
-          // 这保持了向后兼容性
+          // v4.0.21: 修复降级逻辑，返回失败状态而非掩盖错误（Issue #157 Bug #2）
+          // 调用方可以根据 ingested: false 决定是否重试或告警
           return {
-            ingested: true,
-            note: `Fallback: MCP call failed (${String(error)})`,
+            ingested: false,
+            error: String(error),
             conversation_id: conversationId,
           };
         }
@@ -845,11 +852,9 @@ const lobsterPlugin = {
     api.logger.info(
       `[lobster-press] ContextEngine registered (threshold=${(pluginConfig.contextThreshold as number) ?? 0.8})`
     );
+    // v4.0.21: 降级为 info 级别（Issue #157 Bug #4）
     api.logger.info(
-      `[lobster-press] DEBUG: ContextEngine.afterTurn should be called after each turn`
-    );
-    api.logger.warn(
-      `[lobster-press] DEBUG: If you don't see "[lobster-press] afterTurn called" logs, ` +
+      `[lobster-press] Note: If you don't see "[lobster-press] afterTurn called" logs, ` +
       `your OpenClaw Gateway may not support ContextEngine.afterTurn hook`
     );
   },

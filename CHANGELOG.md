@@ -5,6 +5,21 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.21] - 2026-03-21
+
+### Fixed
+- **🟠 P1**: `compact` 方法解析路径仍使用旧 `details.result`（Issue #157 Bug #1）
+  - 统一使用 `content[0].text` → `JSON.parse` 解析路径
+- **🔴 P0**: `ingest` 降级逻辑返回 `ingested: true` 掩盖错误（Issue #157 Bug #2）
+  - 修复为返回 `ingested: false` + `error` 字段
+- **🟡 P2**: `bootstrap` 的 if 判断形同虚设（Issue #157 Bug #3）
+  - 当 `status.error` 不包含 "not found" 时返回 `bootstrapped: false`
+- **🟢 P3**: WARN 级别调试日志常驻生产环境（Issue #157 Bug #4）
+  - 降级为 info 级别
+
+### Thanks
+- 感谢 @Comet 的审查报告
+
 ## [4.0.20] - 2026-03-21
 
 ### Fixed
