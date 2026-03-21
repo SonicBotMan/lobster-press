@@ -5,6 +5,24 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.22] - 2026-03-21
+
+### Fixed
+- **🟡 P2**: `lobster_check_context` 触发压缩后透传 McpEnvelope 内部字段（Issue #158 Bug #1）
+  - 提取实际压缩结果，不再透传 requestId、status 等 IPC 元数据
+- **🟡 P2**: `assemble` 解析路径存在 `.result` 中间层，与 `compact` 不一致（Issue #158 Bug #2）
+  - 添加注释说明 Python 层返回结构差异
+- **🟡 P2**: `ingest` 的 `message.id` 可能传入 undefined（Issue #158 Bug #3）
+  - 改为 `id: params.message?.id ?? crypto.randomUUID()`
+
+### Added
+- CI 检查：TypeScript 编译强制、MCP 解析一致性、空实现检测、版本号同步
+- `scripts/release.sh`: 一键发布脚本（15 步流程）
+- `.git/hooks/pre-push`: 版本号同步检查 hook
+
+### Thanks
+- 感谢 @Comet 的审查报告
+
 ## [4.0.21] - 2026-03-21
 
 ### Fixed

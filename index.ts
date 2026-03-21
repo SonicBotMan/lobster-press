@@ -472,14 +472,18 @@ const lobsterPlugin = {
             force: true,
           });
           
+          // v4.0.22: 提取实际压缩结果，不透传 McpEnvelope 内部字段（Issue #158 Bug #1）
+          const compressText = compressResult.content?.[0]?.text;
+          const compressData = compressText ? JSON.parse(compressText) : {};
+          
           return {
             content: [
               {
                 type: "text",
-                text: `✅ 上下文检查：${messageCount} 条消息，已触发压缩\n\n${JSON.stringify(compressResult.details, null, 2)}`,
+                text: `✅ 上下文检查：${messageCount} 条消息，已触发压缩\n\n${JSON.stringify(compressData, null, 2)}`,
               },
             ],
-            details: { message_count: messageCount, action: "compressed", compress_result: compressResult.details },
+            details: { message_count: messageCount, action: "compressed", compress_result: compressData },
           };
         }
         
@@ -698,8 +702,9 @@ const lobsterPlugin = {
         
         try {
           // 构建消息对象
+          // v4.0.22: 确保 id 字段始终存在（Issue #158 Bug #3）
           const messages = [{
-            id: params.message?.id,
+            id: params.message?.id ?? crypto.randomUUID(),
             role: params.message?.role || "user",
             content: typeof params.message?.content === "string" 
               ? params.message.content 
@@ -745,6 +750,8 @@ const lobsterPlugin = {
           });
 
           // v4.0.19: 统一解析路径（Issue #155 Bug #4）
+          // v4.0.22: 注意 assemble 返回结构有 .result 中间层，与 compact 不同（Issue #158 Bug #2）
+          // TODO: Python 层应统一返回结构，将有效载荷置于顶层
           const text = result.content?.[0]?.text;
           const data = text ? JSON.parse(text) : {};
           const assembled = data?.result?.assembled ?? [];
