@@ -51,10 +51,12 @@ def compressor(temp_db, mock_llm):
 @pytest.fixture
 def mcp_server(temp_db, mock_llm):
     """创建 LobsterPressMCPServer 实例"""
-    return LobsterPressMCPServer(
-        db=temp_db,
-        llm_client=mock_llm
+    server = LobsterPressMCPServer(
+        db_path=temp_db.db_path
     )
+    # Manually inject the mock LLM client
+    server._llm_client = mock_llm
+    return server
 
 
 @pytest.fixture
