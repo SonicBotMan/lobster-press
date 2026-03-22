@@ -185,7 +185,7 @@ async function ensureMcpServer(config: Record<string, unknown>): Promise<ChildPr
         (config.namespace as string) || "default",
       ],
       {
-        cwd: join(__dirname, ".."), // 设置工作目录为包根目录，让 Python 找到 mcp_server 模块
+        cwd: __dirname, // v4.0.26: 修复 cwd 路径错误（Issue #167 Bug #4）- index.ts 在包根目录
         env: {
           ...process.env,
           LOBSTER_LLM_API_KEY:
@@ -231,8 +231,11 @@ async function ensureMcpServer(config: Record<string, unknown>): Promise<ChildPr
   try {
     return await bootPromise;
   } finally {
-    // v4.0.14: 无条件清除 bootPromise，避免竞态（Issue #152 Bug #3）
-    bootPromise = null;
+    // v4.0.26: 修复竞态条件，只有当前进程成功启动才清除（Issue #167 Bug #1）
+    // 避免并发请求时启动多个 Python 子进程
+    if (mcpProcess && mcpReady) {
+      bootPromise = null;
+    }
   }
 }
 
@@ -533,7 +536,8 @@ const lobsterPlugin = {
 
         // v4.0.14: 删除无用的 _getDb() 调用（Issue #152 Bug #5）
         const threshold = (pluginConfig.contextThreshold as number) ?? 0.8;
-        const tokenBudget = params.tokenBudget ?? 128000;
+        // v4.0.26: 优先读取 pluginConfig.maxContextTokens（Issue #167 Bug #2）
+        const tokenBudget = (pluginConfig.maxContextTokens as number) ?? params.tokenBudget ?? 128000;
 
         // v4.0.0: 获取轮次数
         const turnCount = await this._getTurnCount(params.sessionId);
@@ -712,9 +716,9 @@ const lobsterPlugin = {
         
         try {
           // 构建消息对象
-          // v4.0.22: 确保 id 字段始终存在（Issue #158 Bug #3）
+          // v4.0.26: 移除 crypto.randomUUID() 兼容性问题（Issue #167 Bug #5）
           const messages = [{
-            id: params.message?.id ?? crypto.randomUUID(),
+            id: params.message?.id ?? `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
             role: params.message?.role || "user",
             content: typeof params.message?.content === "string" 
               ? params.message.content 
@@ -833,14 +837,15 @@ const lobsterPlugin = {
             return null;
           }
           
-          // v4.0.18: 改进截断逻辑（Issue #154 Bug #2）
-          // 使用 tokenBudget 做自适应控制，取最新 5 条而非前 5 条
-          const maxContextChars = Math.floor((pluginConfig.maxContextTokens as number ?? 8000) * 3);
+          // v4.0.26: 修复截断逻辑（Issue #167 Bug #3）
+          // prepareContext 用于注入摘要到 system prompt，不是全量上下文
+          // 使用固定 4000 字符上限，避免逻辑混淆
+          const maxContextChars = 4000;
           const content = messages
             .slice(-5)  // 最新 5 条（而非前 5 条）
             .map((m: any) => `[${m.role}]: ${m.content ?? ''}`)
             .join('\n')
-            .slice(0, maxContextChars);  // 基于 tokenBudget 自适应截断
+            .slice(0, maxContextChars);
           
           return content ? `[Memory Context]\n${content}` : null;
         } catch (error) {
