@@ -118,6 +118,7 @@ class TFIDFScorer:
         """初始化评分器"""
         self.idf_cache: Dict[str, float] = {}
         self.corpus_tokens: List[List[str]] = []
+        self._corpus_hash: int = 0  # Fix 6: 语料库哈希，用于判断是否需要重新计算 IDF（Issue #174）
     
     def tokenize(self, text: str) -> List[str]:
         """分词（支持中文 bi-gram）
@@ -205,12 +206,12 @@ class TFIDFScorer:
     
     def score_and_tag(self, messages: List[Dict]) -> List[ScoredMessage]:
         """批量评分并打标签（v2.5.0 核心接口）
-        
+
         供 IncrementalCompressor 在入库前调用
-        
+
         Args:
             messages: 原始消息列表，每条格式 {id, role, content, timestamp}
-        
+
         Returns:
             ScoredMessage 列表，含 msg_type 和 compression_exempt
         """
@@ -225,11 +226,18 @@ class TFIDFScorer:
                     if isinstance(block, dict) and block.get('type') == 'text':
                         texts.append(block.get('text', ''))
                 content = ' '.join(texts)
-            
+
             tokens = self.tokenize(str(content))
             corpus_tokens.append(tokens)
-        
-        idf_cache = self.compute_idf(corpus_tokens)
+
+        # Fix 6: IDF 缓存优化，避免 O(n²) 重复计算（Issue #174）
+        corpus_hash = hash((len(messages), tuple(len(t) for t in corpus_tokens[:10])))
+        if corpus_hash != self._corpus_hash or not self.idf_cache:
+            # 语料库变化，重新计算 IDF
+            self.idf_cache = self.compute_idf(corpus_tokens)
+            self._corpus_hash = corpus_hash
+
+        idf_cache = self.idf_cache
         
         # 逐条评分
         results = []
