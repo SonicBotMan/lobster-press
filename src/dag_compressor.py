@@ -738,7 +738,8 @@ class DAGCompressor:
         FILE_PATH_RE = re.compile(
             r'(?:[\./][\w./\-]+\.\w{1,6}|/[\w./\-]+)', re.UNICODE
         )
-        PASCAL_RE = re.compile(r'\b[A-Z][a-zA-Z0-9]{2,}(?:[A-Z][a-zA-Z0-9]+)+\b')
+        # v4.0.35: 限制重复次数避免 ReDoS（Security #19）
+        PASCAL_RE = re.compile(r'\b[A-Z][a-zA-Z0-9]{2,20}(?:[A-Z][a-zA-Z0-9]{1,20}){0,5}\b')
         DECISION_KEYWORDS = ['决定', '选择', '配置', '设置', '采用', '使用', '改为', '切换']
         
         entity_candidates = {}  # name → type
