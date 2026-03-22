@@ -15,7 +15,9 @@
   "scripts": {
     "build": "tsc",
     "test": "echo \"No Node.js tests yet - Python tests cover the core functionality\" && exit 0",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test:ts": "vitest run",
+    "test:ts:watch": "vitest"
   },
   "keywords": [
     "openclaw",
@@ -32,8 +34,10 @@
     "openclaw": ">=2026.3.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.0",
     "openclaw": "^2026.3.0",
-    "typescript": "^5.4.0"
+    "typescript": "^5.4.0",
+    "vitest": "^4.1.0"
   },
   "repository": {
     "type": "git",
