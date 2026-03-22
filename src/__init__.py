@@ -6,14 +6,22 @@ LobsterPress - Cognitive Memory System for AI Agents
 所有其他文件应从此处导入版本号。
 """
 
-__version__ = "4.0.38"
+
+__version__ = "4.0.40"
+
+__version__ = "4.0.40"
+ (v4.0.40: 修复 MCP cwd 路径 + 恢复 lifecycle hooks)
 __author__ = "SonicBotMan"
 __email__ = "sonicbotman@example.com"
 
 # 版本历史（最近5个）
 VERSION_HISTORY = [
+
     ("4.0.37", "2026-03-22", "Issue #181 - E2E test bug fixes"),
     ("4.0.36", "2026-03-22", "Issue #174 - Expert feedback optimization"),
+
+    ("4.0.40", "2026-03-22", "Issue #174 - Expert feedback optimization"),
+ (v4.0.40: 修复 MCP cwd 路径 + 恢复 lifecycle hooks)
     ("4.0.35", "2026-03-22", "Issue #174 - P0/P1/P2 fixes"),
     ("4.0.34", "2026-03-21", "Issue #173 - TF-IDF optimization"),
     ("4.0.33", "2026-03-21", "Issue #172 - Performance improvements"),
