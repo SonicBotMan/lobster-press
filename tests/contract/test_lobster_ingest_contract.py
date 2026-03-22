@@ -44,7 +44,8 @@ def test_response_field_types(mcp_server):
         })
         
         result = json.loads(response["content"][0]["text"])
-        assert isinstance(result["ingested"], bool)
+        # ingested 是整数类型，表示成功入库的消息数量
+        assert isinstance(result["ingested"], int), "'ingested' must be an integer"
     
     asyncio.run(run_test())
 
@@ -64,6 +65,8 @@ def test_edge_case_empty_messages(mcp_server):
         })
         
         result = json.loads(response["content"][0]["text"])
-        assert result["ingested"] is True
+        # 空消息列表应该返回 ingested=0
+        assert result["ingested"] == 0, "Empty messages should result in ingested=0"
+        assert "message" in result, "Should have a message field"
     
     asyncio.run(run_test())
