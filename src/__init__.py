@@ -6,7 +6,7 @@ LobsterPress - Cognitive Memory System for AI Agents
 所有其他文件应从此处导入版本号。
 """
 
-__version__ = "4.0.37"
+__version__ = "4.0.38"
 __author__ = "SonicBotMan"
 __email__ = "sonicbotman@example.com"
 
