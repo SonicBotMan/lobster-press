@@ -5,6 +5,11 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.32] - 2026-03-22
+
+### Fixed
+- 🔴 **P0**: `src/database.py` 版本号未同步到 v4.0.31（CI 失败修复）
+
 ## [4.0.31] - 2026-03-22
 
 ### Fixed
