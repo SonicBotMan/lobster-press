@@ -134,6 +134,10 @@ class DAGCompressor:
         COMPRESS_WINDOW = 100
         uncompressed_messages = uncompressed_messages[:COMPRESS_WINDOW]
         
+        # Bug #2 修复：重新按时间戳排序，还原时序
+        # EventSegmenter 依赖相邻消息的语义距离来切割话题边界，乱序输入会导致情节切割完全错误
+        uncompressed_messages.sort(key=lambda m: m.get('timestamp', ''))
+        
         # 5. 计算 uncompressed messages 的 token 数
         uncompressed_tokens = sum(m.get('token_count', 0) for m in uncompressed_messages)
         
@@ -674,8 +678,6 @@ class DAGCompressor:
         # 注意：被压缩的消息仍然保留在 messages 表中（无损存储）
         # 但它们不再出现在 context_items 中（已经被摘要替代）
         # 这样就避免了重复压缩
-        
-        self.db.conn.commit()
     
     def get_context_items(self, conversation_id: str) -> List[Dict]:
         """获取当前上下文项（可见内容）
@@ -746,8 +748,10 @@ class DAGCompressor:
         import re
         
         # 正则规则
+        # Bug #3 修复：避免误匹配普通句子中的点号
+        # 匹配：绝对路径(/...) 或 相对路径(./... 或 ../...)
         FILE_PATH_RE = re.compile(
-            r'(?:[\./][\w./\-]+\.\w{1,6}|/[\w./\-]+)', re.UNICODE
+            r'(?:/[\w./\-]+\.\w{1,6}|\.\.?/[\w./\-]+)', re.UNICODE
         )
         # v4.0.35: 限制重复次数避免 ReDoS（Security #19）
         PASCAL_RE = re.compile(r'\b[A-Z][a-zA-Z0-9]{2,20}(?:[A-Z][a-zA-Z0-9]{1,20}){0,5}\b')
