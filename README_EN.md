@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - Transform AI conversations from 'ephemeral phantoms' into 'permanent nutrients in the digital hippocampus'" width="100%">
 
-# 🧠 LobsterPress v4.0.28
+# 🧠 LobsterPress v4.0.29
 
 **Cognitive Memory System for AI Agents**
 *LLM Persistent Memory Engine Based on Cognitive Science*
@@ -14,7 +14,7 @@
 
 [中文](README.md) | **English**
 
-**Latest**: [v4.0.28](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.28) · [Changelog](CHANGELOG.md)
+**Latest**: [v4.0.29](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.29) · [Changelog](CHANGELOG.md)
 
 </div>
 

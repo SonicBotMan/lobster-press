@@ -5,6 +5,13 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.29] - 2026-03-22
+
+### Fixed
+- 🟠 **P1**: `assemble()` 方法 catch 块缺少错误日志，失败时完全静默（Issue #170）
+  - 问题：assemble 失败时没有任何日志记录，开发者和运维无法感知
+  - 修复：添加 `api.logger.error()` 调用，与 `prepareContext`、`_getTurnCount` 等方法保持一致
+
 ## [4.0.28] - 2026-03-22
 
 ### Fixed

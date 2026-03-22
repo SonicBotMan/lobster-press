@@ -789,7 +789,8 @@ const lobsterPlugin = {
 
           return { messages, estimatedTokens: totalTokens };
         } catch (error) {
-          // 失败时返回原始消息
+          // v4.0.29: 添加错误日志（Issue #170）
+          api.logger.error(`[lobster-press] assemble failed for session ${p.sessionId}: ${error}`);
           return { messages: p.messages as any[], estimatedTokens: 0 };
         }
       },
