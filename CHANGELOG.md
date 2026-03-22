@@ -5,6 +5,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.28] - 2026-03-22
+
+### Fixed
+- 🔴 **P0**: `ingest()` 忽略 `sessionKey` 参数，导致特定场景下消息丢失（Issue #172）
+  - 问题：`ingest` 只用 `sessionId`，而 `prepareContext` 会 fallback 到 `sessionKey`，导致 key 不一致
+  - 修复：与 `prepareContext` 保持一致的 fallback 逻辑：优先 `sessionId`，fallback 到 `sessionKey`
+  - 新增：无有效 conversationId 时返回 `{ ingested: false, error: "no conversationId" }` 并记录警告日志
+
 ## [4.0.27] - 2026-03-22
 
 ### Added

@@ -716,7 +716,12 @@ const lobsterPlugin = {
       
       async ingest(params: { sessionId: string; sessionKey?: string; message: any; isHeartbeat?: boolean }) {
         // v4.0.20: 调用 lobster_ingest MCP 工具存储消息（Issue #156 Bug #2）
-        const conversationId = params.sessionId;  // 直接使用 sessionId 作为 conversationId
+        // v4.0.28: 与 prepareContext 保持一致，优先 sessionId，fallback 到 sessionKey（Issue #172）
+        const conversationId = params.sessionId || params.sessionKey;
+        if (!conversationId) {
+          api.logger.warn(`[lobster-press] ingest called with no sessionId or sessionKey, skipping`);
+          return { ingested: false, error: "no conversationId", conversation_id: "" };
+        }
         
         try {
           // 构建消息对象
