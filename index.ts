@@ -898,6 +898,127 @@ const lobsterPlugin = {
       `[lobster-press] Note: If you don't see "[lobster-press] afterTurn called" logs, ` +
       `your OpenClaw Gateway may not support ContextEngine.afterTurn hook`
     );
+    
+    // ── Lifecycle Hooks (v4.0.38: Issue #183 双模式插件) ───────────────────────
+    // 参考 MemOS OpenClaw Plugin：使用 lifecycle hooks 作为 ContextEngine 的降级方案
+    // 当 OpenClaw Gateway 不支持 ContextEngine.afterTurn 时，通过 lifecycle hooks 实现记忆管理
+    
+    // 1. before_agent_start: 召回记忆
+    api.on("before_agent_start", async (event: any, ctx: any) => {
+      // 检查是否启用 lifecycle 模式
+      const lifecycleEnabled = pluginConfig.lifecycleEnabled !== false;  // 默认 true
+      if (!lifecycleEnabled) return;
+      
+      // 获取 conversation_id
+      const conversationId = ctx?.sessionId || ctx?.sessionKey;
+      if (!conversationId) return;
+      
+      // 检查 prompt 是否存在
+      if (!event?.prompt || event.prompt.length < 3) return;
+      
+      try {
+        api.logger.info(`[lobster-press] Lifecycle: before_agent_start for session ${conversationId}`);
+        
+        // 调用 lobster_assemble 获取相关记忆
+        const result = await callMcp(pluginConfig, "lobster_assemble", {
+          conversation_id: conversationId,
+          token_budget: pluginConfig.maxContextTokens ?? 128000,
+        });
+        
+        // 解析返回结果
+        const text = result.content?.[0]?.text;
+        const data = text ? JSON.parse(text) : {};
+        const assembled = data?.assembled ?? [];
+        
+        if (assembled.length === 0) {
+          api.logger.info(`[lobster-press] Lifecycle: no memories found for session ${conversationId}`);
+          return;
+        }
+        
+        // 将记忆格式化为上下文
+        const memoryContext = assembled
+          .slice(-10)  // 最新 10 条记忆
+          .map((item: any) => `[${item.tier || 'memory'}]: ${item.content || ''}`)
+          .join('\n\n')
+          .slice(0, 8000);  // 限制 8000 字符
+        
+        if (!memoryContext) return;
+        
+        api.logger.info(`[lobster-press] Lifecycle: injected ${assembled.length} memories (${memoryContext.length} chars)`);
+        
+        // 返回 prependContext 注入记忆
+        return {
+          prependContext: `[LobsterPress Memory Context]\n${memoryContext}`,
+        };
+      } catch (error) {
+        api.logger.warn(`[lobster-press] Lifecycle: before_agent_start failed: ${error}`);
+      }
+    });
+    
+    // 2. agent_end: 写入记忆
+    api.on("agent_end", async (event: any, ctx: any) => {
+      // 检查是否启用 lifecycle 模式
+      const lifecycleEnabled = pluginConfig.lifecycleEnabled !== false;  // 默认 true
+      if (!lifecycleEnabled) return;
+      
+      // 检查是否成功
+      if (!event?.success || !event?.messages?.length) return;
+      
+      // 获取 conversation_id
+      const conversationId = ctx?.sessionId || ctx?.sessionKey;
+      if (!conversationId) return;
+      
+      try {
+        api.logger.info(`[lobster-press] Lifecycle: agent_end for session ${conversationId}`);
+        
+        // 提取最后一条对话（user + assistant）
+        const messages = event.messages.slice(-2).map((msg: any) => ({
+          id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+          role: msg.role || "user",
+          content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content || {}),
+          timestamp: msg.timestamp || new Date().toISOString(),
+        }));
+        
+        if (messages.length === 0) return;
+        
+        // 调用 lobster_ingest 保存消息
+        const result = await callMcp(pluginConfig, "lobster_ingest", {
+          conversation_id: conversationId,
+          messages: messages,
+        });
+        
+        // 解析返回结果
+        const responseText = result?.content?.[0]?.text;
+        const response = responseText ? JSON.parse(responseText) : {};
+        
+        if (response.ingested > 0) {
+          api.logger.info(`[lobster-press] Lifecycle: ingested ${response.ingested} messages for session ${conversationId}`);
+          
+          // 检查是否需要压缩（消息数 > 50）
+          const describeResult = await callMcp(pluginConfig, "lobster_describe", {
+            conversation_id: conversationId,
+          });
+          
+          const describeText = describeResult.content?.[0]?.text;
+          const stats = describeText ? JSON.parse(describeText) : {};
+          const messageCount = stats?.message_count ?? 0;
+          
+          if (messageCount > 50) {
+            api.logger.info(`[lobster-press] Lifecycle: triggering compress for session ${conversationId} (${messageCount} messages)`);
+            
+            // 调用 lobster_compress 压缩记忆
+            await callMcp(pluginConfig, "lobster_compress", {
+              conversation_id: conversationId,
+              force: false,
+            });
+          }
+        }
+      } catch (error) {
+        api.logger.warn(`[lobster-press] Lifecycle: agent_end failed: ${error}`);
+      }
+    });
+    
+    api.logger.info(`[lobster-press] Lifecycle hooks registered (before_agent_start + agent_end)`);
   },
 };
 

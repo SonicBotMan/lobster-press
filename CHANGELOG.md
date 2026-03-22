@@ -5,6 +5,28 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.38] - 2026-03-22
+
+### Added (Issue #183: 双模式插件)
+- 🦞 **Lifecycle Hooks**: 新增 `before_agent_start` 和 `agent_end` hooks
+  - 作为 ContextEngine 的降级方案
+  - 参考 MemOS OpenClaw Plugin 实现
+  - 立即可用，无需等待 OpenClaw Gateway 更新
+- 🔄 **双模式支持**: 同时支持 `lifecycle` 和 `context-engine` 两种模式
+  - ContextEngine 模式（未来）：`afterTurn` 自动压缩
+  - Lifecycle 模式（现在）：`before_agent_start` 召回记忆，`agent_end` 写入记忆
+- 🎯 **自动压缩**: 当消息数 > 50 时自动触发压缩
+- 📊 **详细日志**: 添加 lifecycle hooks 的详细日志
+
+### Implementation Details
+- `before_agent_start`: 调用 `lobster_assemble` 获取记忆，返回 `prependContext` 注入
+- `agent_end`: 调用 `lobster_ingest` 保存消息，自动检测并触发压缩
+- 配置选项：`lifecycleEnabled`（默认 true）
+
+### References
+- MemOS OpenClaw Plugin: https://github.com/MemTensor/MemOS-Cloud-OpenClaw-Plugin
+- Issue #183: https://github.com/SonicBotMan/lobster-press/issues/183
+
 ## [4.0.37] - 2026-03-22
 
 ### Fixed (E2E Test Bug Fixes - Issue #181)
