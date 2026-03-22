@@ -7,12 +7,13 @@ LobsterPress - Cognitive Memory System for AI Agents
 """
 
 
-__version__ = "4.0.40"
+__version__ = "4.0.41"
 __author__ = "SonicBotMan"
 __email__ = "sonicbotman@example.com"
 
 # 版本历史（最近5个）
 VERSION_HISTORY = [
+    ("4.0.41", "2026-03-22", "Issue #185 - Fix __init__.py syntax error"),
     ("4.0.40", "2026-03-22", "Issue #184 - MCP cwd path fix + lifecycle hooks"),
     ("4.0.37", "2026-03-22", "Issue #181 - E2E test bug fixes"),
     ("4.0.36", "2026-03-22", "Issue #174 - Expert feedback optimization"),

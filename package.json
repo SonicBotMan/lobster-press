@@ -1,10 +1,10 @@
 {
   "name": "@sonicbotman/lobster-press",
 
-  "version": "4.0.40",
+  "version": "4.0.41",
   "description": "Cognitive Memory System for AI Agents — OpenClaw Plugin",
 
-  "version": "4.0.40",
+  "version": "4.0.41",
   "description": "Cognitive Memory System for AI Agents \u2014 OpenClaw Plugin",
  (v4.0.40: 修复 MCP cwd 路径 + 恢复 lifecycle hooks)
   "type": "module",
