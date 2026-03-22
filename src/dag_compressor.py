@@ -120,6 +120,17 @@ class DAGCompressor:
             print(f"✅ 所有旧消息都已被压缩，无需继续")
             return None
         
+        # v4.0.34: 按遗忘曲线保留率升序排列，优先压缩"最应该被遗忘"的消息（Issue #173 修复二）
+        # 保留率越低 = 记忆价值越低 = 越应该先被压缩
+        # Ref: arXiv:2004.11327 — Adaptive Forgetting Curves
+        _now = datetime.utcnow()
+        uncompressed_messages.sort(
+            key=lambda m: self.db._compute_retention(m, _now)
+        )
+        # 只取前 N 条（保留率最低的优先进入本次压缩窗口）
+        COMPRESS_WINDOW = 100
+        uncompressed_messages = uncompressed_messages[:COMPRESS_WINDOW]
+        
         # 5. 计算 uncompressed messages 的 token 数
         uncompressed_tokens = sum(m.get('token_count', 0) for m in uncompressed_messages)
         
@@ -181,6 +192,13 @@ class DAGCompressor:
                 compressed_message_ids=[m['message_id'] for m in episode],
                 new_summary_id=summary_id
             )
+            
+            # v4.0.34: R³Mem 实体自动提取（Issue #173 修复三）
+            # 有 LLM 时用 LLM 提取；无 LLM 时用正则规则提取
+            if self.llm_client:
+                self._extract_entities_llm(conversation_id, episode, summary_id)
+            else:
+                self._extract_entities_rule(conversation_id, episode, summary_id)
             
             print(f"✅ 创建叶子摘要: {summary_id}")
             print(f"   - 消息数: {len(episode)}")
@@ -694,6 +712,122 @@ class DAGCompressor:
                     })
         
         return items
+    
+    # ==================== R³Mem 实体提取 ====================
+    # v4.0.34: Issue #173 修复三
+    
+    def _extract_entities_rule(
+        self,
+        conversation_id: str,
+        messages: list,
+        summary_id: str
+    ) -> None:
+        """
+        v4.0.34: 基于规则的实体提取（无 LLM 降级方案）
+        
+        提取三类实体：
+        1. 文件路径：以 / 或 ./ 开头，或含常见扩展名
+        2. 技术概念关键词：大写开头的连续词组（PascalCase）
+        3. 决策/配置关键词：含 "决定"、"配置"、"设置" 等词的句子主语
+        
+        Ref: arXiv:2502.15957 §3.2 Entity-Level Retrieval
+        """
+        import re
+        
+        # 正则规则
+        FILE_PATH_RE = re.compile(
+            r'(?:[\./][\w./\-]+\.\w{1,6}|/[\w./\-]+)', re.UNICODE
+        )
+        PASCAL_RE = re.compile(r'\b[A-Z][a-zA-Z0-9]{2,}(?:[A-Z][a-zA-Z0-9]+)+\b')
+        DECISION_KEYWORDS = ['决定', '选择', '配置', '设置', '采用', '使用', '改为', '切换']
+        
+        entity_candidates = {}  # name → type
+        
+        for msg in messages:
+            content = msg.get('content', '')
+            if not isinstance(content, str):
+                continue
+            
+            # 文件路径
+            for match in FILE_PATH_RE.findall(content):
+                if len(match) > 3:
+                    entity_candidates[match] = 'file'
+            
+            # PascalCase 技术概念
+            for match in PASCAL_RE.findall(content):
+                entity_candidates[match] = 'concept'
+            
+            # 决策关键词上下文
+            for kw in self.DECISION_KEYWORDS if hasattr(self, 'DECISION_KEYWORDS') else []:
+                idx = content.find(kw)
+                if idx != -1:
+                    # 取关键词前 10 字作为主语
+                    subject = content[max(0, idx - 10):idx].strip().split()[-1] if content[max(0, idx - 10):idx].strip() else ''
+                    if subject and len(subject) > 1:
+                        entity_candidates[subject] = 'decision'
+        
+        msg_ids = [m['message_id'] for m in messages]
+        for name, etype in entity_candidates.items():
+            self.db.upsert_entity(
+                conversation_id=conversation_id,
+                entity_name=name,
+                entity_type=etype,
+                message_ids=msg_ids,
+                namespace=self.db.namespace
+            )
+    
+    def _extract_entities_llm(
+        self,
+        conversation_id: str,
+        messages: list,
+        summary_id: str
+    ) -> None:
+        """
+        v4.0.34: 基于 LLM 的高质量实体提取
+        
+        Prompt 要求 LLM 返回 JSON 数组：
+        [{"name": "...", "type": "person|file|concept|decision"}]
+        
+        Ref: arXiv:2502.15957 §3.2 Entity-Level Retrieval
+        """
+        import json as _json
+        
+        combined = '\n'.join(
+            f"[{m.get('role','?')}]: {m.get('content','')[:300]}"
+            for m in messages
+        )
+        prompt = (
+            "从以下对话片段中提取所有关键实体（人名、文件路径、技术概念、重要决策）。\n"
+            "返回 JSON 数组，格式：[{\"name\": \"...\", \"type\": \"person|file|concept|decision\"}]\n"
+            "只返回 JSON，不要其他文字。\n\n"
+            f"{combined}"
+        )
+        
+        try:
+            raw = self.llm_client.generate(prompt, temperature=0.0, max_tokens=300)
+            # 提取 JSON 部分（防止 LLM 混入其他文字）
+            start = raw.find('[')
+            end = raw.rfind(']') + 1
+            if start == -1 or end == 0:
+                raise ValueError("No JSON array found")
+            entities = _json.loads(raw[start:end])
+        except Exception as e:
+            print(f"⚠️ LLM 实体提取失败: {e}，降级为规则提取")
+            self._extract_entities_rule(conversation_id, messages, summary_id)
+            return
+        
+        msg_ids = [m['message_id'] for m in messages]
+        for ent in entities:
+            name = ent.get('name', '').strip()
+            etype = ent.get('type', 'concept')
+            if name:
+                self.db.upsert_entity(
+                    conversation_id=conversation_id,
+                    entity_name=name,
+                    entity_type=etype,
+                    message_ids=msg_ids,
+                    namespace=self.db.namespace
+                )
 
 
 # ==================== 测试代码 ====================

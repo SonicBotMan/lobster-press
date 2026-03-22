@@ -5,7 +5,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: v4.0.33
+Version: v4.0.34
 """
 
 import sqlite3
@@ -25,6 +25,12 @@ except ImportError:
     # 当直接运行或从父目录导入时
     from three_pass_trimmer import ThreePassTrimmer
 
+# v4.0.34: 导入 TFIDFScorer（Issue #173 修复一）
+try:
+    from .pipeline.tfidf_scorer import TFIDFScorer
+except ImportError:
+    from pipeline.tfidf_scorer import TFIDFScorer
+
 
 class LobsterDatabase:
     """LobsterPress 数据库 - 无损存储层"""
@@ -42,6 +48,7 @@ class LobsterDatabase:
         self.db_path = db_path
         self.namespace = namespace  # v3.6.0 新增
         self.trimmer = ThreePassTrimmer()  # v4.0.0 新增
+        self.tfidf_scorer = TFIDFScorer()  # v4.0.34 新增（Issue #173 修复一）
         self.conn = None
         self.cursor = None
         self._init_database()
@@ -395,6 +402,22 @@ class LobsterDatabase:
         tfidf_score = message.get('tfidf_score', 0.0)
         structural_bonus = message.get('structural_bonus', 0.0)
         compression_exempt = 1 if message.get('compression_exempt', False) else 0
+        
+        # v4.0.34: 自动计算 TF-IDF 分数（Issue #173 修复一）
+        # 若调用方已传入分数（>0），优先使用；否则用当前对话语料重新评分
+        if tfidf_score == 0.0 and content:
+            try:
+                corpus_msgs = self.get_messages(conversation_id) if conversation_id else []
+                corpus_texts = [self._extract_content(m) for m in corpus_msgs] + [content]
+                scored = self.tfidf_scorer.score_messages(
+                    [{"content": t, "role": "user", "msg_type": "unknown"} for t in corpus_texts]
+                )
+                if scored:
+                    last = scored[-1]
+                    tfidf_score = last.get('tfidf_score', 0.0)
+                    structural_bonus = last.get('structural_bonus', 0.0)
+            except Exception as e:
+                print(f"⚠️ TF-IDF 计算失败: {e}")
         
         # Phase 3: 使用事务确保原子性
         with self.conn:

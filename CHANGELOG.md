@@ -5,6 +5,15 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.34] - 2026-03-22
+
+### Added
+- ✨ **TF-IDF 自动计算**: `save_message()` 自动计算 TF-IDF 分数，不再依赖外部传入 (Issue #173 修复一)
+- ✨ **遗忘曲线排序**: `leaf_compact()` 按保留率升序排列，优先压缩"最应该被遗忘"的消息 (Issue #173 修复二)
+- ✨ **R³Mem 实体自动提取**: 压缩后自动提取实体（文件路径、技术概念、决策关键词） (Issue #173 修复三)
+  - 支持 LLM 提取和规则提取两种模式
+  - Ref: arXiv:2502.15957 §3.2 Entity-Level Retrieval
+
 ## [4.0.33] - 2026-03-22
 
 ### Fixed
