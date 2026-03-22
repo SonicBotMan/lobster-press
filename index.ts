@@ -361,6 +361,7 @@ const lobsterPlugin = {
       }
       
       // maxContextTokens: 必须是正整数（v4.0.20: Issue #156 Bug #3）
+      // v4.0.27: 添加默认值 40000（Issue #166 P1-1）
       if (typeof raw.maxContextTokens === "number" &&
           Number.isInteger(raw.maxContextTokens) && raw.maxContextTokens > 0) {
         validated.maxContextTokens = raw.maxContextTokens;
@@ -369,6 +370,9 @@ const lobsterPlugin = {
         if (!isNaN(parsed) && parsed > 0) {
           validated.maxContextTokens = parsed;
         }
+      } else {
+        // 用户未设置时使用默认值
+        validated.maxContextTokens = 40000;
       }
 
       // registerAsDefault: 必须是布尔值（v4.0.17: Issue #153 Bug #4）
@@ -743,7 +747,8 @@ const lobsterPlugin = {
           };
         } catch (error) {
           // v4.0.21: 修复降级逻辑，返回失败状态而非掩盖错误（Issue #157 Bug #2）
-          // 调用方可以根据 ingested: false 决定是否重试或告警
+          // v4.0.27: 添加警告日志（Issue #166 P0-2）
+          api.logger.warn(`[lobster-press] ingest failed for session ${conversationId}: ${error}`);
           return {
             ingested: false,
             error: String(error),

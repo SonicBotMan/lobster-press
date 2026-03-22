@@ -5,6 +5,17 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.27] - 2026-03-22
+
+### Added
+- 🟠 **P1**: `ingest()` 失败时添加警告日志，便于监控消息丢失（Issue #166 P0-2）
+  - 新增：`api.logger.warn()` 记录 ingest 失败详情
+
+### Changed
+- 🟡 **P2**: `maxContextTokens` 默认值从 128000 调整为 40000（Issue #166 P1-1）
+  - 在 `configSchema` 中设置默认值，而非使用方 fallback
+  - 40000 tokens ≈ 120000 字符，适合大多数上下文窗口
+
 ## [4.0.26] - 2026-03-22
 
 ### Fixed
