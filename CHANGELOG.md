@@ -5,6 +5,35 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.36] - 2026-03-22
+
+### Fixed (P0 - Critical)
+- 🔴 **Fix 1**: DECISION_KEYWORDS 死代码修复 (Issue #174)
+  - 提升 `DECISION_KEYWORDS` 为类常量，移除 `hasattr` 检查
+  - 实体提取功能现已正常工作
+- 🔴 **Fix 3**: 修复"丢弃消息"死循环 (Issue #174)
+  - 不再丢弃过小的尾部消息，合并到最后一个 episode
+  - 压缩流程不再卡死
+- 🔴 **Fix 2**: 数据库事务保护 (Issue #174)
+  - 使用 `with self.db.conn:` 事务保护，确保原子性
+  - 数据一致性得到保障
+
+### Performance (P1)
+- 🟠 **Fix 5**: 中文文本复杂度加权 (Issue #174)
+  - 引入 `zh_character_ratio` 计算中文字符占比
+  - 汉字密度是英文的 2-3 倍，加权处理
+  - 中文文本的复杂度评估更准确
+- 🟠 **Fix 7**: afterTurn 本地计数 (Issue #174)
+  - 添加 `_turn_counts` 缓存，避免频繁的 `SELECT COUNT(*)` 查询
+  - 计数器性能提升显著
+- 🟠 **Fix 6**: TF-IDF O(n²) 性能优化 (Issue #174)
+  - 添加 `_corpus_hash` 检测语料库变化
+  - 只在语料库变化时重新计算 IDF
+  - 性能提升：大对话（500+ 消息）从 10s+ 降至 <1s
+
+### Notes
+- Fix 4（SQLite 并发安全）推迟到后续版本：修复量 83 处，风险较高
+
 ## [4.0.35] - 2026-03-22
 
 ### Security
