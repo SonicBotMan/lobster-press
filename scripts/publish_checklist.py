@@ -33,6 +33,53 @@ def get_git_tags() -> list:
     tags = run_cmd("git tag -l 'v*' | sort -V")
     return tags.split("\n") if tags else []
 
+def check_version_consistency() -> dict:
+    """检查所有文件的版本号是否一致"""
+    import os
+    
+    pkg_version = get_package_version()
+    
+    # 需要检查的文件及其版本号模式
+    version_files = {
+        "src/__init__.py": r'__version__\s*=\s*["\']([^"\']+)["\']',
+        "src/database.py": r'Version:\s*v?([\d.]+)',
+        "src/agent_tools.py": r'Version:\s*v?([\d.]+)',
+        "src/incremental_compressor.py": r'Version:\s*v?([\d.]+)',
+        "src/llm_client.py": r'Version:\s*v?([\d.]+)',
+        "src/llm_providers.py": r'Version:\s*v?([\d.]+)',
+        "src/prompts.py": r'Version:\s*v?([\d.]+)',
+        "src/semantic_memory.py": r'Version:\s*v?([\d.]+)',
+        "src/dag_compressor.py": r'Version:\s*v?([\d.]+)',
+        "mcp_server/lobster_mcp_server.py": r'Version:\s*v?([\d.]+)',
+        "README.md": r'最新版本.*?v?([\d.]+)',
+        "README_EN.md": r'Latest.*?v?([\d.]+)',
+    }
+    
+    inconsistencies = []
+    
+    for file_path, pattern in version_files.items():
+        if not os.path.exists(file_path):
+            continue
+        
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        match = re.search(pattern, content, re.IGNORECASE)
+        if match:
+            file_version = match.group(1)
+            if file_version != pkg_version:
+                inconsistencies.append({
+                    "file": file_path,
+                    "expected": pkg_version,
+                    "actual": file_version
+                })
+    
+    return {
+        "consistent": len(inconsistencies) == 0,
+        "package_version": pkg_version,
+        "inconsistencies": inconsistencies
+    }
+
 def confirm(prompt: str) -> bool:
     """等待用户确认"""
     while True:
@@ -72,6 +119,20 @@ def main():
     print("=" * 60)
     print("  Phase 1: 代码准备")
     print("=" * 60)
+    
+    # 检查版本号一致性
+    version_check = check_version_consistency()
+    if not version_check["consistent"]:
+        print(f"❌ 版本号不一致！")
+        print(f"   package.json: {version_check['package_version']}")
+        for inc in version_check["inconsistencies"]:
+            print(f"   {inc['file']}: {inc['actual']} (应为 {inc['expected']})")
+        print()
+        if not confirm("是否已修复版本号不一致？"):
+            print("❌ 发布已取消")
+            return 1
+    else:
+        print(f"✅ 版本号一致性检查通过 ({version_check['package_version']})")
     
     checks = [
         ("1. 所有修改已提交到 Git", "git status --porcelain", ""),

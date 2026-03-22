@@ -24,11 +24,23 @@ python3 scripts/publish_checklist.py
 - [ ] 3. TypeScript 编译通过 (`npx tsc --noEmit`)
 - [ ] 4. **CI 检查通过**（MCP 解析一致性、空实现检测）
 
-### Phase 2: 版本号同步（4 个文件必须一致！）
-- [ ] 5. `package.json` 版本号已更新
-- [ ] 6. `src/database.py` 文件头 Version: 已更新 ⚠️ v4.0.18 忘记同步！
-- [ ] 7. `README.md` 版本引用已更新
-- [ ] 8. `CHANGELOG.md` 已添加新版本记录
+### Phase 2: 版本号同步（11 个文件必须一致！）
+- [ ] 5. `src/__init__.py` 的 `__version__` 已更新 **（单一真实来源）**
+- [ ] 6. `package.json` 版本号已更新
+- [ ] 7. `src/database.py` 文件头 Version: 已更新
+- [ ] 8. `src/agent_tools.py` 文件头 Version: 已更新
+- [ ] 9. `src/incremental_compressor.py` 文件头 Version: 已更新
+- [ ] 10. `src/llm_client.py` 文件头 Version: 已更新
+- [ ] 11. `src/llm_providers.py` 文件头 Version: 已更新
+- [ ] 12. `src/prompts.py` 文件头 Version: 已更新
+- [ ] 13. `src/semantic_memory.py` 文件头 Version: 已更新
+- [ ] 14. `src/dag_compressor.py` 文件头 Version: 已更新
+- [ ] 15. `mcp_server/lobster_mcp_server.py` 文件头 Version: 已更新
+- [ ] 16. `README.md` 版本引用已更新
+- [ ] 17. `README_EN.md` 版本引用已更新
+- [ ] 18. `CHANGELOG.md` 已添加新版本记录
+
+**⚠️ 快速同步命令**（见下方"发布命令速查"）
 
 ### Phase 3: Git 发布
 - [ ] 9. Git commit 已创建
@@ -77,12 +89,26 @@ python3 scripts/publish_checklist.py
 ## 发布命令速查
 
 ```bash
-# === 版本号同步（4 个文件）===
-VERSION="4.0.20"
+# === 版本号同步（11 个文件）===
+VERSION="4.0.36"
+
+# 单一真实来源
+sed -i "s/__version__ = \".*\"/__version__ = \"$VERSION\"/" src/__init__.py
+
+# package.json
 sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
-sed -i "s/Version: v.*/Version: v$VERSION/" src/database.py
+
+# 所有 Python 文件（文件头 Version:）
+find src mcp_server -name "*.py" -exec sed -i "s/Version: v.*/Version: v$VERSION/g" {} \;
+
+# README 文件
 sed -i "s/v4\.0\.[0-9]*/v$VERSION/g" README.md
+sed -i "s/v4\.0\.[0-9]*/v$VERSION/g" README_EN.md
+
 # 手动编辑 CHANGELOG.md
+
+# === 验证版本号一致性 ===
+python3 scripts/publish_checklist.py
 
 # === 提交 ===
 git add -A && git commit -m "chore: v$VERSION 发布"
@@ -119,6 +145,7 @@ curl -X POST -H "Authorization: token $GITHUB_TOKEN" \
 | v4.0.18 | database.py 版本号 | CI version-check 失败 | v4.0.19 |
 | v4.0.18 | `__dirname` 作用域 | 100% 启动崩溃 | v4.0.19 |
 | v4.0.12-4.0.18 | GitHub Packages | 用户看到旧版本 | v4.0.19 手动补发 |
+| v4.0.25-4.0.35 | 8 个文件版本号不一致 | 可信度受损 | v4.0.36 手动修复 |
 
 **结论**：必须建立强制检查机制，不能依赖记忆。
 
