@@ -8,7 +8,7 @@ LobsterPress LLM Client - 统一 LLM 客户端接口
 - 国内：DeepSeek, 智谱 GLM, 百度文心, 阿里通义千问
 
 Author: LobsterPress Team
-Version: v4.0.37
+Version: v4.0.41
 """
 
 import os

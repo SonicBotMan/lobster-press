@@ -5,7 +5,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: v4.0.37
+Version: v4.0.41
 """
 
 import sqlite3
@@ -25,7 +25,7 @@ except ImportError:
     # 当直接运行或从父目录导入时
     from three_pass_trimmer import ThreePassTrimmer
 
-# v4.0.37: 延迟导入 TFIDFScorer 以避免循环导入（Issue #181）
+# v4.0.41: 延迟导入 TFIDFScorer 以避免循环导入（Issue #181）
 # 原因：database.py -> pipeline/__init__.py -> batch_importer.py -> database.py
 # 解决：在需要时才导入 TFIDFScorer
 TFIDFScorer = None  # 将在 _get_tfidf_scorer() 中延迟导入
@@ -47,14 +47,14 @@ class LobsterDatabase:
         self.db_path = db_path
         self.namespace = namespace  # v3.6.0 新增
         self.trimmer = ThreePassTrimmer()  # v4.0.0 新增
-        self._tfidf_scorer = None  # v4.0.37: 延迟加载（Issue #181）
+        self._tfidf_scorer = None  # v4.0.41: 延迟加载（Issue #181）
         self._turn_counts = {}  # Fix 7: 本地计数器缓存（Issue #174）
         self.conn = None
         self.cursor = None
         self._init_database()
     
     def _get_tfidf_scorer(self):
-        """延迟加载 TFIDFScorer（v4.0.37 Issue #181）"""
+        """延迟加载 TFIDFScorer（v4.0.41 Issue #181）"""
         if self._tfidf_scorer is None:
             global TFIDFScorer
             if TFIDFScorer is None:
@@ -427,7 +427,7 @@ class LobsterDatabase:
                 )
                 if scored:
                     last = scored[-1]
-                    # v4.0.37: ScoredMessage 是 dataclass，不是 dict（Issue #181）
+                    # v4.0.41: ScoredMessage 是 dataclass，不是 dict（Issue #181）
                     tfidf_score = last.tfidf_score if hasattr(last, 'tfidf_score') else 0.0
                     structural_bonus = last.structural_bonus if hasattr(last, 'structural_bonus') else 0.0
             except Exception as e:
