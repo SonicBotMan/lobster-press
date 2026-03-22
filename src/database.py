@@ -5,7 +5,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: v4.0.35
+Version: v4.0.36
 """
 
 import sqlite3
@@ -49,6 +49,7 @@ class LobsterDatabase:
         self.namespace = namespace  # v3.6.0 新增
         self.trimmer = ThreePassTrimmer()  # v4.0.0 新增
         self.tfidf_scorer = TFIDFScorer()  # v4.0.34 新增（Issue #173 修复一）
+        self._turn_counts = {}  # Fix 7: 本地计数器缓存（Issue #174）
         self.conn = None
         self.cursor = None
         self._init_database()
@@ -430,15 +431,21 @@ class LobsterDatabase:
             
             # 执行 UPSERT
             self.cursor.execute("""
-                INSERT OR REPLACE INTO messages 
+                INSERT OR REPLACE INTO messages
                 (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
                  msg_type, tfidf_score, structural_bonus, compression_exempt)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
                   msg_type, tfidf_score, structural_bonus, compression_exempt))
-            
+
             new_rowid = self.cursor.lastrowid
-            
+
+            # Fix 7: 更新本地计数器（Issue #174）
+            if role == 'user' and old_rowid is None:  # 只在新插入 user 消息时更新
+                if conversation_id in self._turn_counts:
+                    self._turn_counts[conversation_id] += 1
+                # else: 没有缓存时不立即查询，等下次 get_turn_count 时再加载
+
             # 维护 FTS5 索引：先删旧，再插新
             if old_rowid is not None:
                 self.cursor.execute(
@@ -614,16 +621,23 @@ class LobsterDatabase:
         """
         if not content or len(content) < 20:
             return 0.0
-        
+
+        # Fix 5: 中文文本复杂度加权（Issue #174）
+        zh_chars = sum(1 for c in content if '\u4e00' <= c <= '\u9fff')
+        zh_ratio = zh_chars / len(content) if content else 0.0
+
+        # 中文加权：汉字密度是英文的 2-3 倍
+        zh_weight = 1.0 + zh_ratio * 2.0  # 最多 3 倍加权
+
         # 维度1：词汇丰富度（TTR）
         words = content.lower().split()
         if len(words) < 5:
             ttr = 0.5
         else:
             ttr = min(len(set(words)) / len(words), 1.0)
-        
-        # 维度2：长度因子
-        length_factor = min(len(content) / 500.0, 1.0)
+
+        # 维度2：长度因子（中文加权）
+        length_factor = min(len(content) / 500.0 * zh_weight, 1.0)
         
         # 维度3：结构深度
         structure_score = 0.0
@@ -1241,18 +1255,29 @@ class LobsterDatabase:
     def get_turn_count(self, conversation_id: str) -> int:
         """v4.0.0: 获取对话的轮次数（user 消息数量）
 
+        Fix 7: 优先使用本地计数器，避免频繁 IPC（Issue #174）
+
         Args:
             conversation_id: 对话 ID
 
         Returns:
             轮次数
         """
+        # Fix 7: 优先使用本地缓存
+        if conversation_id in self._turn_counts:
+            return self._turn_counts[conversation_id]
+
+        # 没有缓存，从数据库加载
         self.cursor.execute(
             "SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND role = 'user'",
             (conversation_id,)
         )
         result = self.cursor.fetchone()
-        return result[0] if result else 0
+        count = result[0] if result else 0
+
+        # 缓存结果
+        self._turn_counts[conversation_id] = count
+        return count
 
     # ==================== 辅助方法 ====================
     
