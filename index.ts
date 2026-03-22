@@ -522,14 +522,11 @@ const lobsterPlugin = {
       // 关键：每次 turn 后自动检查上下文使用率
       // v4.0.0: Focus 主动压缩触发（定时 + 紧急 + 被动三策略）
       // v4.0.23: 异常处理策略文档化（Issue #160 建议 #2）
+      // v4.0.30: 三种策略均捕获异常，不中断对话（Issue #169）
       //
       // ── 异常处理设计决策 ──
-      // 策略一（定时）和策略二（紧急）有意不捕获异常，让异常向上冒泡：
-      // 1. 压缩失败是严重问题，需要上层知道
-      // 2. 不应该静默忽略压缩失败，否则会导致上下文溢出
-      // 3. 让 OpenClaw 决定如何处理异常（记录日志、通知用户等）
-      //
-      // 策略三（被动）同样不捕获异常，保持一致性
+      // 三种策略均捕获异常并记录日志，不向上冒泡：
+      // 压缩失败不应中断用户对话，由日志监控告警。
       async afterTurn(params: any) {
         // v4.0.6: 调试日志 - 确认 afterTurn 被调用（Issue #141 诊断）
         api.logger.info(`[lobster-press] afterTurn called (sessionId=${params?.sessionId ?? "unknown"})`);
@@ -573,13 +570,19 @@ const lobsterPlugin = {
             `[lobster-press] Focus scheduled compression at turn ${turnCount}`
           );
 
-          await callMcp(pluginConfig, "lobster_compress", {
-            conversation_id: params.sessionId,
-            current_tokens: currentTokenCount,
-            token_budget: tokenBudget,
-            strategy: 'focus_scheduled',
-            force: true,
-          });
+          // v4.0.30: 添加异常捕获（Issue #169）
+          try {
+            await callMcp(pluginConfig, "lobster_compress", {
+              conversation_id: params.sessionId,
+              current_tokens: currentTokenCount,
+              token_budget: tokenBudget,
+              strategy: 'focus_scheduled',
+              force: true,
+            });
+          } catch (err) {
+            api.logger.error(`[lobster-press] scheduled compression failed at turn ${turnCount}: ${err}`);
+            // 定时压缩失败不中断对话，记录日志后继续
+          }
 
           // v4.0.0: 定时压缩完成，不注入消息（避免干扰对话）
           return;
@@ -592,13 +595,19 @@ const lobsterPlugin = {
           );
           
           // v4.0.9: 修复 P0-1 - 紧急压缩必须执行，不能只打日志（Issue #142）
-          await callMcp(pluginConfig, "lobster_compress", {
-            conversation_id: params.sessionId,
-            current_tokens: currentTokenCount,
-            token_budget: tokenBudget,
-            strategy: "urgent",
-            force: true,
-          });
+          // v4.0.30: 添加异常捕获（Issue #169）
+          try {
+            await callMcp(pluginConfig, "lobster_compress", {
+              conversation_id: params.sessionId,
+              current_tokens: currentTokenCount,
+              token_budget: tokenBudget,
+              strategy: "urgent",
+              force: true,
+            });
+          } catch (err) {
+            api.logger.error(`[lobster-press] URGENT compression failed (context at ${(ratio * 100).toFixed(1)}%): ${err}`);
+            // 紧急压缩失败需要记录，但不应中断用户对话
+          }
           return;
         }
 

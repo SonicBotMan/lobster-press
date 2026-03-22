@@ -5,6 +5,14 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.30] - 2026-03-22
+
+### Fixed
+- 🔴 **P0**: `afterTurn` 策略一/二缺少异常捕获，异常冒泡可能中断对话（Issue #169）
+  - 问题：策略一（定时）和策略二（紧急）没有 try/catch，异常会冒泡到 Gateway
+  - 修复：为两种策略添加 try/catch，记录错误日志但不中断对话
+  - 更新：异常处理注释，明确三种策略均捕获异常
+
 ## [4.0.29] - 2026-03-22
 
 ### Fixed

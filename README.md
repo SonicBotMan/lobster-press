@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
 
-# 🧠 LobsterPress v4.0.29「深海」
+# 🧠 LobsterPress v4.0.30「深海」
 
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v4.0.29](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.29) · [更新日志](CHANGELOG.md)
+**最新版本**: [v4.0.30](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.30) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -306,7 +306,7 @@ export LOBSTER_LLM_MODEL=deepseek-chat
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| **v4.0.29** ⭐ | 2026-03-22 | Issue #167 审计修复（5 个 Bug） |
+| **v4.0.30** ⭐ | 2026-03-22 | Issue #167 审计修复（5 个 Bug） |
 | **v4.0.25** | 2026-03-21 | Issue #154 修复（ESM 兼容 + 截断逻辑） |
 | **v4.0.25** | 2026-03-21 | Issue #153 修复（per-session 锁 + 版本动态） |
 | **v4.0.25** | 2026-03-21 | README 重写 + 学术引用 |
