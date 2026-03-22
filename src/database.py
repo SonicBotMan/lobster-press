@@ -5,7 +5,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: v4.0.36
+Version: v4.0.37
 """
 
 import sqlite3
@@ -25,11 +25,10 @@ except ImportError:
     # 当直接运行或从父目录导入时
     from three_pass_trimmer import ThreePassTrimmer
 
-# v4.0.34: 导入 TFIDFScorer（Issue #173 修复一）
-try:
-    from .pipeline.tfidf_scorer import TFIDFScorer
-except ImportError:
-    from pipeline.tfidf_scorer import TFIDFScorer
+# v4.0.37: 延迟导入 TFIDFScorer 以避免循环导入（Issue #181）
+# 原因：database.py -> pipeline/__init__.py -> batch_importer.py -> database.py
+# 解决：在需要时才导入 TFIDFScorer
+TFIDFScorer = None  # 将在 _get_tfidf_scorer() 中延迟导入
 
 
 class LobsterDatabase:
@@ -48,11 +47,24 @@ class LobsterDatabase:
         self.db_path = db_path
         self.namespace = namespace  # v3.6.0 新增
         self.trimmer = ThreePassTrimmer()  # v4.0.0 新增
-        self.tfidf_scorer = TFIDFScorer()  # v4.0.34 新增（Issue #173 修复一）
+        self._tfidf_scorer = None  # v4.0.37: 延迟加载（Issue #181）
         self._turn_counts = {}  # Fix 7: 本地计数器缓存（Issue #174）
         self.conn = None
         self.cursor = None
         self._init_database()
+    
+    def _get_tfidf_scorer(self):
+        """延迟加载 TFIDFScorer（v4.0.37 Issue #181）"""
+        if self._tfidf_scorer is None:
+            global TFIDFScorer
+            if TFIDFScorer is None:
+                try:
+                    from .pipeline.tfidf_scorer import TFIDFScorer as _TFIDFScorer
+                except ImportError:
+                    from pipeline.tfidf_scorer import TFIDFScorer as _TFIDFScorer
+                TFIDFScorer = _TFIDFScorer
+            self._tfidf_scorer = TFIDFScorer()
+        return self._tfidf_scorer
     
     def _init_database(self):
         """初始化数据库结构 - 借鉴 lossless-claw"""
@@ -410,13 +422,14 @@ class LobsterDatabase:
             try:
                 corpus_msgs = self.get_messages(conversation_id) if conversation_id else []
                 corpus_texts = [self._extract_content(m) for m in corpus_msgs] + [content]
-                scored = self.tfidf_scorer.score_messages(
+                scored = self._get_tfidf_scorer().score_messages(
                     [{"content": t, "role": "user", "msg_type": "unknown"} for t in corpus_texts]
                 )
                 if scored:
                     last = scored[-1]
-                    tfidf_score = last.get('tfidf_score', 0.0)
-                    structural_bonus = last.get('structural_bonus', 0.0)
+                    # v4.0.37: ScoredMessage 是 dataclass，不是 dict（Issue #181）
+                    tfidf_score = last.tfidf_score if hasattr(last, 'tfidf_score') else 0.0
+                    structural_bonus = last.structural_bonus if hasattr(last, 'structural_bonus') else 0.0
             except Exception as e:
                 print(f"⚠️ TF-IDF 计算失败: {e}")
         

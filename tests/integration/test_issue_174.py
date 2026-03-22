@@ -12,7 +12,7 @@
 - Fix 7: afterTurn 本地计数
 
 Author: LobsterPress Team
-Version: v4.0.36
+Version: v4.0.37
 """
 
 import pytest

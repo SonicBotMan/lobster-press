@@ -4,10 +4,10 @@
 LobsterPress MCP Server
 基于 Model Context Protocol (MCP) 的认知记忆压缩服务
 
-Version: v4.0.36
+Version: v4.0.37
 Changelog: https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md
 
-# lobster-press v4.0.36 MCP 工具集
+# lobster-press v4.0.37 MCP 工具集
 
 ## Write 层（写入记忆）
 - lobster_compact   — 触发 DAG 压缩，将工作记忆写入情节记忆
@@ -39,7 +39,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # v4.0.13: 统一版本号常量（Issue #151 Bug #8）
-LOBSTERPRESS_VERSION = "v4.0.36"
+LOBSTERPRESS_VERSION = "v4.0.37"
 
 
 @dataclass
@@ -70,7 +70,8 @@ class LobsterPressMCPServer:
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
 
         # v3.2.2: OpenClaw 插件支持
-        self.db_path = db_path or os.path.expanduser("~/.openclaw/lobster.db")
+        # v4.0.37: 修复 db_path 中 ~ 未展开的 Bug（Issue #181）
+        self.db_path = os.path.expanduser(db_path) if db_path else os.path.expanduser("~/.openclaw/lobster.db")
         self.llm_provider = llm_provider
         self.llm_model = llm_model
         self.namespace = namespace  # v3.6.0 新增

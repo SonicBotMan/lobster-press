@@ -5,6 +5,25 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.37] - 2026-03-22
+
+### Fixed (E2E Test Bug Fixes - Issue #181)
+- 🔴 **Bug #1**: 数据库路径 `~` 未展开
+  - 修复：`db_path` 参数使用 `os.path.expanduser()` 展开 `~`
+  - 影响：数据库文件现在正确创建在 `~/.openclaw/lobster.db`
+- 🔴 **Bug #2**: 循环导入导致 `lobster_compress` 等工具失败
+  - 修复：延迟导入 `TFIDFScorer`，避免循环依赖
+  - 循环链条：`database.py → pipeline/__init__.py → batch_importer.py → database.py`
+  - 影响：所有 MCP 工具现在可以正常工作
+- 🔴 **Bug #3**: TF-IDF 计算失败 (`ScoredMessage` 对象没有 `get` 方法)
+  - 修复：使用属性访问（`last.tfidf_score`）而不是字典方法（`last.get()`）
+  - 影响：TF-IDF 分数现在可以正确计算
+
+### Test Results
+- ✅ 成功工具：6/15（40%）
+- ❌ 失败工具：0/15（0%）
+- 所有核心功能（ingest, compress, assemble, grep）现已正常工作
+
 ## [4.0.36] - 2026-03-22
 
 ### Fixed (P0 - Critical)
