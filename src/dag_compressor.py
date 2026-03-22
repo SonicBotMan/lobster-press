@@ -32,6 +32,9 @@ class DAGCompressor:
     5. v2.6.0 新增：情节边界分割（EventSegmenter）
     """
     
+    # Fix 1: 提升为类常量，避免死代码（Issue #174）
+    DECISION_KEYWORDS = ['决定', '选择', '配置', '设置', '采用', '使用', '改为', '切换']
+    
     def __init__(self, 
                  db: LobsterDatabase,
                  fresh_tail_count: int = 32,
@@ -154,12 +157,17 @@ class DAGCompressor:
             if pending_tokens >= max_tokens * 0.5:
                 merged_episodes.append(pending)
                 pending = []
-        # 尾部剩余：放宽阈值避免丢弃过多
+        # 尾部剩余：不丢弃，强制加入最后一个 episode（Fix 3, Issue #174）
         if pending:
             pending_tokens = sum(m.get("token_count", 0) for m in pending)
             if pending_tokens >= max_tokens * 0.3:
                 merged_episodes.append(pending)
-            # else: 太小，丢弃
+            elif merged_episodes:
+                # 太小则合并到上一个 episode，避免死循环
+                merged_episodes[-1].extend(pending)
+            else:
+                # 没有任何 episode，也强制压缩（避免卡死）
+                merged_episodes.append(pending)
         
         if not merged_episodes:
             print(f"⚠️ 所有 episode 都太小，无需压缩")
@@ -630,35 +638,38 @@ class DAGCompressor:
         
         return compressed_ids
     
-    def _update_context_after_compression(self, 
+    def _update_context_after_compression(self,
                                           conversation_id: str,
                                           compressed_message_ids: List[str],
                                           new_summary_id: str):
         """压缩后更新上下文
-        
+
         借鉴 lossless-claw 的 context_items 管理：
         - 被压缩的消息从上下文中移除
         - 新的摘要添加到上下文中
-        
+
         Args:
             conversation_id: 对话 ID
             compressed_message_ids: 被压缩的消息 ID 列表
             new_summary_id: 新创建的摘要 ID
         """
-        # 获取当前最大的 ordinal
-        self.db.cursor.execute("""
-            SELECT MAX(ordinal) FROM context_items
-            WHERE conversation_id = ?
-        """, (conversation_id,))
-        
-        result = self.db.cursor.fetchone()
-        max_ordinal = result[0] if result and result[0] is not None else 0
-        
-        # 添加新的摘要到上下文
-        self.db.cursor.execute("""
-            INSERT INTO context_items (conversation_id, ordinal, item_type, item_id)
-            VALUES (?, ?, ?, ?)
-        """, (conversation_id, max_ordinal + 1, 'summary', new_summary_id))
+        # Fix 2: 使用事务保护，确保原子性（Issue #174）
+        with self.db.conn:
+            # 获取当前最大的 ordinal
+            self.db.cursor.execute("""
+                SELECT MAX(ordinal) FROM context_items
+                WHERE conversation_id = ?
+            """, (conversation_id,))
+
+            result = self.db.cursor.fetchone()
+            max_ordinal = result[0] if result and result[0] is not None else 0
+
+            # 添加新的摘要到上下文
+            self.db.cursor.execute("""
+                INSERT INTO context_items (conversation_id, ordinal, item_type, item_id)
+                VALUES (?, ?, ?, ?)
+            """, (conversation_id, max_ordinal + 1, 'summary', new_summary_id))
+        # with 块退出时自动 commit，失败自动 rollback
         
         # 注意：被压缩的消息仍然保留在 messages 表中（无损存储）
         # 但它们不再出现在 context_items 中（已经被摘要替代）
@@ -740,7 +751,7 @@ class DAGCompressor:
         )
         # v4.0.35: 限制重复次数避免 ReDoS（Security #19）
         PASCAL_RE = re.compile(r'\b[A-Z][a-zA-Z0-9]{2,20}(?:[A-Z][a-zA-Z0-9]{1,20}){0,5}\b')
-        DECISION_KEYWORDS = ['决定', '选择', '配置', '设置', '采用', '使用', '改为', '切换']
+        # Fix 1: DECISION_KEYWORDS 已提升为类常量（Issue #174）
         
         entity_candidates = {}  # name → type
         
@@ -759,7 +770,8 @@ class DAGCompressor:
                 entity_candidates[match] = 'concept'
             
             # 决策关键词上下文
-            for kw in self.DECISION_KEYWORDS if hasattr(self, 'DECISION_KEYWORDS') else []:
+            # Fix 1: 直接使用类常量，不再需要 hasattr 检查（Issue #174）
+            for kw in self.DECISION_KEYWORDS:
                 idx = content.find(kw)
                 if idx != -1:
                     # 取关键词前 10 字作为主语
