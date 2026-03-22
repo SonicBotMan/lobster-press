@@ -5,6 +5,15 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.31] - 2026-03-22
+
+### Fixed
+- 🔴 **P0**: `dag_compressor.py` 小 episode 被跳过但不标记，导致压缩空转（Issue #171）
+  - 问题：小 episode 被 `continue` 跳过，但消息 ID 不在 `compressed_message_ids` 中
+  - 后果：`uncompressed_tokens` 虚高，压缩阈值永远触发但实际无效
+  - 修复：实施"合并小 episode"方案，累积小 episode 直到 tokens ≥ max_tokens * 0.5
+  - 尾部阈值：放宽到 max_tokens * 0.3 避免丢弃过多
+
 ## [4.0.30] - 2026-03-22
 
 ### Fixed

@@ -134,14 +134,28 @@ class DAGCompressor:
             return None
         
         # 7. 为每个情节生成叶子摘要
-        last_summary = None
+        # v4.0.30: 合并过小的 episode，避免压缩空转（Issue #171）
+        merged_episodes = []
+        pending = []
         for episode in episodes:
-            # Phase 2 (Issue #115): Episode token guard - 跳过太小的 episode
-            episode_tokens = sum(m.get("token_count", 0) for m in episode)
-            if episode_tokens < max_tokens * 0.5:
-                print(f"⏭️ skip small episode: {episode_tokens} tokens (< {max_tokens * 0.5})")
-                continue
-            
+            pending.extend(episode)
+            pending_tokens = sum(m.get("token_count", 0) for m in pending)
+            if pending_tokens >= max_tokens * 0.5:
+                merged_episodes.append(pending)
+                pending = []
+        # 尾部剩余：放宽阈值避免丢弃过多
+        if pending:
+            pending_tokens = sum(m.get("token_count", 0) for m in pending)
+            if pending_tokens >= max_tokens * 0.3:
+                merged_episodes.append(pending)
+            # else: 太小，丢弃
+        
+        if not merged_episodes:
+            print(f"⚠️ 所有 episode 都太小，无需压缩")
+            return None
+        
+        last_summary = None
+        for episode in merged_episodes:
             # 生成摘要内容
             summary_content = self._generate_leaf_summary(episode)
             
