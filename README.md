@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
 
-# 🧠 LobsterPress v4.0.41「深海」
+# 🧠 LobsterPress v4.0.49「深海」
 
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v4.0.41](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.41) · [更新日志](CHANGELOG.md)
+**最新版本**: [v4.0.49](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.49) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -124,14 +124,16 @@ python -m mcp_server.lobster_mcp_server --db ~/.openclaw/lobster.db
 
 ### ContextEngine 集成
 
+> ⚠️ **注意**: 由于 OpenClaw Issue #52810，lifecycle hooks 当前不触发。请使用手动 MCP 工具调用。
+
 LobsterPress 实现了完整的 OpenClaw ContextEngine 接口：
 
-| 方法 | 触发时机 | 功能 |
-|------|----------|------|
-| `prepareContext` | 每轮对话开始前 | 注入最新摘要到 system prompt |
-| `afterTurn` | 每轮对话结束后 | 检查上下文使用率，自动触发压缩 |
-| `compact` | 手动调用 | 强制执行 DAG 压缩 |
-| `assemble` | 上下文组装时 | 按三层记忆模型拼装最优上下文 |
+| 方法 | 触发时机 | 功能 | 当前状态 |
+|------|----------|------|----------|
+| `prepareContext` | 每轮对话开始前 | 注入最新摘要到 system prompt | ⚠️ 手动 |
+| `afterTurn` | 每轮对话结束后 | 检查上下文使用率，自动触发压缩 | ⚠️ 手动 |
+| `compact` | 手动调用 | 强制执行 DAG 压缩 | ✅ 可用 |
+| `assemble` | 上下文组装时 | 按三层记忆模型拼装最优上下文 | ✅ 可用 |
 
 ---
 
@@ -166,6 +168,23 @@ LobsterPress 实现了完整的 OpenClaw ContextEngine 接口：
 | 工具 | 说明 |
 |------|------|
 | `lobster_check_context` | 手动检查上下文（降级方案） |
+
+---
+
+## ⚠️ 当前状态：手动记忆管理
+
+由于 OpenClaw lifecycle hooks（`api.on()`）存在触发问题（Issue #52810），当前版本 **不支持自动记忆管理**。
+
+你需要显式调用 MCP 工具来管理记忆：
+
+| 时机 | 工具 | 说明 |
+|------|------|------|
+| 对话开始前 | `lobster_assemble` | 召回历史记忆 |
+| 对话结束后 | `lobster_ingest` | 保存新消息 |
+
+详见 [手动记忆管理指南](docs/MANUAL_MEMORY.md)。
+
+> 这是短期方案，等待 OpenClaw 修复后将恢复自动模式。
 
 ---
 
@@ -306,7 +325,8 @@ export LOBSTER_LLM_MODEL=deepseek-chat
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
-| **v4.0.41** ⭐ | 2026-03-22 | Issue #174 专家反馈修复（6 个优化） |
+| **v4.0.49** ⭐ | 2026-03-23 | MCP 工具模式：禁用 lifecycle hooks，添加手动记忆管理指南 |
+| **v4.0.41** | 2026-03-22 | Issue #174 专家反馈修复（6 个优化） |
 | **v4.0.25** | 2026-03-21 | Issue #154 修复（ESM 兼容 + 截断逻辑） |
 | **v4.0.25** | 2026-03-21 | Issue #153 修复（per-session 锁 + 版本动态） |
 | **v4.0.25** | 2026-03-21 | README 重写 + 学术引用 |

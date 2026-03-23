@@ -5,6 +5,30 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.49] - 2026-03-23
+
+### Changed (Issue #52810: MCP 工具模式)
+- ⚠️ **Lifecycle Hooks 禁用**: 由于 OpenClaw `api.on()` 不触发，暂时禁用 lifecycle hooks
+  - `before_agent_start` 和 `agent_end` hooks 已注释保留
+  - 添加 TODO 注释，等待 OpenClaw 修复后恢复
+- 📝 **手动记忆管理**: 新增 `docs/MANUAL_MEMORY.md` 指南
+  - 说明如何显式调用 `lobster_assemble`（对话开始前）
+  - 说明如何显式调用 `lobster_ingest`（对话结束后）
+- 📖 **README 更新**: 添加当前状态说明和手动模式指南链接
+
+### Migration Guide
+如果你依赖自动记忆管理，需要改为手动调用 MCP 工具：
+
+```python
+# 对话开始前
+result = lobster_assemble(conversation_id="conv_123", token_budget=128000)
+
+# 对话结束后
+result = lobster_ingest(conversation_id="conv_123", messages=[...])
+```
+
+详见 [手动记忆管理指南](docs/MANUAL_MEMORY.md)。
+
 ## [4.0.38] - 2026-03-22
 
 ### Added (Issue #183: 双模式插件)

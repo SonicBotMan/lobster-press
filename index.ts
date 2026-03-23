@@ -918,6 +918,13 @@ const lobsterPlugin = {
     // 参考 MemOS OpenClaw Plugin：使用 lifecycle hooks 作为 ContextEngine 的降级方案
     // 当 OpenClaw Gateway 不支持 ContextEngine.afterTurn 时，通过 lifecycle hooks 实现记忆管理
     
+    // TODO(OpenClaw Issue #52810): lifecycle hooks (api.on()) 当前不触发
+    // 临时方案：使用显式 MCP 工具调用（lobster_assemble / lobster_ingest）
+    // 详见 docs/MANUAL_MEMORY.md
+    // 
+    // 以下代码已禁用，等待 OpenClaw 修复后恢复：
+    /*
+    
     // v4.0.46: Debug logging - lifecycle hooks
     debugLog('About to register lifecycle hooks...');
     debugLog(`api.on type: ${typeof api.on}`);
@@ -1067,6 +1074,11 @@ const lobsterPlugin = {
     
     console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: All lifecycle hooks registered successfully`);
     api.logger.info(`[lobster-press] Lifecycle hooks registered (before_agent_start + agent_end)`);
+    
+    */  // END: lifecycle hooks disabled (Issue #52810)
+    
+    // v4.0.49: 使用手动 MCP 工具模式
+    api.logger.info(`[lobster-press] Lifecycle hooks disabled (Issue #52810). Use manual MCP tools: lobster_assemble / lobster_ingest`);
   },
 };
 
