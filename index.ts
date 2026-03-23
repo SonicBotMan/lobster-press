@@ -397,11 +397,11 @@ const lobsterPlugin = {
         ? (api.pluginConfig as Record<string, unknown>)
         : {};
 
-    // v4.0.46: Debug logging - write to file to bypass all loggers
-    const fs = require('fs');
+    // v4.0.48: Debug logging - write to file to bypass all loggers (ESM compatible)
+    import { appendFileSync } from 'fs';
     const debugLog = (msg: string) => {
       const logLine = `[${new Date().toISOString()}] [lobster-press] DEBUG: ${msg}\n`;
-      fs.appendFileSync('/tmp/lobster-debug.log', logLine);
+      try { appendFileSync('/tmp/lobster-debug.log', logLine); } catch {}
     };
     debugLog('register() called');
     debugLog(`pluginConfig=${JSON.stringify({
