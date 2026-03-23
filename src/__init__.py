@@ -7,7 +7,7 @@ LobsterPress - Cognitive Memory System for AI Agents
 """
 
 
-__version__ = "4.0.55"
+__version__ = "4.0.56"
 __author__ = "SonicBotMan"
 __email__ = "sonicbotman@example.com"
 

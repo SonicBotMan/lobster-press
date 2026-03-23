@@ -928,6 +928,10 @@ const lobsterPlugin = {
     // 1. before_agent_start: 召回记忆
     debugLog('Registering before_agent_start hook...');
     api.on("before_agent_start", async (event: any, ctx: any) => {
+      // v4.0.55: 临时禁用，测试 flatMap 错误
+      debugLog('before_agent_start: DISABLED for testing flatMap issue');
+      return;
+      
       // Debug: hook 被调用
       debugLog(`HOOK FIRED: before_agent_start, ctx.sessionId=${ctx?.sessionId}`);
       
@@ -985,14 +989,9 @@ const lobsterPlugin = {
         
         api.logger.info(`[lobster-press] Lifecycle: injected ${assembled.length} memories (${memoryContext.length} chars)`);
         
-        // 返回 prependContext 注入记忆（v4.0.55: 修复格式为数组）
+        // 返回 prependContext 注入记忆
         return {
-          prependContext: [
-            {
-              role: "system",
-              content: [{type: "text", text: `[LobsterPress Memory Context]\n${memoryContext}`}]
-            }
-          ]
+          prependContext: `[LobsterPress Memory Context]\n${memoryContext}`,
         };
       } catch (error) {
         api.logger.warn(`[lobster-press] Lifecycle: before_agent_start failed: ${error}`);
