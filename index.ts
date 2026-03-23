@@ -397,16 +397,16 @@ const lobsterPlugin = {
         ? (api.pluginConfig as Record<string, unknown>)
         : {};
 
-    // v4.0.43: Debug logging for lifecycle hooks investigation
-    api.logger.info(`[lobster-press] v4.0.43 DEBUG: register() called`);
-    api.logger.info(`[lobster-press] v4.0.43 DEBUG: pluginConfig=${JSON.stringify({
+    // v4.0.44: Debug logging for lifecycle hooks investigation (using console.log)
+    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: register() called`);
+    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: pluginConfig=${JSON.stringify({
       dbPath: pluginConfig.dbPath,
       llmProvider: pluginConfig.llmProvider,
       lifecycleEnabled: pluginConfig.lifecycleEnabled,
       contextThreshold: pluginConfig.contextThreshold,
       maxContextTokens: pluginConfig.maxContextTokens,
     })}`);
-    api.logger.info(`[lobster-press] v4.0.43 DEBUG: api object methods: ${Object.keys(api).join(', ')}`);
+    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: api object methods: ${Object.keys(api).join(', ')}`);
 
     // ── lobster_grep ───────────────────────────────────────────────────────
     api.registerTool({
@@ -914,33 +914,33 @@ const lobsterPlugin = {
     // 参考 MemOS OpenClaw Plugin：使用 lifecycle hooks 作为 ContextEngine 的降级方案
     // 当 OpenClaw Gateway 不支持 ContextEngine.afterTurn 时，通过 lifecycle hooks 实现记忆管理
     
-    // v4.0.43: Debug logging
-    api.logger.info(`[lobster-press] v4.0.43 DEBUG: About to register lifecycle hooks...`);
-    api.logger.info(`[lobster-press] v4.0.43 DEBUG: api.on type: ${typeof api.on}`);
+    // v4.0.44: Debug logging
+    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: About to register lifecycle hooks...`);
+    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: api.on type: ${typeof api.on}`);
     
     // 1. before_agent_start: 召回记忆
-    api.logger.info(`[lobster-press] v4.0.43 DEBUG: Registering before_agent_start hook...`);
+    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: Registering before_agent_start hook...`);
     api.on("before_agent_start", async (event: any, ctx: any) => {
       // Debug: hook 被调用
-      api.logger.info(`[lobster-press] DEBUG: before_agent_start hook called, event=${JSON.stringify(event)}, ctx=${JSON.stringify(ctx)}`);
+      console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: before_agent_start hook called, event=${JSON.stringify(event)}, ctx=${JSON.stringify(ctx)}`);
       
       // 检查是否启用 lifecycle 模式
       const lifecycleEnabled = pluginConfig.lifecycleEnabled !== false;  // 默认 true
       if (!lifecycleEnabled) {
-        api.logger.info(`[lobster-press] DEBUG: lifecycle disabled, skipping`);
+        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: lifecycle disabled, skipping`);
         return;
       }
       
       // 获取 conversation_id
       const conversationId = ctx?.sessionId || ctx?.sessionKey;
       if (!conversationId) {
-        api.logger.info(`[lobster-press] DEBUG: no conversationId, ctx=${JSON.stringify(ctx)}`);
+        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: no conversationId, ctx=${JSON.stringify(ctx)}`);
         return;
       }
       
       // 检查 prompt 是否存在
       if (!event?.prompt || event.prompt.length < 3) {
-        api.logger.info(`[lobster-press] DEBUG: no prompt or too short, event=${JSON.stringify(event)}`);
+        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: no prompt or too short, event=${JSON.stringify(event)}`);
         return;
       }
       
@@ -982,31 +982,31 @@ const lobsterPlugin = {
         api.logger.warn(`[lobster-press] Lifecycle: before_agent_start failed: ${error}`);
       }
     });
-    api.logger.info(`[lobster-press] v4.0.43 DEBUG: before_agent_start hook registered`);
+    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: before_agent_start hook registered`);
     
     // 2. agent_end: 写入记忆
-    api.logger.info(`[lobster-press] v4.0.43 DEBUG: Registering agent_end hook...`);
+    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: Registering agent_end hook...`);
     api.on("agent_end", async (event: any, ctx: any) => {
       // Debug: hook 被调用
-      api.logger.info(`[lobster-press] DEBUG: agent_end hook called, event.success=${event?.success}, ctx=${JSON.stringify(ctx)}`);
+      console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: agent_end hook called, event.success=${event?.success}, ctx=${JSON.stringify(ctx)}`);
       
       // 检查是否启用 lifecycle 模式
       const lifecycleEnabled = pluginConfig.lifecycleEnabled !== false;  // 默认 true
       if (!lifecycleEnabled) {
-        api.logger.info(`[lobster-press] DEBUG: lifecycle disabled, skipping`);
+        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: lifecycle disabled, skipping`);
         return;
       }
       
       // 检查是否成功
       if (!event?.success || !event?.messages?.length) {
-        api.logger.info(`[lobster-press] DEBUG: event not successful or no messages, event=${JSON.stringify(event)}`);
+        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: event not successful or no messages, event=${JSON.stringify(event)}`);
         return;
       }
       
       // 获取 conversation_id
       const conversationId = ctx?.sessionId || ctx?.sessionKey;
       if (!conversationId) {
-        api.logger.info(`[lobster-press] DEBUG: no conversationId, ctx=${JSON.stringify(ctx)}`);
+        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: no conversationId, ctx=${JSON.stringify(ctx)}`);
         return;
       }
       
@@ -1059,9 +1059,9 @@ const lobsterPlugin = {
         api.logger.warn(`[lobster-press] Lifecycle: agent_end failed: ${error}`);
       }
     });
-    api.logger.info(`[lobster-press] v4.0.43 DEBUG: agent_end hook registered`);
+    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: agent_end hook registered`);
     
-    api.logger.info(`[lobster-press] v4.0.43 DEBUG: All lifecycle hooks registered successfully`);
+    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: All lifecycle hooks registered successfully`);
     api.logger.info(`[lobster-press] Lifecycle hooks registered (before_agent_start + agent_end)`);
   },
 };
