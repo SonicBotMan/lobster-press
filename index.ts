@@ -1030,18 +1030,25 @@ const lobsterPlugin = {
         
         // 提取最后一条对话（user + assistant）
         const messages = event.messages.slice(-2).map((msg: any, index: number) => {
-          // v4.0.57: 修复 content 格式，确保是数组
+          // v4.0.58: 修复 content 格式，过滤非标准类型（如 thinking）
           let contentArray;
           if (typeof msg.content === "string") {
             // 字符串 → 包装为数组
             contentArray = [{type: "text", text: msg.content}];
           } else if (Array.isArray(msg.content)) {
-            // 已经是数组 → 直接使用
-            contentArray = msg.content;
+            // 已经是数组 → 过滤只保留 text 类型
+            contentArray = msg.content.filter((block: any) => block.type === "text");
+            // 如果过滤后为空，创建一个空文本
+            if (contentArray.length === 0) {
+              contentArray = [{type: "text", text: ""}];
+            }
           } else {
             // 其他类型 → 尝试转换为字符串数组
             contentArray = [{type: "text", text: String(msg.content || "")}];
           }
+          
+          // Debug: 打印 content 转换
+          debugLog(`agent_end: msg ${index}, role=${msg.role}, original type=${typeof msg.content}, isArray=${Array.isArray(msg.content)}, final length=${contentArray.length}`);
           
           return {
             id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
