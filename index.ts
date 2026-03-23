@@ -918,12 +918,8 @@ const lobsterPlugin = {
     // 参考 MemOS OpenClaw Plugin：使用 lifecycle hooks 作为 ContextEngine 的降级方案
     // 当 OpenClaw Gateway 不支持 ContextEngine.afterTurn 时，通过 lifecycle hooks 实现记忆管理
     
-    // TODO(OpenClaw Issue #52810): lifecycle hooks (api.on()) 当前不触发
-    // 临时方案：使用显式 MCP 工具调用（lobster_assemble / lobster_ingest）
-    // 详见 docs/MANUAL_MEMORY.md
-    // 
-    // 以下代码已禁用，等待 OpenClaw 修复后恢复：
-    /*
+    // TODO(OpenClaw Issue #52810): 正在验证 hooks 是否触发
+    // v4.0.50: 恢复 lifecycle hooks 进行实际 agent 交互测试
     
     // v4.0.46: Debug logging - lifecycle hooks
     debugLog('About to register lifecycle hooks...');
@@ -937,21 +933,25 @@ const lobsterPlugin = {
       
       // 检查是否启用 lifecycle 模式
       const lifecycleEnabled = pluginConfig.lifecycleEnabled !== false;  // 默认 true
+      debugLog(`before_agent_start: lifecycleEnabled=${lifecycleEnabled}`);
       if (!lifecycleEnabled) {
-        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: lifecycle disabled, skipping`);
+        debugLog('before_agent_start: lifecycle disabled, skipping');
         return;
       }
       
       // 获取 conversation_id
       const conversationId = ctx?.sessionId || ctx?.sessionKey;
+      debugLog(`before_agent_start: conversationId=${conversationId}`);
       if (!conversationId) {
-        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: no conversationId, ctx=${JSON.stringify(ctx)}`);
+        debugLog(`before_agent_start: no conversationId, ctx keys=${Object.keys(ctx || {}).join(',')}`);
         return;
       }
       
       // 检查 prompt 是否存在
-      if (!event?.prompt || event.prompt.length < 3) {
-        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: no prompt or too short, event=${JSON.stringify(event)}`);
+      const promptLength = event?.prompt?.length || 0;
+      debugLog(`before_agent_start: prompt length=${promptLength}`);
+      if (!event?.prompt || promptLength < 3) {
+        debugLog('before_agent_start: no prompt or too short, skipping');
         return;
       }
       
@@ -1003,21 +1003,25 @@ const lobsterPlugin = {
       
       // 检查是否启用 lifecycle 模式
       const lifecycleEnabled = pluginConfig.lifecycleEnabled !== false;  // 默认 true
+      debugLog(`agent_end: lifecycleEnabled=${lifecycleEnabled}`);
       if (!lifecycleEnabled) {
-        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: lifecycle disabled, skipping`);
+        debugLog('agent_end: lifecycle disabled, skipping');
         return;
       }
       
       // 检查是否成功
-      if (!event?.success || !event?.messages?.length) {
-        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: event not successful or no messages, event=${JSON.stringify(event)}`);
+      const hasMessages = event?.messages?.length > 0;
+      debugLog(`agent_end: success=${event?.success}, hasMessages=${hasMessages}`);
+      if (!event?.success || !hasMessages) {
+        debugLog('agent_end: event not successful or no messages, skipping');
         return;
       }
       
       // 获取 conversation_id
       const conversationId = ctx?.sessionId || ctx?.sessionKey;
+      debugLog(`agent_end: conversationId=${conversationId}`);
       if (!conversationId) {
-        console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: no conversationId, ctx=${JSON.stringify(ctx)}`);
+        debugLog(`agent_end: no conversationId, ctx keys=${Object.keys(ctx || {}).join(',')}`);
         return;
       }
       
@@ -1074,11 +1078,7 @@ const lobsterPlugin = {
     
     console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: All lifecycle hooks registered successfully`);
     api.logger.info(`[lobster-press] Lifecycle hooks registered (before_agent_start + agent_end)`);
-    
-    */  // END: lifecycle hooks disabled (Issue #52810)
-    
-    // v4.0.49: 使用手动 MCP 工具模式
-    api.logger.info(`[lobster-press] Lifecycle hooks disabled (Issue #52810). Use manual MCP tools: lobster_assemble / lobster_ingest`);
+    // END: lifecycle hooks (v4.0.50: re-enabled for testing)
   },
 };
 
