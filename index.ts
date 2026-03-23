@@ -397,16 +397,21 @@ const lobsterPlugin = {
         ? (api.pluginConfig as Record<string, unknown>)
         : {};
 
-    // v4.0.44: Debug logging for lifecycle hooks investigation (using process.stdout.write to bypass logger)
-    process.stdout.write(`[${new Date().toISOString()}] [lobster-press] DEBUG: register() called\n`);
-    process.stdout.write(`[${new Date().toISOString()}] [lobster-press] DEBUG: pluginConfig=${JSON.stringify({
+    // v4.0.46: Debug logging - write to file to bypass all loggers
+    const fs = require('fs');
+    const debugLog = (msg: string) => {
+      const logLine = `[${new Date().toISOString()}] [lobster-press] DEBUG: ${msg}\n`;
+      fs.appendFileSync('/tmp/lobster-debug.log', logLine);
+    };
+    debugLog('register() called');
+    debugLog(`pluginConfig=${JSON.stringify({
       dbPath: pluginConfig.dbPath,
       llmProvider: pluginConfig.llmProvider,
       lifecycleEnabled: pluginConfig.lifecycleEnabled,
       contextThreshold: pluginConfig.contextThreshold,
       maxContextTokens: pluginConfig.maxContextTokens,
-    })}\n`);
-    process.stdout.write(`[${new Date().toISOString()}] [lobster-press] DEBUG: api object methods: ${Object.keys(api).join(', ')}\n`);
+    })}`);
+    debugLog(`api object methods: ${Object.keys(api).join(', ')}`);
 
     // ── lobster_grep ───────────────────────────────────────────────────────
     api.registerTool({
@@ -914,9 +919,9 @@ const lobsterPlugin = {
     // 参考 MemOS OpenClaw Plugin：使用 lifecycle hooks 作为 ContextEngine 的降级方案
     // 当 OpenClaw Gateway 不支持 ContextEngine.afterTurn 时，通过 lifecycle hooks 实现记忆管理
     
-    // v4.0.45: Debug logging (using process.stdout.write)
-    process.stdout.write(`[${new Date().toISOString()}] [lobster-press] DEBUG: About to register lifecycle hooks...\n`);
-    process.stdout.write(`[${new Date().toISOString()}] [lobster-press] DEBUG: api.on type: ${typeof api.on}\n`);
+    // v4.0.46: Debug logging - lifecycle hooks
+    debugLog('About to register lifecycle hooks...');
+    debugLog(`api.on type: ${typeof api.on}`);
     
     // 1. before_agent_start: 召回记忆
     console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: Registering before_agent_start hook...`);
