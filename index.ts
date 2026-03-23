@@ -922,12 +922,12 @@ const lobsterPlugin = {
     // v4.0.46: Debug logging - lifecycle hooks
     debugLog('About to register lifecycle hooks...');
     debugLog(`api.on type: ${typeof api.on}`);
-    
+
     // 1. before_agent_start: 召回记忆
-    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: Registering before_agent_start hook...`);
+    debugLog('Registering before_agent_start hook...');
     api.on("before_agent_start", async (event: any, ctx: any) => {
       // Debug: hook 被调用
-      console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: before_agent_start hook called, event=${JSON.stringify(event)}, ctx=${JSON.stringify(ctx)}`);
+      debugLog(`HOOK FIRED: before_agent_start, ctx.sessionId=${ctx?.sessionId}`);
       
       // 检查是否启用 lifecycle 模式
       const lifecycleEnabled = pluginConfig.lifecycleEnabled !== false;  // 默认 true
@@ -987,13 +987,13 @@ const lobsterPlugin = {
         api.logger.warn(`[lobster-press] Lifecycle: before_agent_start failed: ${error}`);
       }
     });
-    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: before_agent_start hook registered`);
-    
+    debugLog('before_agent_start hook registered');
+
     // 2. agent_end: 写入记忆
-    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: Registering agent_end hook...`);
+    debugLog('Registering agent_end hook...');
     api.on("agent_end", async (event: any, ctx: any) => {
       // Debug: hook 被调用
-      console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: agent_end hook called, event.success=${event?.success}, ctx=${JSON.stringify(ctx)}`);
+      debugLog(`HOOK FIRED: agent_end, event.success=${event?.success}, ctx.sessionId=${ctx?.sessionId}`);
       
       // 检查是否启用 lifecycle 模式
       const lifecycleEnabled = pluginConfig.lifecycleEnabled !== false;  // 默认 true
@@ -1064,7 +1064,7 @@ const lobsterPlugin = {
         api.logger.warn(`[lobster-press] Lifecycle: agent_end failed: ${error}`);
       }
     });
-    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: agent_end hook registered`);
+    debugLog('agent_end hook registered');
     
     console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: All lifecycle hooks registered successfully`);
     api.logger.info(`[lobster-press] Lifecycle hooks registered (before_agent_start + agent_end)`);
