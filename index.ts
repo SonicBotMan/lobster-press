@@ -185,7 +185,7 @@ async function ensureMcpServer(config: Record<string, unknown>): Promise<ChildPr
         (config.namespace as string) || "default",
       ],
       {
-        cwd: __dirname, // v4.0.26: 修复 cwd 路径错误（Issue #167 Bug #4）- index.ts 在包根目录
+        cwd: join(__dirname, ".."), // v4.0.53: 修复 cwd 路径错误 - dist/index.js 的 __dirname 指向 dist/，需要回到包根目录
         env: {
           ...process.env,
           LOBSTER_LLM_API_KEY:
