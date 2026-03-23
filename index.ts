@@ -12,7 +12,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readFileSync } from "node:fs";
+import { readFileSync, appendFileSync } from "node:fs";
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 
@@ -398,7 +398,6 @@ const lobsterPlugin = {
         : {};
 
     // v4.0.48: Debug logging - write to file to bypass all loggers (ESM compatible)
-    import { appendFileSync } from 'fs';
     const debugLog = (msg: string) => {
       const logLine = `[${new Date().toISOString()}] [lobster-press] DEBUG: ${msg}\n`;
       try { appendFileSync('/tmp/lobster-debug.log', logLine); } catch {}
