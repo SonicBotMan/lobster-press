@@ -1029,11 +1029,12 @@ const lobsterPlugin = {
         api.logger.info(`[lobster-press] Lifecycle: agent_end for session ${conversationId}`);
         
         // 提取最后一条对话（user + assistant）
-        const messages = event.messages.slice(-2).map((msg: any) => ({
+        const messages = event.messages.slice(-2).map((msg: any, index: number) => ({
           id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
           role: msg.role || "user",
           content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content || {}),
           timestamp: msg.timestamp || new Date().toISOString(),
+          seq: msg.seq || index,  // v4.0.54: 添加 seq 字段（Python save_message 必需）
         }));
         
         if (messages.length === 0) return;
