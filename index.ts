@@ -928,10 +928,6 @@ const lobsterPlugin = {
     // 1. before_agent_start: 召回记忆
     debugLog('Registering before_agent_start hook...');
     api.on("before_agent_start", async (event: any, ctx: any) => {
-      // v4.0.55: 临时禁用，测试 flatMap 错误
-      debugLog('before_agent_start: DISABLED for testing flatMap issue');
-      return;
-      
       // Debug: hook 被调用
       debugLog(`HOOK FIRED: before_agent_start, ctx.sessionId=${ctx?.sessionId}`);
       
@@ -1033,13 +1029,28 @@ const lobsterPlugin = {
         api.logger.info(`[lobster-press] Lifecycle: agent_end for session ${conversationId}`);
         
         // 提取最后一条对话（user + assistant）
-        const messages = event.messages.slice(-2).map((msg: any, index: number) => ({
-          id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-          role: msg.role || "user",
-          content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content || {}),
-          timestamp: msg.timestamp || new Date().toISOString(),
-          seq: msg.seq || index,  // v4.0.54: 添加 seq 字段（Python save_message 必需）
-        }));
+        const messages = event.messages.slice(-2).map((msg: any, index: number) => {
+          // v4.0.57: 修复 content 格式，确保是数组
+          let contentArray;
+          if (typeof msg.content === "string") {
+            // 字符串 → 包装为数组
+            contentArray = [{type: "text", text: msg.content}];
+          } else if (Array.isArray(msg.content)) {
+            // 已经是数组 → 直接使用
+            contentArray = msg.content;
+          } else {
+            // 其他类型 → 尝试转换为字符串数组
+            contentArray = [{type: "text", text: String(msg.content || "")}];
+          }
+          
+          return {
+            id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+            role: msg.role || "user",
+            content: JSON.stringify(contentArray),  // 保存为数组 JSON
+            timestamp: msg.timestamp || new Date().toISOString(),
+            seq: msg.seq || index,
+          };
+        });
         
         if (messages.length === 0) return;
         
