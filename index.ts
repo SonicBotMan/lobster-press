@@ -985,9 +985,14 @@ const lobsterPlugin = {
         
         api.logger.info(`[lobster-press] Lifecycle: injected ${assembled.length} memories (${memoryContext.length} chars)`);
         
-        // 返回 prependContext 注入记忆
+        // 返回 prependContext 注入记忆（v4.0.55: 修复格式为数组）
         return {
-          prependContext: `[LobsterPress Memory Context]\n${memoryContext}`,
+          prependContext: [
+            {
+              role: "system",
+              content: [{type: "text", text: `[LobsterPress Memory Context]\n${memoryContext}`}]
+            }
+          ]
         };
       } catch (error) {
         api.logger.warn(`[lobster-press] Lifecycle: before_agent_start failed: ${error}`);
