@@ -5,6 +5,26 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.89] - 2026-03-24
+
+### Changed (Issue #169: 记忆优先级排序 - 方案C)
+- 🧠 **记忆优先级排序**: 按优先级注入记忆（semantic > episodic > working）
+  - 长期记忆（semantic/episodic）优先级高于工作记忆（working）
+  - 解决了 `.slice(-10)` 截断导致长期记忆被忽略的问题
+  - 小文现在能回忆起完整的水果列表（10种），而不是之前的3种
+- 📝 **格式优化**: 记忆上下文格式更清晰
+  - 使用 `[tier]: content` 格式，易于识别记忆来源
+  - 移除 `.slice(-10)` 截断，避免记忆碎片化
+  - 字符限制提升到 8000 字符，足够容纳所有记忆
+- 🔧 **代码简化**: 移除冗余逻辑
+  - 日志从 `assembled.length` 改为 `sortedAssembled.length`
+  - 代码更简洁易维护
+
+### Test Results
+- ✅ 小文成功回忆起 10 种水果（之前只能回忆 3 种）
+- ✅ 记忆注入效率显著提升
+- ✅ 长期记忆不再被短期对话挤占
+
 ## [4.0.49] - 2026-03-23
 
 ### Changed (Issue #52810: MCP 工具模式)

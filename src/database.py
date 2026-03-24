@@ -919,10 +919,11 @@ class LobsterDatabase:
 
         if 'working' in tiers:
             # 最近 20 条未被压缩的消息（working 层）
+            # v4.0.85: 修复排序方式，从 seq DESC 改为 created_at DESC，确保用户输入不被截断
             working = self._execute_fetch_all(
                 """SELECT * FROM messages
                    WHERE conversation_id = ? AND memory_tier = 'working'
-                   ORDER BY seq DESC LIMIT 20""",
+                   ORDER BY created_at DESC LIMIT 20""",
                 (conversation_id,),
                 table='messages'
             )

@@ -960,6 +960,7 @@ const lobsterPlugin = {
       // 检查 prompt 是否存在
       const promptLength = event?.prompt?.length || 0;
       debugLog(`before_agent_start: prompt length=${promptLength}`);
+      debugLog(`before_agent_start: prompt preview=${event?.prompt?.substring(0, 500)}`);
       if (!event?.prompt || promptLength < 3) {
         debugLog('before_agent_start: no prompt or too short, skipping');
         return;
@@ -967,7 +968,37 @@ const lobsterPlugin = {
       
       try {
         api.logger.info(`[lobster-press] Lifecycle: before_agent_start for session ${conversationId}`);
-        
+
+        // v4.0.86: 先提取用户输入,再保存到数据库
+        let userText = event.prompt;
+        const lastBraceIndex = userText.lastIndexOf('}');
+        if (lastBraceIndex !== -1) {
+          userText = userText.substring(lastBraceIndex + 1).trim();
+          // 去除 markdown 代码块标记
+          userText = userText.replace(/^```\s*/gm, '').trim();
+        }
+        debugLog(`before_agent_start: extracted user text="${userText.substring(0, 100)}..."`);
+
+        const userMessage = {
+          id: `user-${Date.now()}`,
+          role: "user",
+          content: JSON.stringify([{type: "text", text: userText}]),
+          timestamp: new Date().toISOString(),
+          seq: 0,  // 用户输入总是 seq=0
+        };
+
+        try {
+          const userIngestResult = await callMcp(pluginConfig, "lobster_ingest", {
+            conversation_id: conversationId,
+            messages: [userMessage],
+          });
+          debugLog(`before_agent_start: saved user input to database`);
+          api.logger.info(`[lobster-press] Lifecycle: saved user input (${event.prompt.length} chars)`);
+        } catch (userIngestError) {
+          debugLog(`before_agent_start: failed to save user input: ${userIngestError}`);
+          api.logger.warn(`[lobster-press] Lifecycle: failed to save user input: ${userIngestError}`);
+        }
+
         // 调用 lobster_assemble 获取相关记忆
         const result = await callMcp(pluginConfig, "lobster_assemble", {
           conversation_id: conversationId,
@@ -976,28 +1007,52 @@ const lobsterPlugin = {
         
         // 解析返回结果
         const text = result.content?.[0]?.text;
+        debugLog(`before_agent_start: lobster_assemble response text length=${text?.length || 0}`);
         const data = text ? JSON.parse(text) : {};
         const assembled = data?.assembled ?? [];
-        
+        debugLog(`before_agent_start: assembled.length=${assembled.length}`);
+
+        // v4.0.79: 打印前 3 条记忆的 content 字段
+        if (assembled.length > 0) {
+          debugLog(`before_agent_start: first 3 memories:`);
+          for (let i = 0; i < Math.min(3, assembled.length); i++) {
+            const item = assembled[i];
+            const contentPreview = item.content ? String(item.content).slice(0, 100) : 'NULL';
+            debugLog(`  [${i}] tier=${item.tier}, content=${contentPreview}...`);
+          }
+        }
+
         if (assembled.length === 0) {
           api.logger.info(`[lobster-press] Lifecycle: no memories found for session ${conversationId}`);
           return;
         }
         
-        // 将记忆格式化为上下文
-        const memoryContext = assembled
-          .slice(-10)  // 最新 10 条记忆
+        // v4.0.89: 方案C - 按优先级排序注入记忆（semantic > episodic > working)
+        // 优先级定义：semantic(0) > episodic(1) > working(2)
+        const priorityOrder: Record<string, number> = { semantic: 0, episodic: 1, working: 2 };
+        
+        // 按优先级排序
+        const sortedAssembled = [...assembled].sort((a: any, b: any) => {
+          const priorityA = priorityOrder[a.tier] ?? 3;
+          const priorityB = priorityOrder[b.tier] ?? 3;
+          return priorityA - priorityB;
+        });
+        
+        // 按优先级顺序生成记忆上下文
+        const memoryContext = sortedAssembled
           .map((item: any) => `[${item.tier || 'memory'}]: ${item.content || ''}`)
           .join('\n\n')
           .slice(0, 8000);  // 限制 8000 字符
         
         if (!memoryContext) return;
         
-        api.logger.info(`[lobster-press] Lifecycle: injected ${assembled.length} memories (${memoryContext.length} chars)`);
+        api.logger.info(`[lobster-press] Lifecycle: injected ${sortedAssembled.length} memories (${memoryContext.length} chars)`);
         
         // 返回 prependContext 注入记忆
+        const prependContextContent = `[LobsterPress Memory Context]\n${memoryContext}`;
+        debugLog(`before_agent_start: prependContext length=${prependContextContent.length}, preview=${prependContextContent.substring(0, 200)}...`);
         return {
-          prependContext: `[LobsterPress Memory Context]\n${memoryContext}`,
+          prependContext: prependContextContent,
         };
       } catch (error) {
         api.logger.warn(`[lobster-press] Lifecycle: before_agent_start failed: ${error}`);
@@ -1021,6 +1076,20 @@ const lobsterPlugin = {
       // 检查是否成功
       const hasMessages = event?.messages?.length > 0;
       debugLog(`agent_end: success=${event?.success}, hasMessages=${hasMessages}`);
+
+      // v4.0.83: 打印 event 对象的所有字段
+      debugLog(`agent_end: event keys=${Object.keys(event || {}).join(',')}`);
+      debugLog(`agent_end: event.prompt=${event?.prompt ? event.prompt.substring(0, 200) : 'undefined'}`);
+      debugLog(`agent_end: event.userInput=${event?.userInput ? event.userInput.substring(0, 200) : 'undefined'}`);
+      debugLog(`agent_end: event.input=${event?.input ? JSON.stringify(event.input).substring(0, 200) : 'undefined'}`);
+
+      // v4.0.84: 打印 ctx 对象的所有字段
+      debugLog(`agent_end: ctx keys=${Object.keys(ctx || {}).join(',')}`);
+      debugLog(`agent_end: ctx.sessionId=${ctx?.sessionId || 'undefined'}`);
+      debugLog(`agent_end: ctx.prompt=${ctx?.prompt ? ctx.prompt.substring(0, 200) : 'undefined'}`);
+      debugLog(`agent_end: ctx.userInput=${ctx?.userInput ? ctx.userInput.substring(0, 200) : 'undefined'}`);
+      debugLog(`agent_end: ctx.input=${ctx?.input ? JSON.stringify(ctx.input).substring(0, 200) : 'undefined'}`);
+
       if (!event?.success || !hasMessages) {
         debugLog('agent_end: event not successful or no messages, skipping');
         return;
@@ -1036,14 +1105,50 @@ const lobsterPlugin = {
       
       try {
         api.logger.info(`[lobster-press] Lifecycle: agent_end for session ${conversationId}`);
+
+        // v4.0.79: 打印 event.messages 的结构
+        const allMessages = event.messages || [];
+        debugLog(`agent_end: allMessages.length=${allMessages.length}`);
+
+        // v4.0.82: 打印所有消息，看看用户的输入在哪里
+        if (allMessages.length > 0) {
+          debugLog(`agent_end: all messages:`);
+          for (let i = 0; i < allMessages.length; i++) {
+            const msg = allMessages[i];
+            const contentPreview = typeof msg.content === "string"
+              ? msg.content.slice(0, 80)
+              : JSON.stringify(msg.content).slice(0, 80);
+            debugLog(`  [${i}] role=${msg.role}, content=${contentPreview}...`);
+          }
+        }
+
+        // v4.0.85: 只保存 assistant 的回复（用户输入已在 before_agent_start 中保存）
+        const filteredMessages = allMessages.filter((msg: any) => {
+          // 只保存 role=assistant 的消息
+          return msg.role === "assistant";
+        });
         
-        // 提取最后一条对话（user + assistant）
-        const messages = event.messages.slice(-2).map((msg: any, index: number) => {
-          // v4.0.75: 修复 content 格式，确保是数组
+        debugLog(`agent_end: filtered to ${filteredMessages.length} assistant messages (from ${allMessages.length} total)`);
+        
+        // 提取最后 2 条 assistant 消息
+        const messages = filteredMessages.slice(-2).map((msg: any, index: number) => {
+          // v4.0.77: 修复双重 JSON 编码问题
           let contentArray;
           if (typeof msg.content === "string") {
-            // 字符串 → 包装为数组
-            contentArray = [{type: "text", text: msg.content}];
+            // 字符串 → 先尝试解析是否是 JSON
+            try {
+              const parsed = JSON.parse(msg.content);
+              if (Array.isArray(parsed)) {
+                // 已经是 JSON 数组格式 → 直接使用
+                contentArray = parsed;
+              } else {
+                // JSON 但不是数组 → 包装成数组
+                contentArray = [{type: "text", text: msg.content}];
+              }
+            } catch {
+              // 不是 JSON → 包装为数组
+              contentArray = [{type: "text", text: msg.content}];
+            }
           } else if (Array.isArray(msg.content)) {
             // 已经是数组 → 直接使用
             contentArray = msg.content;
@@ -1054,10 +1159,10 @@ const lobsterPlugin = {
           
           return {
             id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
-            role: msg.role || "user",
+            role: "assistant",  // v4.0.85: 明确指定为 assistant
             content: JSON.stringify(contentArray),  // 保存为数组 JSON
             timestamp: msg.timestamp || new Date().toISOString(),
-            seq: msg.seq || index,
+            seq: index + 1,  // v4.0.85: seq 从 1 开始（用户输入是 0）
           };
         });
         
@@ -1068,6 +1173,9 @@ const lobsterPlugin = {
           conversation_id: conversationId,
           messages: messages,
         });
+        
+        // v4.0.78: 添加 debug 日志
+        debugLog(`agent_end: lobster_ingest called successfully, messages: ${messages.length} messages, conversationId=${conversationId}`);
         
         // 解析结果
         const text = result.content?.[0]?.text;
