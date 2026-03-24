@@ -5,6 +5,42 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.92] - 2026-03-24
+
+### Added (交互式配置向导可靠性增强)
+- ✅ **配置保存验证**: 写入配置文件后立即读取验证，确保配置成功保存
+- ✅ **API Key 格式测试**: 基本格式检查（OpenAI/Anthropic/智谱/DeepSeek）
+- ✅ **配置回滚机制**: 验证失败自动恢复旧配置，不会丢失用户原有配置
+- ✅ **错误处理完善**: 友好的错误提示和建议操作
+
+### Fixed
+- 🐛 **TypeScript 编译错误**: 修复 `oldConfig` 类型和 `details` 字段问题
+- 🐛 **CI 失败**: 所有返回对象添加 `details` 字段，符合 `AgentToolResult` 类型要求
+
+## [4.0.91] - 2026-03-24
+
+### Added (交互式配置向导)
+- 🎯 **lobster_configure 工具**: 5 步交互式配置向导
+  - 步骤 1: 欢迎和 LLM 选择（使用 LLM 还是 TF-IDF）
+  - 步骤 2: LLM Provider 选择（OpenAI/Anthropic/智谱/DeepSeek/自定义）
+  - 步骤 3: API Key 输入（带安全提示）
+  - 步骤 4: 自动功能确认（C-HLR+/Focus/记忆注入）
+  - 步骤 5: 完成并显示配置示例
+- 🤖 **AI 主动引导**: AI 可以主动引导用户完成配置
+- 📋 **友好提示**: 清晰的配置说明和选项
+
+## [4.0.90] - 2026-03-24
+
+### Changed (C-HLR+ 自动应用)
+- ✅ **C-HLR+ 自适应遗忘曲线自动应用**: 每次对话结束后自动调用 `lobster_sweep`
+- 🔧 **agent_end hook 增强**: 添加自动调用 `lobster_sweep` 应用遗忘曲线
+- 📊 **五大模块更新**: 模块二（C-HLR+）从手动改为自动
+
+### Test Results
+- ✅ 用户无需手动调用 `lobster_sweep`
+- ✅ 遗忘曲线自动应用于每轮对话
+- ✅ 记忆衰减自动标记
+
 ## [4.0.89] - 2026-03-24
 
 ### Changed (Issue #169: 记忆优先级排序 - 方案C)
