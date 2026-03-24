@@ -34,29 +34,304 @@
 
 ---
 
-## 📦 安装
+## 📦 安装教程（面向 OpenClaw 用户）
 
-### 系统要求
+### 前置条件
 
-| 依赖 | 版本 | 说明 |
-|------|------|------|
-| **OpenClaw Gateway** | 2026.3.9+ | 推荐，支持 afterTurn 钩子 |
-| **Node.js** | 18+ | OpenClaw 插件模式 |
-| **Python** | 3.10+ | MCP Server 运行时 |
+在安装 LobsterPress 之前，请确保您的系统满足以下要求：
 
-> ⚠️ **重要**: 作为 OpenClaw 插件时，**必须全局安装**才能被发现。
+| 依赖 | 版本 | 如何检查 | 如何安装 |
+|------|------|----------|----------|
+| **OpenClaw Gateway** | 2026.3.9+ | `openclaw gateway version` | [安装指南](https://docs.openclaw.ai) |
+| **Node.js** | 18+ | `node --version` | [下载地址](https://nodejs.org) |
+| **Python** | 3.10+ | `python3 --version` | 系统自带或 [下载](https://python.org) |
+| **npm** | 9+ | `npm --version` | 随 Node.js 安装 |
 
-### OpenClaw 插件安装（推荐）
+> 💡 **提示**: 如果您已经在使用 OpenClaw，那么 Node.js 和 Python 应该已经安装好了。
+
+---
+
+### 安装步骤（推荐方式）
+
+#### 步骤 1: 安装 LobsterPress
+
+打开终端，运行以下命令：
 
 ```bash
-# 全局安装
+# 全局安装 LobsterPress
 npm install -g @sonicbotman/lobster-press
-
-# 验证安装
-lobster-press --version
 ```
 
-### 配置示例
+安装成功后，您会看到类似这样的输出：
+
+```
++ @sonicbotman/lobster-press@4.0.92
+added 1 package in 2s
+```
+
+#### 步骤 2: 验证安装
+
+```bash
+# 检查版本
+lobster-press --version
+
+# 预期输出: 4.0.92
+```
+
+#### 步骤 3: 配置 LobsterPress
+
+LobsterPress 提供了**交互式配置向导**，帮助您快速完成配置。
+
+**方式 1: 使用 AI 助手引导配置（推荐）**
+
+在与 AI 对话时，直接说：
+
+```
+帮我配置 LobsterPress 记忆系统
+```
+
+AI 会自动调用 `lobster_configure` 工具，引导您完成配置。
+
+**方式 2: 手动配置（高级用户）**
+
+如果您熟悉 OpenClaw 配置，可以手动编辑 `~/.openclaw/openclaw.json`：
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "lobster-press": {
+        "enabled": true
+      }
+    },
+    "slots": {
+      "contextEngine": "lobster-press"
+    }
+  }
+}
+```
+
+> ⚠️ **重要**: 推荐使用方式 1（AI 引导配置），避免配置错误。
+
+#### 步骤 4: 重启 OpenClaw Gateway
+
+```bash
+# 方式 1: 使用 openclaw 命令（如果可用）
+openclaw gateway restart
+
+# 方式 2: 使用 systemctl
+systemctl --user restart openclaw-gateway
+
+# 方式 3: 发送重启信号
+kill -HUP $(pgrep openclaw-gateway)
+```
+
+#### 步骤 5: 验证 LobsterPress 是否工作
+
+在与 AI 对话时，说：
+
+```
+我喜欢吃苹果
+```
+
+然后过几轮对话后，问：
+
+```
+我刚才说我喜欢吃什么？
+```
+
+如果 AI 能回答"苹果"，说明 LobsterPress 记忆系统已经正常工作！
+
+---
+
+### 安装方式 2: 从 tarball 安装（离线安装）
+
+如果您无法访问 npm，可以从 GitHub 下载 tarball 安装：
+
+```bash
+# 1. 下载最新版本 tarball
+# 访问 https://github.com/SonicBotMan/lobster-press/releases
+# 下载 lobster-press-4.0.92.tgz
+
+# 2. 创建插件目录
+mkdir -p ~/.openclaw/extensions/lobster-press
+
+# 3. 解压到插件目录
+cd ~/.openclaw/extensions/lobster-press
+tar -xzf /path/to/lobster-press-4.0.92.tgz --strip-components=1
+
+# 4. 安装 Python 依赖
+cd ~/.openclaw/extensions/lobster-press
+pip install -e .
+
+# 5. 配置（参考步骤 3）
+```
+
+---
+
+### 配置向导使用指南
+
+LobsterPress v4.0.92 提供了 5 步交互式配置向导：
+
+| 步骤 | 说明 | 您需要做的 |
+|------|------|-----------|
+| **1. 欢迎** | 介绍配置流程 | 阅读说明 |
+| **2. LLM 选择** | 选择使用 LLM 还是 TF-IDF | 选择是否使用 LLM |
+| **3. Provider** | 选择 LLM 提供商 | 选择 OpenAI/智谱/DeepSeek 等 |
+| **4. API Key** | 输入 API Key | 输入您的 API Key |
+| **5. 完成** | 确认配置 | 查看配置示例 |
+
+**配置示例对话**：
+
+```
+您: 帮我配置 LobsterPress
+
+AI: 欢迎使用 LobsterPress 配置向导！🦞
+    LobsterPress 是一个基于认知科学的 LLM 永久记忆引擎。
+    
+    **第一步：选择记忆模式**
+    
+    LobsterPress 支持两种记忆模式：
+    1. **LLM 模式**（推荐）：使用大语言模型智能提取记忆
+    2. **TF-IDF 模式**：基于词频统计的传统模式
+    
+    请选择您想使用的模式（LLM/TF-IDF）：
+
+您: LLM
+
+AI: ✅ 已选择 LLM 模式
+    
+    **第二步：选择 LLM Provider**
+    
+    请选择您的 LLM 提供商：
+    1. OpenAI
+    2. Anthropic
+    3. 智谱 AI（GLM）
+    4. DeepSeek
+    5. 自定义
+    
+    请输入选项（1-5）：
+
+您: 3
+
+AI: ✅ 已选择智谱 AI
+    
+    **第三步：输入 API Key**
+    
+    请输入您的智谱 AI API Key：
+    （格式：xxxxxxxx.xxxxxxxxxxxxxxxx）
+    
+    ⚠️ 安全提示：API Key 会被加密存储，不会上传到云端。
+
+您: [您的 API Key]
+
+AI: ✅ 配置完成！
+    
+    LobsterPress 已经配置好了，您的 AI 助手现在拥有了长期记忆能力！
+    
+    **配置摘要**：
+    - 记忆模式: LLM
+    - Provider: 智谱 AI
+    - API Key: 已配置 ✅
+    
+    **下一步**：重启 OpenClaw Gateway 使配置生效。
+```
+
+---
+
+### 常见问题（FAQ）
+
+#### Q1: 安装后 AI 还是记不住之前说的话？
+
+**可能原因**：
+1. OpenClaw Gateway 没有重启
+2. 配置文件中没有启用 `lobster-press`
+3. `slots.contextEngine` 没有设置
+
+**解决方法**：
+```bash
+# 1. 检查配置
+cat ~/.openclaw/openclaw.json | grep -A 5 "lobster-press"
+
+# 2. 重启 Gateway
+systemctl --user restart openclaw-gateway
+
+# 3. 查看日志
+journalctl --user -u openclaw-gateway -f | grep lobster
+```
+
+#### Q2: 提示 "lobster-press command not found"？
+
+**可能原因**：npm 全局安装路径不在 PATH 中。
+
+**解决方法**：
+```bash
+# 检查 npm 全局路径
+npm config get prefix
+
+# 添加到 PATH（以 bash 为例）
+echo 'export PATH="$(npm config get prefix)/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+#### Q3: 配置后 Gateway 启动失败？
+
+**可能原因**：配置文件 JSON 格式错误。
+
+**解决方法**：
+```bash
+# 验证 JSON 格式
+python3 -m json.tool ~/.openclaw/openclaw.json
+
+# 如果报错，检查 JSON 语法（逗号、引号等）
+# 或者恢复备份
+cp ~/.openclaw/openclaw.json.backup ~/.openclaw/openclaw.json
+```
+
+#### Q4: 如何查看 LobsterPress 是否在运行？
+
+**方法 1: 查看日志**
+```bash
+journalctl --user -u openclaw-gateway -f | grep -i lobster
+```
+
+**方法 2: 检查数据库**
+```bash
+# 查看是否有记忆被保存
+sqlite3 ~/.openclaw/lobster.db "SELECT COUNT(*) FROM messages;"
+```
+
+#### Q5: 如何卸载 LobsterPress？
+
+```bash
+# 1. 移除配置
+# 编辑 ~/.openclaw/openclaw.json，删除 "lobster-press" 相关配置
+
+# 2. 卸载 npm 包
+npm uninstall -g @sonicbotman/lobster-press
+
+# 3. 删除数据库（可选）
+rm ~/.openclaw/lobster.db
+
+# 4. 重启 Gateway
+systemctl --user restart openclaw-gateway
+```
+
+---
+
+### 获取帮助
+
+如果您遇到问题，可以通过以下方式获取帮助：
+
+1. **查看文档**: [docs.openclaw.ai](https://docs.openclaw.ai)
+2. **GitHub Issues**: [提交问题](https://github.com/SonicBotMan/lobster-press/issues)
+3. **Discord 社区**: [加入讨论](https://discord.com/invite/clawd)
+
+---
+
+### 高级配置（可选）
+
+如果您是高级用户，可以手动配置以下选项：
 
 ```json
 {
@@ -73,19 +348,27 @@ lobster-press --version
           "namespace": "default"
         }
       }
+    },
+    "slots": {
+      "contextEngine": "lobster-press"
     }
   }
 }
 ```
 
-### 独立使用（Python）
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| `llmProvider` | LLM 提供商（openai/anthropic/zhipu/deepseek） | - |
+| `llmModel` | LLM 模型名称 | - |
+| `llmApiKey` | API Key（建议用环境变量） | - |
+| `contextThreshold` | 上下文使用率阈值（触发压缩） | 0.8 |
+| `freshTailCount` | 保留最近 N 条消息不压缩 | 32 |
+| `namespace` | 命名空间（多租户隔离） | default |
 
-```bash
-pip install -e .
-
-# 运行 MCP Server
-python -m mcp_server.lobster_mcp_server --db ~/.openclaw/lobster.db
-```
+> 💡 **安全提示**: API Key 建议使用环境变量，不要直接写在配置文件中：
+> ```bash
+> export LOBSTER_LLM_API_KEY="your-api-key"
+> ```
 
 ---
 
