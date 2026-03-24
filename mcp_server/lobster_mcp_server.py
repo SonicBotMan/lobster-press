@@ -4,10 +4,10 @@
 LobsterPress MCP Server
 基于 Model Context Protocol (MCP) 的认知记忆压缩服务
 
-Version: v4.0.41
+Version: v4.0.93
 Changelog: https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md
 
-# lobster-press v4.0.41 MCP 工具集
+# lobster-press v4.0.93 MCP 工具集
 
 ## Write 层（写入记忆）
 - lobster_compact   — 触发 DAG 压缩，将工作记忆写入情节记忆

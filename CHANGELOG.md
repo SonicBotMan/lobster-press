@@ -5,6 +5,18 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.93] - 2026-03-24
+
+### Fixed (安装教程修正)
+- 📝 **修正安装教程**: 移除错误的 `npm install -g` 推荐，改为正确的 OpenClaw 插件安装方式
+- 📝 **移除不存在的 CLI 命令**: `lobster-press --version` 命令不存在，已从教程中移除
+- 📝 **简化安装文档**: 合并"离线安装"到主要安装方式，添加"快速验证命令"
+- 🔧 **版本号同步**: 修复 `lobster_mcp_server.py` 中版本号从 v4.0.41 滞后的问题
+
+### Changed
+- 安装步骤从 5 步扩展为 6 步，明确区分"安装"和"配置"
+- 添加重要提示：LobsterPress 必须安装到 `~/.openclaw/extensions/lobster-press/` 目录
+
 ## [4.0.92] - 2026-03-24
 
 ### Added (交互式配置向导可靠性增强)

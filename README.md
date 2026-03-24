@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
 
-# 🧠 LobsterPress v4.0.92「配置向导」
+# 🧠 LobsterPress v4.0.93「配置向导」
 
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v4.0.92](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.92) · [更新日志](CHANGELOG.md)
+**最新版本**: [v4.0.93](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.93) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -53,34 +53,54 @@
 
 ### 安装步骤（推荐方式）
 
-#### 步骤 1: 安装 LobsterPress
+> ⚠️ **重要**: LobsterPress 是 OpenClaw 插件，必须安装到 `~/.openclaw/extensions/lobster-press/` 目录才能工作。**不要**使用 `npm install -g`（全局安装不会让 OpenClaw 加载插件）。
 
-打开终端，运行以下命令：
-
-```bash
-# 全局安装 LobsterPress
-npm install -g @sonicbotman/lobster-press
-```
-
-安装成功后，您会看到类似这样的输出：
-
-```
-+ @sonicbotman/lobster-press@4.0.92
-added 1 package in 2s
-```
-
-#### 步骤 2: 验证安装
+#### 步骤 1: 创建插件目录
 
 ```bash
-# 检查版本
-lobster-press --version
-
-# 预期输出: 4.0.92
+# 创建 OpenClaw 插件目录
+mkdir -p ~/.openclaw/extensions/lobster-press
 ```
 
-#### 步骤 3: 配置 LobsterPress
+#### 步骤 2: 安装 LobsterPress
 
-LobsterPress 提供了**交互式配置向导**，帮助您快速完成配置。
+**方式 A: 从 npm 下载并安装（推荐）**
+
+```bash
+# 进入插件目录
+cd ~/.openclaw/extensions/lobster-press
+
+# 下载最新版本 tarball
+npm pack @sonicbotman/lobster-press@latest
+
+# 解压到当前目录
+tar -xzf *.tgz --strip-components=1
+
+# 清理 tarball 文件
+rm *.tgz
+```
+
+**方式 B: 从 GitHub Release 下载（离线安装）**
+
+1. 访问 [GitHub Releases](https://github.com/SonicBotMan/lobster-press/releases)
+2. 下载最新版本的 `lobster-press-X.X.X.tgz`
+3. 解压到插件目录：
+
+```bash
+cd ~/.openclaw/extensions/lobster-press
+tar -xzf /path/to/lobster-press-X.X.X.tgz --strip-components=1
+```
+
+#### 步骤 3: 验证安装
+
+```bash
+# 检查插件文件是否存在
+ls ~/.openclaw/extensions/lobster-press/
+
+# 预期输出: dist/  mcp_server/  openclaw.plugin.json  package.json  README.md  src/
+```
+
+#### 步骤 4: 配置 LobsterPress
 
 **方式 1: 使用 AI 助手引导配置（推荐）**
 
@@ -94,11 +114,12 @@ AI 会自动调用 `lobster_configure` 工具，引导您完成配置。
 
 **方式 2: 手动配置（高级用户）**
 
-如果您熟悉 OpenClaw 配置，可以手动编辑 `~/.openclaw/openclaw.json`：
+编辑 `~/.openclaw/openclaw.json`，添加插件配置：
 
 ```json
 {
   "plugins": {
+    "allow": ["lobster-press"],
     "entries": {
       "lobster-press": {
         "enabled": true
@@ -113,7 +134,7 @@ AI 会自动调用 `lobster_configure` 工具，引导您完成配置。
 
 > ⚠️ **重要**: 推荐使用方式 1（AI 引导配置），避免配置错误。
 
-#### 步骤 4: 重启 OpenClaw Gateway
+#### 步骤 5: 重启 OpenClaw Gateway
 
 ```bash
 # 方式 1: 使用 openclaw 命令（如果可用）
@@ -126,7 +147,7 @@ systemctl --user restart openclaw-gateway
 kill -HUP $(pgrep openclaw-gateway)
 ```
 
-#### 步骤 5: 验证 LobsterPress 是否工作
+#### 步骤 6: 验证 LobsterPress 是否工作
 
 在与 AI 对话时，说：
 
@@ -144,34 +165,26 @@ kill -HUP $(pgrep openclaw-gateway)
 
 ---
 
-### 安装方式 2: 从 tarball 安装（离线安装）
+### 快速验证命令
 
-如果您无法访问 npm，可以从 GitHub 下载 tarball 安装：
+安装完成后，可以使用以下命令快速验证：
 
 ```bash
-# 1. 下载最新版本 tarball
-# 访问 https://github.com/SonicBotMan/lobster-press/releases
-# 下载 lobster-press-4.0.92.tgz
+# 1. 检查插件文件
+ls ~/.openclaw/extensions/lobster-press/
 
-# 2. 创建插件目录
-mkdir -p ~/.openclaw/extensions/lobster-press
+# 2. 检查 OpenClaw 配置
+cat ~/.openclaw/openclaw.json | grep -A 5 "lobster-press"
 
-# 3. 解压到插件目录
-cd ~/.openclaw/extensions/lobster-press
-tar -xzf /path/to/lobster-press-4.0.92.tgz --strip-components=1
-
-# 4. 安装 Python 依赖
-cd ~/.openclaw/extensions/lobster-press
-pip install -e .
-
-# 5. 配置（参考步骤 3）
+# 3. 检查 Gateway 日志（确认插件加载）
+journalctl --user -u openclaw-gateway -f | grep lobster
 ```
 
 ---
 
 ### 配置向导使用指南
 
-LobsterPress v4.0.92 提供了 5 步交互式配置向导：
+LobsterPress v4.0.93 提供了 5 步交互式配置向导：
 
 | 步骤 | 说明 | 您需要做的 |
 |------|------|-----------|
