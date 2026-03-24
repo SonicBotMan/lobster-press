@@ -122,18 +122,20 @@ python -m mcp_server.lobster_mcp_server --db ~/.openclaw/lobster.db
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### ContextEngine 集成
+### Lifecycle Hooks 集成
 
-> ⚠️ **注意**: 由于 OpenClaw Issue #52810，lifecycle hooks 当前不触发。请使用手动 MCP 工具调用。
+LobsterPress 通过 OpenClaw lifecycle hooks 实现自动记忆管理：
 
-LobsterPress 实现了完整的 OpenClaw ContextEngine 接口：
+| Hook | 触发时机 | 功能 | 状态 |
+|------|----------|------|------|
+| `before_agent_start` | 每轮对话开始前 | 自动注入历史记忆（按 semantic > episodic > working 优先级） | ✅ 启用 |
+| `agent_end` | 每轮对话结束后 | 自动保存用户输入和 Agent 回复 | ✅ 启用 |
 
-| 方法 | 触发时机 | 功能 | 当前状态 |
-|------|----------|------|----------|
-| `prepareContext` | 每轮对话开始前 | 注入最新摘要到 system prompt | ⚠️ 手动 |
-| `afterTurn` | 每轮对话结束后 | 检查上下文使用率，自动触发压缩 | ⚠️ 手动 |
-| `compact` | 手动调用 | 强制执行 DAG 压缩 | ✅ 可用 |
-| `assemble` | 上下文组装时 | 按三层记忆模型拼装最优上下文 | ✅ 可用 |
+**手动工具**（可选）：
+| 工具 | 触发时机 | 功能 | 状态 |
+|------|----------|------|------|
+| `lobster_compress` | 手动调用 | 强制执行 DAG 压缩 | ✅ 可用 |
+| `lobster_assemble` | 手动调用 | 按三层记忆模型拼装最优上下文 | ✅ 可用 |
 
 ---
 
@@ -168,27 +170,6 @@ LobsterPress 实现了完整的 OpenClaw ContextEngine 接口：
 | 工具 | 说明 |
 |------|------|
 | `lobster_check_context` | 手动检查上下文（降级方案） |
-
----
-
-## ✅ 自动记忆管理
-
-LobsterPress v4.0.89 已实现完整的自动记忆管理：
-
-| Lifecycle Hook | 触发时机 | 功能 | 状态 |
-|---------------|---------|------|------|
-| `before_agent_start` | 每轮对话开始前 | 自动注入历史记忆 | ✅ 启用 |
-| `agent_end` | 每轮对话结束后 | 自动保存对话消息 | ✅ 启用 |
-
-**工作流程**：
-1. 用户发送消息 → `before_agent_start` 触发
-2. LobsterPress 召回历史记忆（按 semantic > episodic > working 优先级）
-3. 记忆注入到 prependContext（格式：`[tier]: content`）
-4. Agent 基于历史记忆回复
-5. 对话结束 → `agent_end` 触发
-6. LobsterPress 自动保存用户输入和 Agent 回复
-
-**用户输入提取**：自动从 `event.prompt` 中提取纯用户文本，去除系统元数据。
 
 ---
 
