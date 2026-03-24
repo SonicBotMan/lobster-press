@@ -786,8 +786,12 @@ const lobsterPlugin = {
         }
       },
       async assemble(p: { messages: any[]; sessionId?: string; tokenBudget?: number }) {
+        // v4.0.73: 添加 debug 日志
+        debugLog(`assemble called: sessionId=${p.sessionId}, messages=${p.messages?.length}`);
+        
         // v3.6.0: 调用 lobster_assemble 按三层记忆模型拼装上下文（Issue #127 模块一）
         if (!p.sessionId) {
+          debugLog('assemble: no sessionId, returning original messages');
           return { messages: p.messages as any[], estimatedTokens: 0 };
         }
 
@@ -805,9 +809,11 @@ const lobsterPlugin = {
           const totalTokens = data?.total_tokens ?? 0;
 
           // 将三层记忆转为 messages 格式
+          // v4.0.73: 修复 content 格式（Issue #183 Bug #5）
+          // OpenClaw 期望 content 是数组格式：[{ type: "text", text: "..." }]
           const messages = assembled.map((item: any) => ({
             role: item.role ?? "assistant",
-            content: item.content ?? "",
+            content: [{ type: "text", text: item.content ?? "" }],  // 数组格式
             _tier: item.tier, // 保留层级信息
           }));
 
@@ -824,8 +830,12 @@ const lobsterPlugin = {
       // v4.0.14: 修复 P1-4 - MCP 返回结构解析错误（Issue #152 Bug #4）
       // 每轮对话开始前，OpenClaw 自动调用，将最新摘要注入 system prompt
       async prepareContext(params: { sessionId?: string; sessionKey?: string }) {
+        // v4.0.73: 添加 debug 日志
+        debugLog(`prepareContext called: sessionId=${params.sessionId}, sessionKey=${params.sessionKey}`);
+        
         const sessionId = params.sessionId || params.sessionKey;
         if (!sessionId) {
+          debugLog('prepareContext: no sessionId, returning null');
           return null;
         }
 
@@ -925,10 +935,10 @@ const lobsterPlugin = {
     debugLog('About to register lifecycle hooks...');
     debugLog(`api.on type: ${typeof api.on}`);
 
-    // 1. before_agent_start: 召回记忆
+    // 1. before_agent_start: 召回记忆 (v4.0.75: 重新启用完整逻辑)
+    // 注意：使用 before_agent_start 而不是 before_prompt_build，因为后者返回值会导致错误
     debugLog('Registering before_agent_start hook...');
     api.on("before_agent_start", async (event: any, ctx: any) => {
-      // Debug: hook 被调用
       debugLog(`HOOK FIRED: before_agent_start, ctx.sessionId=${ctx?.sessionId}`);
       
       // 检查是否启用 lifecycle 模式
@@ -995,10 +1005,9 @@ const lobsterPlugin = {
     });
     debugLog('before_agent_start hook registered');
 
-    // 2. agent_end: 写入记忆
+    // 2. agent_end: 写入记忆 (v4.0.75: 重新启用完整逻辑)
     debugLog('Registering agent_end hook...');
     api.on("agent_end", async (event: any, ctx: any) => {
-      // Debug: hook 被调用
       debugLog(`HOOK FIRED: agent_end, event.success=${event?.success}, ctx.sessionId=${ctx?.sessionId}`);
       
       // 检查是否启用 lifecycle 模式
@@ -1030,25 +1039,18 @@ const lobsterPlugin = {
         
         // 提取最后一条对话（user + assistant）
         const messages = event.messages.slice(-2).map((msg: any, index: number) => {
-          // v4.0.58: 修复 content 格式，过滤非标准类型（如 thinking）
+          // v4.0.75: 修复 content 格式，确保是数组
           let contentArray;
           if (typeof msg.content === "string") {
             // 字符串 → 包装为数组
             contentArray = [{type: "text", text: msg.content}];
           } else if (Array.isArray(msg.content)) {
-            // 已经是数组 → 过滤只保留 text 类型
-            contentArray = msg.content.filter((block: any) => block.type === "text");
-            // 如果过滤后为空，创建一个空文本
-            if (contentArray.length === 0) {
-              contentArray = [{type: "text", text: ""}];
-            }
+            // 已经是数组 → 直接使用
+            contentArray = msg.content;
           } else {
             // 其他类型 → 尝试转换为字符串数组
             contentArray = [{type: "text", text: String(msg.content || "")}];
           }
-          
-          // Debug: 打印 content 转换
-          debugLog(`agent_end: msg ${index}, role=${msg.role}, original type=${typeof msg.content}, isArray=${Array.isArray(msg.content)}, final length=${contentArray.length}`);
           
           return {
             id: msg.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
@@ -1067,38 +1069,21 @@ const lobsterPlugin = {
           messages: messages,
         });
         
-        // 解析返回结果
-        const responseText = result?.content?.[0]?.text;
-        const response = responseText ? JSON.parse(responseText) : {};
+        // 解析结果
+        const text = result.content?.[0]?.text;
+        const data = text ? JSON.parse(text) : {};
         
-        if (response.ingested > 0) {
-          api.logger.info(`[lobster-press] Lifecycle: ingested ${response.ingested} messages for session ${conversationId}`);
-          
-          // 检查是否需要压缩（消息数 > 50）
-          const describeResult = await callMcp(pluginConfig, "lobster_describe", {
-            conversation_id: conversationId,
-          });
-          
-          const describeText = describeResult.content?.[0]?.text;
-          const stats = describeText ? JSON.parse(describeText) : {};
-          const messageCount = stats?.message_count ?? 0;
-          
-          if (messageCount > 50) {
-            api.logger.info(`[lobster-press] Lifecycle: triggering compress for session ${conversationId} (${messageCount} messages)`);
-            
-            // 调用 lobster_compress 压缩记忆
-            await callMcp(pluginConfig, "lobster_compress", {
-              conversation_id: conversationId,
-              force: false,
-            });
-          }
+        if (data.success) {
+          api.logger.info(`[lobster-press] Lifecycle: agent_end saved ${messages.length} messages`);
+        } else {
+          api.logger.warn(`[lobster-press] Lifecycle: agent_end failed: ${data.error || 'unknown error'}`);
         }
       } catch (error) {
         api.logger.warn(`[lobster-press] Lifecycle: agent_end failed: ${error}`);
       }
     });
     debugLog('agent_end hook registered');
-    
+
     console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: All lifecycle hooks registered successfully`);
     api.logger.info(`[lobster-press] Lifecycle hooks registered (before_agent_start + agent_end)`);
     // END: lifecycle hooks (v4.0.50: re-enabled for testing)
