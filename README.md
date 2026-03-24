@@ -171,20 +171,24 @@ LobsterPress 实现了完整的 OpenClaw ContextEngine 接口：
 
 ---
 
-## ⚠️ 当前状态：手动记忆管理
+## ✅ 自动记忆管理
 
-由于 OpenClaw lifecycle hooks（`api.on()`）存在触发问题（Issue #52810），当前版本 **不支持自动记忆管理**。
+LobsterPress v4.0.89 已实现完整的自动记忆管理：
 
-你需要显式调用 MCP 工具来管理记忆：
+| Lifecycle Hook | 触发时机 | 功能 | 状态 |
+|---------------|---------|------|------|
+| `before_agent_start` | 每轮对话开始前 | 自动注入历史记忆 | ✅ 启用 |
+| `agent_end` | 每轮对话结束后 | 自动保存对话消息 | ✅ 启用 |
 
-| 时机 | 工具 | 说明 |
-|------|------|------|
-| 对话开始前 | `lobster_assemble` | 召回历史记忆 |
-| 对话结束后 | `lobster_ingest` | 保存新消息 |
+**工作流程**：
+1. 用户发送消息 → `before_agent_start` 触发
+2. LobsterPress 召回历史记忆（按 semantic > episodic > working 优先级）
+3. 记忆注入到 prependContext（格式：`[tier]: content`）
+4. Agent 基于历史记忆回复
+5. 对话结束 → `agent_end` 触发
+6. LobsterPress 自动保存用户输入和 Agent 回复
 
-详见 [手动记忆管理指南](docs/MANUAL_MEMORY.md)。
-
-> 这是短期方案，等待 OpenClaw 修复后将恢复自动模式。
+**用户输入提取**：自动从 `event.prompt` 中提取纯用户文本，去除系统元数据。
 
 ---
 
