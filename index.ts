@@ -584,6 +584,7 @@ LobsterPress 可以使用 LLM 生成高质量摘要，也可以使用 TF-IDF 提
 **下一步**：设置 \`step="llm_choice"\` 和 \`llm_enabled=true/false\``,
               },
             ],
+            details: { step: "welcome" },
           };
         }
         
@@ -610,6 +611,7 @@ LobsterPress 可以使用 LLM 生成高质量摘要，也可以使用 TF-IDF 提
 **下一步**：设置 \`step="provider"\` 和 \`provider="选择的provider"\``,
               },
             ],
+            details: { step: "llm_choice", llm_enabled: true },
           };
         }
         
@@ -645,6 +647,7 @@ LobsterPress 可以使用 LLM 生成高质量摘要，也可以使用 TF-IDF 提
 **下一步**：设置 \`step="apikey"\` 和 \`api_key="您的API Key"\``,
               },
             ],
+            details: { step: "provider", provider: params.provider },
           };
         }
         
@@ -680,6 +683,7 @@ LobsterPress 可以使用 LLM 生成高质量摘要，也可以使用 TF-IDF 提
 **下一步**：设置 \`step="complete"\``,
               },
             ],
+            details: { step: "features", llm_enabled: params.llm_enabled },
           };
         }
         
@@ -690,7 +694,7 @@ LobsterPress 可以使用 LLM 生成高质量摘要，也可以使用 TF-IDF 提
           
           try {
             // 1. 读取旧配置（备份）
-            let oldConfig: Record<string, unknown> = {};
+            let oldConfig: any = {};
             let configExists = false;
             
             if (existsSync(configPath)) {
@@ -905,6 +909,7 @@ ${JSON.stringify(fullConfig, null, 2)}
               text: `❌ 未知的配置步骤：${step}\n\n请使用以下步骤之一：welcome/llm_choice/provider/apikey/features/complete`,
             },
           ],
+          details: { step, error: "unknown_step" },
         };
       },
     });
