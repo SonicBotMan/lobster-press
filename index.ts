@@ -1183,6 +1183,26 @@ const lobsterPlugin = {
         
         if (data.success) {
           api.logger.info(`[lobster-press] Lifecycle: agent_end saved ${messages.length} messages`);
+          
+          // v4.0.90: 自动应用 C-HLR+ 遗忘曲线（罡哥建议）
+          // 每次保存消息后，自动标记衰减消息
+          try {
+            debugLog(`agent_end: calling lobster_sweep to apply forgetting curve`);
+            const sweepResult = await callMcp(pluginConfig, "lobster_sweep", {
+              conversation_id: conversationId,
+            });
+            debugLog(`agent_end: lobster_sweep completed`);
+            
+            // 可选：自动清理已衰减的消息（保守策略：保留 7 天）
+            // const pruneResult = await callMcp(pluginConfig, "lobster_prune", {
+            //   conversation_id: conversationId,
+            //   older_than_days: 7,
+            // });
+          } catch (sweepError) {
+            // 遗忘曲线失败不影响主流程
+            api.logger.warn(`[lobster-press] Lifecycle: lobster_sweep failed: ${sweepError}`);
+            debugLog(`agent_end: lobster_sweep error: ${sweepError}`);
+          }
         } else {
           api.logger.warn(`[lobster-press] Lifecycle: agent_end failed: ${data.error || 'unknown error'}`);
         }

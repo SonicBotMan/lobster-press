@@ -102,8 +102,9 @@ python -m mcp_server.lobster_mcp_server --db ~/.openclaw/lobster.db
 │  ├── Pass 2: 去重工具结果                                   │
 │  └── Pass 3: 折叠系统样板代码                               │
 ├─────────────────────────────────────────────────────────────┤
-│  模块二: C-HLR+ 自适应遗忘曲线                               │
+│  模块二: C-HLR+ 自适应遗忘曲线（✅ 自动应用）              │
 │  └── h = base_h × (1 + α × complexity) × spaced_bonus       │
+│  └── v4.0.90: agent_end hook 自动调用 lobster_sweep         │
 ├─────────────────────────────────────────────────────────────┤
 │  模块三: Focus 主动压缩触发                                  │
 │  ├── 定时触发: 每 12 轮                                     │
