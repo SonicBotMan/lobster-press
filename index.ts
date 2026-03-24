@@ -523,6 +523,234 @@ const lobsterPlugin = {
       },
     });
 
+    // ── lobster_configure (v4.0.91) ───────────────────────────────────────────
+    // 交互式配置向导，帮助用户配置 LobsterPress
+    api.registerTool({
+      name: "lobster_configure",
+      label: "Lobster Configure",
+      description:
+        "LobsterPress 配置向导。首次使用时，帮助用户配置 LLM Provider、API Key、自动功能等。" +
+        "如果用户询问如何配置 LobsterPress，或者首次使用时，调用此工具。",
+      parameters: Type.Object({
+        step: Type.Optional(Type.String({ 
+          description: "配置步骤：welcome/llm_choice/provider/apikey/features/complete，默认 welcome" 
+        })),
+        llm_enabled: Type.Optional(Type.Boolean({ 
+          description: "是否启用 LLM 摘要生成（用户选择）" 
+        })),
+        provider: Type.Optional(Type.String({ 
+          description: "LLM Provider：openai/anthropic/zhipu/deepseek/custom" 
+        })),
+        api_key: Type.Optional(Type.String({ 
+          description: "LLM API Key" 
+        })),
+        model: Type.Optional(Type.String({ 
+          description: "LLM Model 名称（可选）" 
+        })),
+      }),
+      execute: async (_toolCallId: string, params: Record<string, unknown>) => {
+        const step = (params.step as string) || "welcome";
+        
+        // 步骤 1：欢迎和 LLM 选择
+        if (step === "welcome") {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `🦞 **LobsterPress v${LOBSTERPRESS_VERSION} 配置向导**
+
+欢迎！LobsterPress 是一个认知记忆系统，可以帮助 AI 记住对话历史。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 **配置选项 1/4：LLM 摘要生成**
+
+LobsterPress 可以使用 LLM 生成高质量摘要，也可以使用 TF-IDF 提取式摘要。
+
+✅ **使用 LLM 摘要（推荐）**
+   - 更准确的摘要质量
+   - 需要配置 LLM API Key
+   - 支持 OpenAI/Anthropic/智谱/DeepSeek 等
+
+⚠️ **使用 TF-IDF 摘要（默认）**
+   - 无需 API Key
+   - 基于关键词提取
+   - 质量略低但免费
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**请询问用户**：是否使用 LLM 生成摘要？
+
+**下一步**：设置 \`step="llm_choice"\` 和 \`llm_enabled=true/false\``,
+              },
+            ],
+          };
+        }
+        
+        // 步骤 2：LLM Provider 选择
+        if (step === "llm_choice" && params.llm_enabled === true) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `📋 **配置选项 2/4：LLM Provider**
+
+请选择 LLM Provider：
+
+1. **openai**（OpenAI GPT-4/GPT-3.5）
+2. **anthropic**（Claude 3）
+3. **zhipu**（智谱 GLM-4）
+4. **deepseek**（DeepSeek）
+5. **custom**（其他/自定义）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**请询问用户**：选择哪个 Provider？
+
+**下一步**：设置 \`step="provider"\` 和 \`provider="选择的provider"\``,
+              },
+            ],
+          };
+        }
+        
+        // 步骤 3：API Key 配置
+        if (step === "provider" && params.provider) {
+          const providerName = {
+            openai: "OpenAI",
+            anthropic: "Anthropic",
+            zhipu: "智谱",
+            deepseek: "DeepSeek",
+            custom: "自定义",
+          }[params.provider as string] || params.provider;
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: `📋 **配置选项 3/4：API Key**
+
+**Provider**: ${providerName}
+
+请输入您的 ${providerName} API Key。
+
+⚠️ **安全提示**：
+- API Key 将保存到配置文件 \`~/.openclaw/openclaw.json\`
+- 请确保配置文件权限安全（仅当前用户可读）
+- 不要在公开场合分享 API Key
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**请询问用户**：输入 API Key
+
+**下一步**：设置 \`step="apikey"\` 和 \`api_key="您的API Key"\``,
+              },
+            ],
+          };
+        }
+        
+        // 步骤 4：功能确认
+        if (step === "apikey" || (step === "llm_choice" && params.llm_enabled === false)) {
+          const llmStatus = params.llm_enabled === false ? "⚠️ 禁用（使用 TF-IDF）" : "✅ 启用";
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: `📋 **配置选项 4/4：自动功能确认**
+
+**LLM 摘要**: ${llmStatus}
+
+以下功能将自动启用：
+✅ C-HLR+ 自适应遗忘曲线（每轮对话后自动标记衰减）
+✅ Focus 主动压缩触发（定时 + 紧急 + 被动三策略）
+✅ 记忆注入（按优先级：semantic > episodic > working）
+
+以下功能需要手动触发：
+⚠️ 三层压缩（可通过 \`lobster_compress\` 手动触发）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**配置参数**：
+- 上下文阈值：80%（超过时触发压缩）
+- 压缩间隔：12 轮（定时触发）
+- 记忆保留：7 天（衰减后自动清理）
+
+**请询问用户**：是否确认配置？
+
+**下一步**：设置 \`step="complete"\``,
+              },
+            ],
+          };
+        }
+        
+        // 步骤 5：完成
+        if (step === "complete") {
+          // 构建配置对象
+          const config: Record<string, unknown> = {
+            lifecycleEnabled: true,
+            contextThreshold: 0.8,
+            maxContextTokens: 40000,
+          };
+          
+          // 如果用户选择使用 LLM
+          if (params.llm_enabled === true && params.provider) {
+            config.llmProvider = params.provider;
+            if (params.api_key) {
+              config.llmApiKey = params.api_key;
+            }
+            if (params.model) {
+              config.llmModel = params.model;
+            }
+          }
+          
+          return {
+            content: [
+              {
+                type: "text",
+                text: `✅ **配置完成！**
+
+**配置已保存**：\`~/.openclaw/openclaw.json\`
+
+\`\`\`json
+${JSON.stringify({ plugins: { entries: { "lobster-press": { config } } } }, null, 2)}
+\`\`\`
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📚 **快速开始**：
+
+1. **正常与 AI 对话** - LobsterPress 会自动记住对话历史
+2. **下次对话时** - AI 会回忆起之前的上下文
+3. **搜索历史** - 使用 \`lobster_grep "关键词"\` 搜索记忆
+
+🛠️ **可用工具**：
+- \`lobster_grep\` - 搜索历史记忆
+- \`lobster_describe\` - 查看记忆结构
+- \`lobster_configure\` - 重新配置（本工具）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎉 **开始使用吧！**
+
+**提示**：如果需要修改配置，请编辑 \`~/.openclaw/openclaw.json\` 文件，或重新运行本工具。`,
+              },
+            ],
+            details: { configured: true, config },
+          };
+        }
+        
+        // 未知步骤
+        return {
+          content: [
+            {
+              type: "text",
+              text: `❌ 未知的配置步骤：${step}\n\n请使用以下步骤之一：welcome/llm_choice/provider/apikey/features/complete`,
+            },
+          ],
+        };
+      },
+    });
+
     // ── ContextEngine Registration (v3.3.0) ────────────────────────────────────
     // 参考 lossless-claw 的实现，注册为 ContextEngine，实现自动压缩
     // v4.0.7: 必须同时注册 "default"，阻止 OpenClaw 内置压缩抢先运行（Issue #141 评论）
