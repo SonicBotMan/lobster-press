@@ -692,6 +692,23 @@ export LOBSTER_LLM_MODEL=deepseek-chat
 
 ---
 
+## 🌟 Star History
+
+If this project helps you, please ⭐️ star it!
+
+[![GitHub stars](https://img.shields.io/github/stars/SonicBotMan/lobster-press?style=for-the-badge&logo=github&color=yellow)](https://github.com/SonicBotMan/lobster-press/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/SonicBotMan/lobster-press?style=for-the-badge&logo=github&color=blue)](https://github.com/SonicBotMan/lobster-press/network/members)
+
+<details>
+<summary>📊 View Star History Chart</summary>
+
+[![Star History Chart](https://api.star-history.com/svg?repos=SonicBotMan/lobster-press&type=Date)](https://star-history.com/#SonicBotMan/lobster-press&Date)
+
+<i>Note: The chart above may take 24-48 hours to update due to GitHub's image cache. Click to view real-time data on Star History website.</i>
+
+</details>
+
+
 <div align="center">
 
 **如果 LobsterPress 对你的项目有帮助，请给个 ⭐ Star！**
