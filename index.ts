@@ -1572,8 +1572,9 @@ ${JSON.stringify(fullConfig, null, 2)}
         const text = result.content?.[0]?.text;
         const data = text ? JSON.parse(text) : {};
         
-        if (data.success) {
-          api.logger.info(`[lobster-press] Lifecycle: agent_end saved ${messages.length} messages`);
+        // v4.0.96: 修复返回值检查（lobster_ingest 返回 ingested，不是 success）
+        if (data.ingested !== undefined && data.ingested > 0) {
+          api.logger.info(`[lobster-press] Lifecycle: agent_end saved ${data.ingested} messages`);
           
           // v4.0.90: 自动应用 C-HLR+ 遗忘曲线（罡哥建议）
           // 每次保存消息后，自动标记衰减消息

@@ -5,6 +5,29 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [4.0.97] - 2026-03-26
+
+### Added (C-HLR+ 遗忘曲线)
+- ✨ **C-HLR+ 算法实现**: 复杂度驱动的自适应遗忘曲线 `h = base_h * (1 + α * complexity)`
+- ✨ **数据库字段新增**: `half_life` (半衰期，小时) 和 `review_count` (复习次数)
+- ✨ **Pass 4 消息去重**: Jaccard 相似度 > 0.8 的重复消息自动去重
+- ✨ **递归 JSON 文本提取**: 支持多层嵌套的 JSON 内容提取
+
+### Changed
+- 🔄 **lobster_sweep 集成 C-HLR+**: 使用遗忘曲线算法计算保留率，自动更新 `half_life`
+- 🔄 **压缩率提升**: Pass 4 去重后压缩率从 37.4% 提升到 60.9%（+23.5%）
+- 🔄 **复杂度计算**: 基于 token 数量、TF-IDF 分数、实体数量、代码检测
+
+### Fixed
+- 🐛 **agent_end hook 检查修复**: `data.success` → `data.ingested > 0`
+- 🐛 **版本号同步修复**: `src/database.py` Version 字段格式错误
+
+### Technical Details
+- 新增文件: `src/pipeline/chlr_scorer.py` (C-HLR+ 评分器)
+- 新增文件: `src/pipeline/intent_extractor.py` (意图提取器)
+- 修改文件: `src/database.py` (新增 migrate_v41 迁移)
+- 修改文件: `src/three_pass_trimmer.py` (新增 Pass 4 去重)
+
 ## [4.0.93] - 2026-03-24
 
 ### Fixed (安装教程修正)

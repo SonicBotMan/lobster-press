@@ -1,7 +1,7 @@
 <div align="center">
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - Transform AI conversations from 'ephemeral phantoms' into 'permanent nutrients in the digital hippocampus'" width="100%">
-# 🧠 LobsterPress v4.0.92「Configuration Wizard」
+# 🧠 LobsterPress v4.0.97「C-HLR+ Forgetting Curve」
 
 **Cognitive Memory System for AI Agents**
 *LLM persistent memory engine based on cognitive science*
@@ -11,7 +11,7 @@
 [![GitHub license](https://img.shields.io/github/license/sonicbotman/lobster-press.svg)](https://github.com/Sonicbotman/lobster-press)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
 [中文](README.md) | **English**
-**Latest**: [v4.0.92](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.92) · [Changelog](CHANGELOG.md)
+**Latest**: [v4.0.97](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.97) · [Changelog](CHANGELOG.md)
 </div>
 ---
 

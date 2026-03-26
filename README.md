@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
 
-# 🧠 LobsterPress v4.0.93「配置向导」
+# 🧠 LobsterPress v4.0.97「C-HLR+ 遗忘曲线」
 
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v4.0.93](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.93) · [更新日志](CHANGELOG.md)
+**最新版本**: [v4.0.97](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.97) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -184,7 +184,7 @@ journalctl --user -u openclaw-gateway -f | grep lobster
 
 ### 配置向导使用指南
 
-LobsterPress v4.0.93 提供了 5 步交互式配置向导：
+LobsterPress v4.0.97 提供了 5 步交互式配置向导：
 
 | 步骤 | 说明 | 您需要做的 |
 |------|------|-----------|
