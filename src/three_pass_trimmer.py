@@ -44,6 +44,7 @@ class ThreePassTrimmer:
                 'pass1_saved': int,
                 'pass2_saved': int,
                 'pass3_saved': int,
+                'pass4_saved': int,  # v4.0.95: 消息去重
             }
         """
         original_tokens = sum(self._estimate_tokens(self._msg_to_text(m)) for m in messages)
@@ -52,28 +53,42 @@ class ThreePassTrimmer:
         after_p2, p2_saved = self._pass2_dedup_tool_results(after_p1)
         after_p3, p3_saved = self._pass3_fold_boilerplate(after_p2)
         
-        trimmed_tokens = sum(self._estimate_tokens(self._msg_to_text(m)) for m in after_p3)
+        # v4.0.95: Pass 4 - 消息去重
+        after_p4, p4_saved, dedup_count = self._pass4_dedup_messages(after_p3)
+        
+        # v4.0.95: 添加 [compressed] 标记
+        for msg in after_p4:
+            if msg.get('_pass1_compressed') or msg.get('_pass4_dedup'):
+                msg['content'] = f"[compressed] {msg.get('content', '')}"
+        
+        trimmed_tokens = sum(self._estimate_tokens(self._msg_to_text(m)) for m in after_p4)
         reduction_pct = (1 - trimmed_tokens / original_tokens) * 100 if original_tokens > 0 else 0.0
         
-        return after_p3, {
+        return after_p4, {
             'original_tokens': original_tokens,
             'trimmed_tokens': trimmed_tokens,
             'reduction_pct': round(reduction_pct, 2),
             'pass1_saved': p1_saved,
             'pass2_saved': p2_saved,
             'pass3_saved': p3_saved,
+            'pass4_saved': p4_saved,
+            'dedup_count': dedup_count,  # v4.0.95: 去重消息数
         }
     
     # ── Pass 1: 剥离机械性 Bloat ──────────────────────────────────────────────
     
     def _pass1_strip_mechanical_bloat(self, messages: List[Dict]) -> Tuple[List[Dict], int]:
         """
-        Pass 1: 保留 user/assistant 全部内容，压缩 tool 输出中的机械性 bloat。
+        Pass 1: 保留 user 全部内容，压缩 tool/assistant 输出中的机械性 bloat。
+        
+        v4.0.94: 扩展无损原则，assistant 消息中的 thinking 块和超长 JSON 也可压缩。
         
         压缩策略：
         - base64 编码块（图片/文件） → '[base64 data: {mime_type}, {original_bytes} bytes]'
-        - JSON 超过 500 字符的 tool 输出 → 提取前 200 字符摘要行
-        - 所有 user/assistant 内容：原样保留，绝不修改
+        - JSON 超过 500 字符 → 提取前 200 字符摘要行
+        - thinking 块 → 压缩为 '[thinking: {preview}...]'
+        - user 内容：原样保留，绝不修改
+        - assistant 内容：保留 text 块，压缩 thinking 块和超长 JSON
         """
         result = []
         saved = 0
@@ -81,9 +96,21 @@ class ThreePassTrimmer:
         for msg in messages:
             role = msg.get('role', '')
             
-            # user / assistant 消息：原样保留（无损原则）
-            if role in ('user', 'assistant'):
+            # user 消息：原样保留（无损原则）
+            if role == 'user':
                 result.append(msg)
+                continue
+            
+            # assistant 消息：压缩 thinking 块和超长 JSON
+            if role == 'assistant':
+                content = msg.get('content', '')
+                original_len = len(content) if isinstance(content, str) else len(json.dumps(content))
+                
+                compressed_content = self._compress_assistant_content(content)
+                compressed_len = len(compressed_content) if isinstance(compressed_content, str) else len(json.dumps(compressed_content))
+                
+                saved += max(0, original_len - compressed_len)
+                result.append({**msg, 'content': compressed_content, '_pass1_compressed': True})
                 continue
             
             # tool / system 消息：尝试压缩
@@ -97,6 +124,82 @@ class ThreePassTrimmer:
             result.append({**msg, 'content': compressed_content, '_pass1_compressed': True})
         
         return result, saved
+    
+    def _compress_assistant_content(self, content):
+        """v4.0.94: 压缩 assistant 消息中的 thinking 块和超长 JSON
+        
+        策略：
+        - thinking 块 → 压缩为 thinking_summary
+        - 超长 JSON (>500 字符) → 递归压缩嵌套结构
+        - text 块 → 检查是否包含嵌套的 JSON，递归处理
+        """
+        if isinstance(content, str):
+            # 尝试解析为 JSON
+            try:
+                data = json.loads(content)
+                compressed = self._compress_assistant_blocks(data)
+                return json.dumps(compressed, ensure_ascii=False)
+            except (json.JSONDecodeError, TypeError):
+                pass
+            
+            # 不是 JSON，超长文本 → 摘要
+            if len(content) > 500:
+                return content[:200] + f'... [truncated {len(content)-200} chars]'
+            return content
+        
+        if isinstance(content, list):
+            compressed = self._compress_assistant_blocks(content)
+            return json.dumps(compressed, ensure_ascii=False)
+        
+        return content
+    
+    def _compress_assistant_blocks(self, blocks):
+        """递归压缩 assistant 消息中的块列表"""
+        if not isinstance(blocks, list):
+            return blocks
+        
+        result = []
+        for block in blocks:
+            if not isinstance(block, dict):
+                result.append(block)
+                continue
+            
+            block_type = block.get('type', '')
+            
+            if block_type == 'thinking':
+                # 压缩 thinking 块
+                thinking = block.get('thinking', '')
+                preview = thinking[:100] if len(thinking) > 100 else thinking
+                result.append({
+                    'type': 'thinking_summary',
+                    'preview': preview + '...' if len(thinking) > 100 else preview,
+                    'original_length': len(thinking),
+                    '_trimmed': True
+                })
+            elif block_type == 'text':
+                # 检查 text 中是否包含嵌套的 JSON
+                text = block.get('text', '')
+                compressed_text = self._compress_nested_text(text)
+                result.append({**block, 'text': compressed_text})
+            else:
+                result.append(block)
+        
+        return result
+    
+    def _compress_nested_text(self, text: str) -> str:
+        """递归压缩 text 字段中嵌套的 JSON"""
+        # 尝试解析为 JSON
+        try:
+            data = json.loads(text)
+            compressed = self._compress_assistant_blocks(data)
+            return json.dumps(compressed, ensure_ascii=False)
+        except (json.JSONDecodeError, TypeError):
+            pass
+        
+        # 不是 JSON，检查是否超长
+        if len(text) > 500:
+            return text[:200] + f'... [truncated {len(text)-200} chars]'
+        return text
     
     def _compress_tool_content(self, content):
         """压缩单条 tool 内容"""
@@ -253,6 +356,147 @@ class ThreePassTrimmer:
         stripped = s.strip()
         return (stripped.startswith('{') and stripped.endswith('}')) or \
                (stripped.startswith('[') and stripped.endswith(']'))
+    
+    # ── Pass 4: 消息去重（v4.0.95）──────────────────────────────────────────────
+    
+    def _pass4_dedup_messages(self, messages: List[Dict]) -> Tuple[List[Dict], int, int]:
+        """
+        Pass 4: 语义去重消息
+        
+        策略：
+        - 相同 role + 相似内容 → 只保留第一次出现
+        - 相似度阈值：0.8（Jaccard 相似度）
+        - 标注重复次数
+        
+        Returns:
+            (deduped_messages, saved_tokens, dedup_count)
+        """
+        if not messages:
+            return [], 0, 0
+        
+        deduped = []
+        saved = 0
+        dedup_count = 0
+        
+        # 按角色分组
+        by_role = {}
+        for msg in messages:
+            role = msg.get('role', 'unknown')
+            if role not in by_role:
+                by_role[role] = []
+            by_role[role].append(msg)
+        
+        # 对每个角色组进行去重
+        for role, group in by_role.items():
+            unique = []
+            for msg in group:
+                content = self._msg_to_text(msg)
+                
+                # 检查是否与已有的相似
+                is_duplicate = False
+                for existing in unique:
+                    existing_content = self._msg_to_text(existing)
+                    similarity = self._calculate_similarity(content, existing_content)
+                    
+                    if similarity > 0.8:  # 相似度阈值
+                        # 标注重复次数
+                        if '_repeat_count' not in existing:
+                            existing['_repeat_count'] = 1
+                        existing['_repeat_count'] += 1
+                        
+                        # 计算节省的 tokens
+                        saved += self._estimate_tokens(content)
+                        dedup_count += 1
+                        
+                        is_duplicate = True
+                        break
+                
+                if not is_duplicate:
+                    msg['_repeat_count'] = 1
+                    unique.append(msg)
+            
+            deduped.extend(unique)
+        
+        # 按原始顺序排序（保留 seq 字段）
+        deduped.sort(key=lambda x: x.get('seq', 0))
+        
+        return deduped, saved, dedup_count
+    
+    def _calculate_similarity(self, text1: str, text2: str) -> float:
+        """
+        计算两个文本的相似度（Jaccard 相似度）
+        
+        v4.0.95: 先提取纯文本（去除 JSON 结构），再计算相似度
+        
+        Args:
+            text1: 文本1
+            text2: 文本2
+        
+        Returns:
+            相似度 0-1
+        """
+        # 提取纯文本
+        plain1 = self._extract_plain_text(text1)
+        plain2 = self._extract_plain_text(text2)
+        
+        # 简单的词频 Jaccard 相似度
+        words1 = set(plain1.lower().split())
+        words2 = set(plain2.lower().split())
+        
+        if not words1 or not words2:
+            return 0.0
+        
+        intersection = words1 & words2
+        union = words1 | words2
+        
+        return len(intersection) / len(union)
+    
+    def _extract_plain_text(self, s: str) -> str:
+        """
+        从 JSON 字符串中提取纯文本（去除 JSON 结构和转义字符）
+        
+        v4.0.95: 递归处理嵌套的 JSON 字符串，提取 text/preview/thinking 等字段
+        
+        Args:
+            s: 可能包含 JSON 的字符串
+        
+        Returns:
+            提取的纯文本
+        """
+        def extract_text(obj):
+            if isinstance(obj, dict):
+                # 优先提取 text 字段
+                if 'text' in obj:
+                    text = obj['text']
+                    # 如果 text 还是 JSON 字符串，递归提取
+                    if isinstance(text, str) and (text.startswith('{') or text.startswith('[')):
+                        try:
+                            nested = json.loads(text)
+                            extracted = extract_text(nested)
+                            if extracted:
+                                return extracted
+                        except:
+                            pass
+                    return text
+                # 如果没有 text，尝试提取 preview 字段
+                elif 'preview' in obj:
+                    return obj['preview']
+                # 如果没有 preview，尝试提取 thinking 字段
+                elif 'thinking' in obj:
+                    return obj['thinking']
+                # 如果都没有，递归处理所有值
+                else:
+                    return ' '.join(extract_text(v) for v in obj.values() if v)
+            elif isinstance(obj, list):
+                return ' '.join(extract_text(item) for item in obj if item)
+            return ''
+        
+        try:
+            data = json.loads(s)
+            return extract_text(data)
+        except:
+            # 如果不是 JSON，直接返回原文
+            return s
     
     def _estimate_tokens(self, text: str) -> int:
         chinese = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')

@@ -4,7 +4,7 @@
 LobsterPress MCP Server
 基于 Model Context Protocol (MCP) 的认知记忆压缩服务
 
-Version: v4.0.93
+Version: v4.0.95
 Changelog: https://github.com/SonicBotMan/lobster-press/blob/master/CHANGELOG.md
 
 # lobster-press v4.0.93 MCP 工具集
@@ -39,7 +39,7 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # v4.0.13: 统一版本号常量（Issue #151 Bug #8）
-LOBSTERPRESS_VERSION = "4.0.92"
+LOBSTERPRESS_VERSION = "4.0.97"
 
 
 @dataclass
@@ -600,6 +600,7 @@ class LobsterPressMCPServer:
         # v3.6.0: 按三层记忆模型拼装上下文（Issue #127 模块一）
         # v4.0.11: 修复 break 逻辑错误（Issue #144）
         # v4.0.13: 改为按比例分配预算，避免硬截断（Issue #151 Bug #7）
+        # v4.0.94: 集成 CMV 三遍压缩 + EM-LLM 事件分割（Phase 1）
         elif tool_name == "lobster_assemble":
             db = self._get_db()
             conversation_id = arguments["conversation_id"]
@@ -612,6 +613,60 @@ class LobsterPressMCPServer:
 
             # 获取三层记忆
             context = db.get_context_by_tier(conversation_id, tiers)
+            
+            # v4.0.94: 对 working 层进行压缩处理
+            if 'working' in context and context['working']:
+                try:
+                    # 1. EM-LLM 事件分割
+                    from pipeline.event_segmenter import EventSegmenter
+                    segmenter = EventSegmenter()
+                    episodes = segmenter.segment(context['working'])
+                    
+                    # 2. 意图提取和摘要生成（v4.0.95）
+                    from pipeline.intent_extractor import IntentExtractor
+                    intent_extractor = IntentExtractor()
+                    intents_data = intent_extractor.extract_intents(context['working'])
+                    intent_summary = intent_extractor.generate_summary(intents_data, max_length=500)
+                    
+                    # 3. CMV 三遍压缩每个情节
+                    from three_pass_trimmer import ThreePassTrimmer
+                    trimmer = ThreePassTrimmer()
+                    compressed_episodes = []
+                    compression_stats = []
+                    
+                    for episode in episodes:
+                        trimmed, stats = trimmer.trim(episode)
+                        compressed_episodes.append(trimmed)
+                        compression_stats.append(stats)
+                    
+                    # 4. 合并压缩后的情节
+                    context['working'] = []
+                    for episode in compressed_episodes:
+                        context['working'].extend(episode)
+                    
+                    # 5. 将意图摘要添加到 working 层开头（作为元信息）
+                    if intent_summary:
+                        context['working'].insert(0, {
+                            'role': 'system',
+                            'content': f'[LobsterPress Intent Summary]\n{intent_summary}',
+                            'seq': -1,
+                            'token_count': len(intent_summary) // 4,  # 估算 token 数
+                        })
+                    
+                    # 记录压缩统计
+                    total_original = sum(s.get('original_tokens', 0) for s in compression_stats)
+                    total_trimmed = sum(s.get('trimmed_tokens', 0) for s in compression_stats)
+                    total_saved = sum(s.get('pass1_saved', 0) + s.get('pass2_saved', 0) + s.get('pass3_saved', 0) for s in compression_stats)
+                    
+                    print(f"[lobster_assemble] 压缩完成: {len(context['working'])} 条消息, "
+                          f"tokens {total_original} → {total_trimmed} (节省 {total_saved})")
+                    print(f"[lobster_assemble] 意图提取: {len(intents_data['user_intents'])} 个用户意图, "
+                          f"{len(intents_data['assistant_conclusions'])} 个 assistant 结论")
+                    
+                except Exception as e:
+                    # 降级：使用原始内容
+                    print(f"[lobster_assemble] 压缩失败，降级使用原始内容: {e}")
+            
             assembled = []
             used_tokens = 0
 

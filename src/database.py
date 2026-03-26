@@ -5,7 +5,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: v4.0.93
+Version: 4.0.97
 """
 
 import sqlite3
@@ -216,6 +216,7 @@ class LobsterDatabase:
         self.migrate_v31()  # 命名空间隔离
         self.migrate_v32()  # 记忆纠错系统
         self.migrate_v40()  # v4.0.0 R³Mem 可逆三层压缩
+        self.migrate_v41()  # v4.0.96 C-HLR+ 遗忘曲线
     
     def migrate_v25(self):
         """v2.5.0 schema 迁移
@@ -384,6 +385,27 @@ class LobsterDatabase:
                 self.cursor.execute(sql)
             except sqlite3.OperationalError:
                 # 字段或索引已存在，跳过
+                pass
+
+        self.conn.commit()
+
+    def migrate_v41(self):
+        """v4.0.96 schema 迁移：C-HLR+ 遗忘曲线
+
+        新增字段：
+        - half_life: 半衰期（小时），基于 C-HLR+ 算法
+        - review_count: 复习次数，影响记忆强度
+        """
+        migrations = [
+            "ALTER TABLE messages ADD COLUMN half_life REAL DEFAULT 12.0",
+            "ALTER TABLE messages ADD COLUMN review_count INTEGER DEFAULT 0",
+        ]
+
+        for sql in migrations:
+            try:
+                self.cursor.execute(sql)
+            except sqlite3.OperationalError:
+                # 字段已存在，跳过
                 pass
 
         self.conn.commit()
@@ -1090,46 +1112,93 @@ class LobsterDatabase:
         return entity_id
 
     def sweep_decayed_messages(self, conversation_id: str, days_threshold: int = 30) -> dict:
-        """v3.6.1: 清理衰减消息（Issue #127 模块二 + Issue #129 Bug 1, 2）
+        """v4.0.96: 基于 C-HLR+ 遗忘曲线的衰减清理
 
-        基于遗忘曲线，将低价值、长期未访问的消息标记为 decayed。
+        使用 C-HLR+ 算法计算记忆保留率，将低保留率的消息标记为 decayed。
 
         ⚠️ 无损原则：消息本体永久保留，只从上下文移除并标记 tier。
 
         Args:
             conversation_id: 对话 ID（防止跨 namespace 误删）
-            days_threshold: 未访问天数阈值（默认 30 天）
+            days_threshold: 未访问天数阈值（默认 30 天，用于过滤候选消息）
 
         Returns:
             清理统计
         """
         from datetime import datetime, timedelta
+        from pipeline.chlr_scorer import CHLRScorer
 
         cutoff_date = (datetime.utcnow() - timedelta(days=days_threshold)).isoformat()
         # v4.0.2: 增加近期消息保护期（7 天），避免误标未评分的新消息（Issue #136 Bug 5）
         protect_cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
 
-        # 查找符合衰减条件的消息（增加 conversation_id 过滤 + 近期保护）
+        # 查找候选消息（增加 conversation_id 过滤 + 近期保护）
         self.cursor.execute("""
-            SELECT message_id, tfidf_score, access_count, last_accessed_at
+            SELECT message_id, token_count, tfidf_score, access_count, 
+                   last_accessed_at, created_at, content, metadata, memory_tier
             FROM messages
             WHERE conversation_id = ?
               AND COALESCE(last_accessed_at, created_at) < ?
               AND created_at < ?
               AND compression_exempt = 0
-              AND tfidf_score < 0.1
+              AND memory_tier != 'decayed'
             ORDER BY tfidf_score ASC, last_accessed_at ASC
             LIMIT 100
         """, (conversation_id, cutoff_date, protect_cutoff))
 
-        candidates = [row[0] for row in self.cursor.fetchall()]
-
-        if not candidates:
+        rows = self.cursor.fetchall()
+        
+        if not rows:
             return {
                 "swept_count": 0,
                 "candidates": 0,
                 "days_threshold": days_threshold,
-                "cutoff_date": cutoff_date
+                "cutoff_date": cutoff_date,
+                "algorithm": "C-HLR+ v4.0.96"
+            }
+
+        # 使用 C-HLR+ 算法计算保留率
+        scorer = CHLRScorer()
+        candidates = []
+        
+        for row in rows:
+            (message_id, token_count, tfidf_score, access_count, 
+             last_accessed_at, created_at, content, metadata, memory_tier) = row
+            
+            message = {
+                'message_id': message_id,
+                'token_count': token_count or 0,
+                'tfidf_score': tfidf_score or 0.0,
+                'access_count': access_count or 0,
+                'last_accessed_at': last_accessed_at or created_at,
+                'created_at': created_at,
+                'content': content,
+                'metadata': metadata,
+                'memory_tier': memory_tier,
+            }
+            
+            # 计算半衰期和保留率
+            half_life = scorer.calculate_half_life(message)
+            retention = scorer.calculate_retention(message)
+            
+            # 更新 half_life 字段
+            self.cursor.execute(
+                "UPDATE messages SET half_life = ? WHERE message_id = ?",
+                (half_life, message_id)
+            )
+            
+            # 如果保留率 < 0.3，则标记为 decayed
+            if scorer.should_decay(message, threshold=0.3):
+                candidates.append(message_id)
+
+        if not candidates:
+            self.conn.commit()
+            return {
+                "swept_count": 0,
+                "candidates": len(rows),
+                "days_threshold": days_threshold,
+                "cutoff_date": cutoff_date,
+                "algorithm": "C-HLR+ v4.0.96"
             }
 
         # 无损删除：只从 context_items 移除（参考 remove_messages_from_context）
@@ -1146,9 +1215,11 @@ class LobsterDatabase:
 
         return {
             "swept_count": swept_count,
-            "candidates": len(candidates),
+            "candidates": len(rows),
+            "decayed_count": len(candidates),
             "days_threshold": days_threshold,
-            "cutoff_date": cutoff_date
+            "cutoff_date": cutoff_date,
+            "algorithm": "C-HLR+ v4.0.96"
         }
 
     # ==================== 工具操作 ====================
