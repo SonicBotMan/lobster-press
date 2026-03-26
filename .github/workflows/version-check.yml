@@ -18,15 +18,16 @@ jobs:
       
       - name: Check database.py version matches tag
         run: |
-          # 从文件头提取版本号
-          FILE_VER=$(grep '^Version:' src/database.py | awk '{print $2}')
+          # 从文件头提取版本号（支持可选的 v 前缀）
+          FILE_VER=$(grep '^Version:' src/database.py | sed 's/^Version: v\?\([0-9.]*\).*/\1/')
           
-          # 从 git tag 获取当前版本（仅 tag 触发时）
+          # 从 git tag 获取当前版本（去掉 v 前缀）
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             GIT_TAG=${GITHUB_REF#refs/tags/}
-            if [ "$FILE_VER" != "$GIT_TAG" ]; then
-              echo "❌ 版本号不一致：database.py=$FILE_VER, tag=$GIT_TAG"
-              echo "请更新 src/database.py 文件头的 Version: 字段为 $GIT_TAG"
+            GIT_TAG_NUM=${GIT_TAG#v}
+            if [ "$FILE_VER" != "$GIT_TAG_NUM" ]; then
+              echo "❌ 版本号不一致：database.py=$FILE_VER, tag=$GIT_TAG_NUM"
+              echo "请更新 src/database.py 文件头的 Version: 字段为 $GIT_TAG_NUM"
               exit 1
             fi
             echo "✅ 版本号一致：$FILE_VER"

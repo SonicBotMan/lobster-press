@@ -172,8 +172,8 @@ jobs:
           PACKAGE_VERSION=$(grep '"version"' package.json | head -1 | sed 's/.*"version": "\([^"]*\)".*/\1/')
           echo "package.json version: $PACKAGE_VERSION"
           
-          # 检查 database.py
-          DB_VERSION=$(grep "Version:" src/database.py | sed 's/.*Version: v\([0-9.]*\).*/\1/')
+          # 检查 database.py（支持可选的 v 前缀）
+          DB_VERSION=$(grep "Version:" src/database.py | sed 's/.*Version: v\?\([0-9.]*\).*/\1/')
           echo "database.py version: $DB_VERSION"
           
           if [ "$PACKAGE_VERSION" != "$DB_VERSION" ]; then
