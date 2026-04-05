@@ -1,17 +1,17 @@
 <div align="center">
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - Transform AI conversations from 'ephemeral phantoms' into 'permanent nutrients in the digital hippocampus'" width="100%">
-# 🧠 LobsterPress v4.0.97「C-HLR+ Forgetting Curve」
+# 🧠 LobsterPress v5.0.0「MemOS 4-Phase」
 
 **Cognitive Memory System for AI Agents**
 *LLM persistent memory engine based on cognitive science*
 
+[![npm version](https://img.shields.io/npm/v/@sonicbotman/lobster-press.svg)](https://www.npmjs.com/package/@sonicbotman/lobster-press)
 [![GitHub release](https://img.shields.io/github/release/SonicBotMan/lobster-press.svg)](https://github.com/sonicBotMan/lobster-press/releases)
-[![GitHub stars](https://img.shields.io/github/stars/SonicBotMan/lobster-press.svg)](https://github.com/sonicbotman/lobster-press)
-[![GitHub license](https://img.shields.io/github/license/sonicbotman/lobster-press.svg)](https://github.com/Sonicbotman/lobster-press)
+[![Test](https://github.com/SonicBotMan/lobster-press/workflows/Test/badge.svg)](https://github.com/SonicBotMan/lobster-press/actions/workflows/test.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
 [中文](README.md) | **English**
-**Latest**: [v4.0.97](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.97) · [Changelog](CHANGELOG.md)
+**Latest**: [v5.0.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v5.0.0) · [Changelog](CHANGELOG.md)
 </div>
 ---
 
@@ -22,17 +22,49 @@ This isn't just an engineering problem — it's a **cognitive science problem**:
 - AI Agents need human-like memory mechanisms: **retain key decisions, forget trivial chats, dynamically update knowledge**
 ---
 
-## 💡 Our solution: Cognitive Memory System
-LobsterPress v4.0 is an open-source LLM memory system based on cognitive science research, integrating cutting-edge studies:
+## 💡 Our solution: MemOS 4-Phase Architecture
+LobsterPress v5.0 implements the **MemOS 4-Phase** cognitive memory optimization framework:
+
 ### 📚 Academic Foundation
 | Paper/Theory | Application | Implementation |
 |--------------|-------------|----------------|
+| **MemOS (memos-claw.openmem.net)** | 4-Phase Framework | Core Intelligence → Skill Evolution → Multi-Agent → Engineering |
 | **EM-LLM (ICLR 2025)** | Event Segmentation | Semantic boundary detection + temporal gap segmentation |
 | **HiMem (Hierarchical Memory)** | Memory Hierarchy | DAG compression + 3-tier summary structure |
-| **Ebbinghaus Forgetting Curve (1885)** | Dynamic Forgetting | R(t) = base_score × e^(-t/stability) |
-| **Memory Reconsolidation (Nader, 2000)** | Knowledge Update | Conflict detection + semantic memory reconsolidation |
+| **Ebbinghaus Forgetting Curve (1885)** | Dynamic Forgetting | R(t) = 0.5^(-t/h) — C-HLR+ corrected formula |
+| **C-HLR+ (lobster-press)** | Complexity-driven decay | h = base_h × (1 + α × complexity) |
 ---
-## 🚀 v4.0 Core Features
+
+## 🚀 MemOS 4-Phase Architecture
+LobsterPress v5.0 implements four optimization phases:
+
+### Phase 1: Core Intelligence
+- **Vector Embedder**: OpenAI compatible API (default) + offline local model support
+- **Hybrid Retriever**: RRF k=60, MMR λ=0.7, 14-day time decay
+- **FallbackLLMClient**: Multi-tier LLM provider fallback chain
+- **Dual Decay Parameters**: Compression half-life 12h + retrieval half-life 14d (independent)
+
+### Phase 2: Skill Evolution
+- **Skill Data Models**: Skill definitions, version history, quality scores
+- **Task Detector**: 2h timeout judgment + LLM topic classification
+- **Skill Evolver**: Rule filter → LLM evaluation → SKILL.md → quality score
+- **MCP Skill Tools**: `lobster_skill get/install/list`
+
+### Phase 3: Multi-Agent
+- **Public Memory**: `lobster_memory_write_public` — cross-agent memory sharing
+- **Skill Discovery**: `lobster_skill_search` — skill registry search
+- **Skill Marketplace**: `lobster_skill_publish/unpublish` — skill lifecycle management
+- **Owner + Namespace Isolation**: Multi-agent memory isolation
+
+### Phase 4: Engineering
+- **OpenClaw Importer**: 🦐 prefix support, openclaw session import
+- **Viewer Web UI**: 127.0.0.1:19876, SHA-256 auth
+- **Async Queue Worker**: Background task processing
+- **Phase 4 MCP Tools**: `lobster_viewer`, `lobster_import`
+
+---
+
+## 🚀 Core Features (C-HLR+ Forgetting Curve)
 ### Feature 1: Forgetting Curve Dynamic scoring
 **Human-like Memory Decay Mechanism**
 Based on the Ebbinghaus forgetting curve, each message is assigned different stability parameters by `msg_type`:
@@ -141,13 +173,16 @@ Raw messages seq 1..N
 ---
 ## 🎓 Academic Value
 ### Comparison with existing work
-| Dimension | LangChain Memory | Mem0 | Letta | LobsterPress v4.0 |
+| Dimension | LangChain Memory | Mem0 | Letta | LobsterPress v5.0 |
 |-----------|------------------|------|-------|-------------------|
 | Lossless Compression | Sliding window | Sliding window | DAG compression | DAG compression |
-| Forgetting Curve | None | None | Ebbinghaus dynamic decay |
-| Event Segmentation | None | None | EM-LLM ICLR 2025 |
+| Forgetting Curve | None | None | Ebbinghaus dynamic decay | C-HLR+ adaptive decay |
+| Event Segmentation | None | None | EM-LLM ICLR 2025 | EM-LLM ICLR 2025 |
 | Semantic Memory | None | Vector search | Vector search | Structured notes table |
-| Conflict Detection | None | None | NLI + Memory Reconsolidation |
+| Vector Retrieval | None | Yes | Yes | Hybrid RRF + MMR |
+| Skill Evolution | None | None | None | Yes (Phase 2) |
+| Multi-Agent Memory | None | None | None | Yes (Phase 3) |
+| Conflict Detection | None | None | NLI + Memory Reconsolidation | NLI + Memory Reconsolidation |
 | Dynamic Scoring | None | None | None | Time-decay scoring |
 
 > Note: Comparison based on the documentation as of 2026-03. Please submit an Issue if outdated.
@@ -181,10 +216,33 @@ After installation, enable it in your OpenClaw configuration:
   }
 }
 ```
-Once enabled, OpenClaw Agent will automatically have access to three memory tools:
+Once enabled, OpenClaw Agent will automatically have access to **22 memory tools**:
+
+**Core Tools:**
 - `lobster_grep` — Full-text search in historical memory (FTS5 + TF-IDF)
 - `lobster_describe` — View DAG summary hierarchy structure
 - `lobster_expand` — Losslessly expand summary to original messages
+- `lobster_compress` — Manual context compression trigger
+- `lobster_ingest` — Ingest messages into memory
+- `lobster_assemble` — Assemble context from memory layers
+- `lobster_sweep` — Apply forgetting curve decay
+- `lobster_check_context` — Manual context usage check
+
+**Skill Evolution (Phase 2):**
+- `lobster_skill get` — Get skill definition
+- `lobster_skill install` — Install a skill
+- `lobster_skill list` — List installed skills
+
+**Multi-Agent (Phase 3):**
+- `lobster_memory_write_public` — Write cross-agent shared memory
+- `lobster_skill_search` — Search skill registry
+- `lobster_skill_publish` — Publish a skill
+- `lobster_skill_unpublish` — Unpublish a skill
+
+**Engineering (Phase 4):**
+- `lobster_viewer` — Open web viewer UI
+- `lobster_import` — Import openclaw sessions
+
 These tools can also be used alongside [lossless-claw](https://github.com/martian-engineering/lossless-claw):
 - **lossless-claw** handles context window DAG compression
 - **lobster-press** handles cross-session long-term semantic memory retrieval
@@ -192,11 +250,16 @@ These tools can also be used alongside [lossless-claw](https://github.com/martia
 ---
 ## 🚀 Quick Start
 ```bash
+# Install as OpenClaw plugin (recommended)
+openclaw plugins install @sonicbotman/lobster-press
+
+# Or install from source
 git clone https://github.com/SonicBotMan/lobster-press.git
 cd lobster-press
 pip install -r requirements.txt
 ```
 ```python
+# Python API (standalone usage)
 from src.database import LobsterDatabase
 from src.incremental_compressor import IncrementalCompressor
 
@@ -212,7 +275,7 @@ result = manager.on_new_message("conv_id", {
     "id": "msg_001",
     "role": "user",
     "content": "We decided to use PostgreSQL as primary database",
-    "timestamp": "2026-03-17T10:00:00Z"
+    "timestamp": "2026-04-05T10:00:00Z"
 })
 # result["compression_strategy"] → "none" | "light" | "aggressive"
 # result["notes_extracted"] → [{"category": "decision", "content": "..."}]
@@ -264,18 +327,33 @@ manager = IncrementalCompressor(
     db,
     max_context_tokens=200_000,    # Target model context window
     context_threshold=0.75,        # Compression trigger usage threshold
-    fresh_tail_count=32,           # Protected recent message count
-    leaf_chunk_tokens=20_000,      # Leaf summary chunk size
-    llm_client=your_llm_client     # Optional: for semantic extraction and conflict detection
+    fresh_tail_count=32,          # Protected recent message count
+    leaf_chunk_tokens=20_000,     # Leaf summary chunk size
+    llm_client=your_llm_client,   # Optional: for semantic extraction and conflict detection
+)
+# v5.0 new parameters:
+embedder = VectorEmbedder(
+    provider="openai",            # "openai" (default) or "local"
+    model="text-embedding-3-small",
+    api_base="https://api.openai.com/v1",  # OpenAI-compatible base URL
+)
+retriever = HybridRetriever(
+    rrf_k=60,                    # RRF constant
+    mmr_lambda=0.7,              # MMR diversity weight
+    decay_retrieval_days=14,     # Retrieval half-life (independent of compression)
 )
 ```
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `max_context_tokens` | 128,000 | **Must set by model** (Claude=200K, Gemini=1M) |
+| `max_context_tokens` | 40,000 | Target model context window |
 | `context_threshold` | 0.75 | DAG compression trigger threshold (0.0–1.0) |
 | `fresh_tail_count` | 32 | Protected recent messages, not compressed |
 | `leaf_chunk_tokens` | 20,000 | Leaf compression chunk size (affects summary granularity) |
 | `llm_client` | None | LLM client (for semantic extraction, optional) |
+| `embedding_provider` | "openai" | Vector embedding provider ("openai" or "local") |
+| `decay_compression_hours` | 12 | Compression half-life in hours (C-HLR+ base) |
+| `decay_retrieval_days` | 14 | Retrieval half-life in days (independent) |
+| `skill_timeout_hours` | 2 | Task detection timeout for skill evolution |
 ---
 ## 📦 Data Migration
 Batch import from legacy versions or other formats
@@ -291,17 +369,32 @@ python -m src.pipeline.batch_importer data.json --db memory.db --batch-size 50
 ## 🗂️ Project Structure
 ```
 src/
-├── database.py               # SQLite storage layer (messages, summaries, DAG, FTS5, notes)
+├── database.py               # SQLite storage (messages, summaries, DAG, FTS5, notes, skills, embeddings)
 ├── dag_compressor.py         # DAG compression engine (leaf summaries + hierarchical aggregation)
 ├── incremental_compressor.py # Three-tier compression scheduler (main entry point)
-├── semantic_memory.py        # Semantic memory层 (Feature 3) ⭐ NEW
+├── semantic_memory.py        # Semantic memory layer (structured notes)
 ├── agent_tools.py            # lobster_grep / lobster_describe / lobster_expand
+├── llm_client.py             # FallbackLLMClient + multi-provider support ⭐ v5.0
+├── vector/
+│   ├── embedder.py          # Vector embedding (Phase 1)
+│   └── retriever.py         # Hybrid retrieval with RRF + MMR (Phase 1)
+├── skills/
+│   ├── models.py            # Skill data models (Phase 2)
+│   ├── task_detector.py     # Task detection + topic classification (Phase 2)
+│   └── evolver.py           # Skill evolution engine (Phase 2)
+├── async_queue/
+│   └── worker.py            # Async background task worker (Phase 4)
+├── viewer/
+│   └── server.py            # Web viewer UI (Phase 4)
+├── migration/
+│   └── importer.py          # OpenClaw session importer (Phase 4)
 └── pipeline/
+    ├── chlr_scorer.py      # C-HLR+ scoring (corrected 0.5^ formula)
     ├── tfidf_scorer.py       # TF-IDF scoring + message type classification
     ├── semantic_dedup.py     # Cosine similarity dedup (light strategy)
     ├── batch_importer.py     # Historical data batch import
-    ├── event_segmenter.py    # Event segmentation (EM-LLM) ⭐ v2.6.0
-    └── conflict_detector.py  # Conflict detection (Feature 4) ⭐ NEW
+    ├── event_segmenter.py    # Event segmentation (EM-LLM)
+    └── conflict_detector.py  # Conflict detection
 ```
 ---
 ## 📜 Version History
@@ -310,35 +403,33 @@ src/
 | v1.0.0 ~ v1.5.5 | 2026-03-13~17 | Early iterations: DAG compression foundation |
 | v2.5.0 ~ v2.6.0 | 2026-03-17 | Cognitive science refactor: EM-LLM + Forgetting curve |
 | v3.0.0 ~ v3.2.1 | 2026-03-17 | LLM integration: Multi-provider + Prompt optimization |
-| **v3.2.2** ⭐ | 2026-03-17 | Engineering standards: CI/CD + Test restructure |
+| **v5.0.0** ⭐ | 2026-04-05 | MemOS 4-Phase: Vector retrieval, Skill evolution, Multi-Agent, Engineering |
 <details>
 <summary>View Full Version Details</summary>
-### v3.2.2 (2026-03-17) - Engineering Standards
-- ✅ Added CI/CD workflow (.github/workflows/test.yml)
-- ✅ Test structure reorganized (unit/integration separation)
-- ✅ Added core module unit tests
-- ✅ Fixed import paths and source bugs
-- ✅ Removed虚假 files (RELEASES.md, etc.)
-- ✅ README honesty improvements
-### v3.2.1 (2026-03-17) - LLM Integration & Prompt Optimization
-- ✅ Centralized prompt template management
-- ✅ Optimized leaf summary, condensed summary, note extraction
-- ✅ Support for 8 major LLM providers
-### v2.6.0 (2026-03-17) - Cognitive Science Driven
-- ✅ EM-LLM event segmentation
-- ✅ Ebbinghaus forgetting curve
-- ✅ Semantic memory layer (notes table)
-- ✅ Conflict detection & reconsolidation
-### v1.0.0 (2026-03-13) - Initial Release
-- ✅ DAG lossless compression architecture
-- ✅ TF-IDF scoring + message type classification
-- ✅ Three-tier compression strategy
+### v5.0.0 (2026-04-05) - MemOS 4-Phase Optimization
+- ✅ Phase 1: Vector embedder + HybridRetriever (RRF + MMR) + FallbackLLMClient
+- ✅ Phase 2: Skill data models + Task detector + Skill evolver + MCP skill tools
+- ✅ Phase 3: Public memory + Skill marketplace + Owner/Namespace isolation
+- ✅ Phase 4: OpenClaw importer + Viewer Web UI + Async queue worker
+- ✅ C-HLR+ formula fix: R(t) = 0.5^(-t/h) (corrected from math.exp)
+- ✅ definePluginEntry() migration for OpenClaw v2026.4.2 compatibility
+### v4.0.97 (2026-03-26) - C-HLR+ Forgetting Curve
+- ✅ C-HLR+ algorithm implementation
+- ✅ Pass 4 message deduplication
+### v4.0.38 (2026-03-22) - Lifecycle Hooks
+- ✅ before_agent_start + agent_end hooks for memory management
 </details>
 ---
 ## 🙏 Acknowledgements
 ### Academic Citations
 If LobsterPress helps your research, please cite the following papers
 ```bibtex
+@misc{memos2026,
+  title={MemOS: Cognitive Memory System for AI Agents},
+  year={2026},
+  url={https://memos-claw.openmem.net},
+  author={MemOS Team}
+}
 @inproceedings{emllm2025,
   title={EM-LLM: Event-Based Memory Management for Large Language Models},
   booktitle={ICLR 2025},

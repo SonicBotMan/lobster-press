@@ -5,6 +5,70 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [5.0.2] - 2026-04-05
+
+### Fixed (OpenClaw v2026.4.2 Compatibility)
+- 🐛 **definePluginEntry()**: 迁移到 `openclaw/plugin-sdk/plugin-entry` 标准导出模式
+- 🐛 **kind: "context-engine"**: 在 lobsterEngine.info 中添加类型声明
+- 🐛 **debugLog 保护**: `debugLog()` 仅在 `LOBSTER_DEBUG=1` 时写入 `/tmp/lobster-debug.log`（之前 65+ 次无条件写入）
+- 🐛 **console.log 删除**: register() 末尾的 bare `console.log` 已移除
+
+### Fixed (Config Consistency)
+- 🐛 **maxContextTokens 统一**: schema 默认值和 runtime trailing fallback 均统一为 `40000`
+- 🐛 **过时配置删除**: `mcp_server/lobster.config.json` (v1.2.8) 已删除
+
+### Fixed (Security)
+- 🔒 **泄漏 API Key**: `tests/integration/test_real_llm.py` 硬编码 ZHIPU API Key → `ZHIPU_API_KEY` 环境变量
+- 🔒 **/tmp 路径泄漏**: 4 个测试文件的 `/tmp/lobster-press` → 相对 project-root 路径
+
+### Tests
+- ✅ 423 tests passed
+
+## [5.0.1] - 2026-04-05
+
+### Fixed (OpenClaw v2026.4.2 Compatibility)
+- 🐛 **peerDependencies 更新**: `>=2026.3.0` → `>=2026.4.2`
+- 🐛 **devDependencies 更新**: `openclaw ^2026.3.0` → `^2026.4.2`
+- 🐛 **版本号同步**: `package.json` v4.0.97 → v5.0.0，`database.py` v4.0.97 → v5.0.0
+- 🐛 **Python 子进程清理**: 添加 `SIGINT`/`SIGTERM` 处理器，防止孤儿进程
+
+### Fixed (P0 Bug Fixes)
+- 🔴 **C-HLR+ 公式修正**: `math.exp(-t/h)` → `0.5 ** (t/h)`（12h 后正确得到 50% 保留率，而非 36.8%）
+- 🔴 **双重计分移除**: 从 retention score 计算中移除 `access_count` 加成
+- 🔴 **Pass 4 无损**: user/assistant 消息正确跳过去重，保持保真度
+
+## [5.0.0] - 2026-04-05
+
+### Added (MemOS 4-Phase Optimization — Core Intelligence)
+- ✨ **向量嵌入层**: `src/vector/embedder.py` — OpenAI 兼容 API（默认）+ 离线方案（本地模型）
+- ✨ **混合检索器**: `src/vector/retriever.py` — RRF k=60, MMR λ=0.7, 14d 时间衰减
+- ✨ **FallbackLLMClient**: `src/llm_client.py` — LLM 提供商降级链（primary → secondary → tertiary）
+- ✨ **双衰减参数**: 压缩半衰期 12h + 检索半衰期 14d（两个独立参数）
+- ✨ **数据库新增**: `embeddings` 表 — 向量存储层
+
+### Added (MemOS 4-Phase — Skill Evolution)
+- ✨ **Skill 数据模型**: `src/skills/models.py` — 技能定义、版本历史、质量评分
+- ✨ **Skill 数据库表**: `skills` 表 + `skill_versions` 表 + `skill_evolve_log` 表
+- ✨ **任务检测器**: `src/skills/task_detector.py` — 2h 超时判断 + LLM topic 分类
+- ✨ **技能进化器**: `src/skills/evolver.py` — 规则过滤 → LLM 评估 → SKILL.md 生成 → 质量评分
+- ✨ **MCP Skill 工具**: `lobster_skill get/install/list` — 技能安装管理
+
+### Added (MemOS 4-Phase — Multi-Agent)
+- ✨ **MCP 多智能体工具**: `lobster_memory_write_public`, `lobster_skill_search`, `lobster_skill_publish`, `lobster_skill_unpublish`
+- ✨ **Owner + Namespace 扩展**: `migrate_v50` 迁移 + owner 过滤器
+- ✨ **异步队列 Worker**: `src/async_queue/worker.py` — 后台任务处理
+
+### Added (MemOS 4-Phase — Engineering)
+- ✨ **OpenClaw 导入器**: `src/migration/importer.py` — 🦐 前缀支持，openclaw 会话导入
+- ✨ **Viewer Web UI**: `src/viewer/server.py` — 127.0.0.1:19876, SHA-256 认证
+- ✨ **MCP Phase 4 工具**: `lobster_viewer`, `lobster_import`
+
+### Changed (Architecture)
+- 🔄 **22 个 MCP 工具**（原 15 个）: 新增 skill/memory_write_public/skill_search/publish/unpublish/viewer/import
+- 🔄 **13 个新 Python 模块**: 向量层、Skill 层、异步队列、Viewer、Migration
+- 🔄 **297 个新测试**: 全面覆盖新功能
+- 🔄 **maxContextTokens 默认值**: 从 128000 统一为 40000
+
 ## [4.0.97] - 2026-03-26
 
 ### Added (C-HLR+ 遗忘曲线)
