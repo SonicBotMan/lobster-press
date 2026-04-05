@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
 
-# 🧠 LobsterPress v4.0.97「C-HLR+ 遗忘曲线」
+# 🧠 LobsterPress v5.0.0「MemOS 4-Phase」
 
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v4.0.97](https://github.com/SonicBotMan/lobster-press/releases/tag/v4.0.97) · [更新日志](CHANGELOG.md)
+**最新版本**: [v5.0.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v5.0.0) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -184,7 +184,7 @@ journalctl --user -u openclaw-gateway -f | grep lobster
 
 ### 配置向导使用指南
 
-LobsterPress v4.0.97 提供了 5 步交互式配置向导：
+LobsterPress v5.0.0 提供了 5 步交互式配置向导：
 
 | 步骤 | 说明 | 您需要做的 |
 |------|------|-----------|
@@ -387,35 +387,34 @@ systemctl --user restart openclaw-gateway
 
 ## 🏗️ 架构概述
 
-### 五大模块（v4.0「深海」）
+### MemOS 4-Phase 架构（v5.0）
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    LobsterPress v4.0                        │
+│                    LobsterPress v5.0「MemOS」                  │
 ├─────────────────────────────────────────────────────────────┤
-│  模块一: CMV 三遍无损压缩                                    │
-│  ├── Pass 1: 剥离 base64/长 JSON 冗余                       │
-│  ├── Pass 2: 去重工具结果                                   │
-│  └── Pass 3: 折叠系统样板代码                               │
+│  Phase 1: Core Intelligence (向量嵌入 + RRF/MMR)           │
+│  ├── Vector Embedder: OpenAI兼容API + numpy离线             │
+│  ├── Hybrid Retriever: FTS5+Vector → RRF(k=60) → MMR     │
+│  ├── LLM Fallback Chain: skill→summary→native→mock        │
+│  └── Dual Decay: 12h压缩 / 14d检索                        │
 ├─────────────────────────────────────────────────────────────┤
-│  模块二: C-HLR+ 自适应遗忘曲线（✅ 自动应用）              │
-│  └── h = base_h × (1 + α × complexity) × spaced_bonus       │
-│  └── v4.0.90: agent_end hook 自动调用 lobster_sweep         │
+│  Phase 2: Skill Evolution (技能进化)                       │
+│  ├── Task Detector: 2h超时 + LLM话题判断                    │
+│  ├── Skill Evolver: 规则过滤→LLM评估→SKILL.md→评分        │
+│  └── MCP lobster_skill: get/install/list                    │
 ├─────────────────────────────────────────────────────────────┤
-│  模块三: Focus 主动压缩触发                                  │
-│  ├── 定时触发: 每 12 轮                                     │
-│  ├── 紧急触发: 上下文 > 85%                                 │
-│  └── 被动触发: 上下文 > 80%                                 │
+│  Phase 3: Multi-Agent (多智能体)                          │
+│  ├── Owner字段: 消息/摘要/笔记按Agent隔离                   │
+│  ├── Public Memory: lobster_memory_write_public              │
+│  └── Skill Sharing: lobster_skill_search/publish             │
 ├─────────────────────────────────────────────────────────────┤
-│  模块四: R³Mem 可逆三层压缩                                  │
-│  ├── Layer 1: Document-Level (返回子摘要)                   │
-│  ├── Layer 2: Paragraph-Level (返回原始消息)                │
-│  └── Layer 3: Entity-Level (按实体过滤)                     │
+│  Phase 4: Engineering (工程化)                              │
+│  ├── Viewer Web UI: 127.0.0.1 + SHA-256认证                 │
+│  ├── Async Queue: 后台任务队列                             │
+│  └── OpenClaw Migration: 🦐标识 + 断点续传                  │
 ├─────────────────────────────────────────────────────────────┤
-│  模块五: WMR 工具框架                                        │
-│  ├── Write: compact, correct                                │
-│  ├── Manage: sweep, assemble, prune                         │
-│  └── Read: grep, describe, expand, status                   │
+│  Legacy: CMV三遍无损压缩 + C-HLR+遗忘曲线 + R³Mem三层      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -468,6 +467,28 @@ LobsterPress 通过 OpenClaw lifecycle hooks 实现自动记忆管理：
 |------|------|
 | `lobster_check_context` | 手动检查上下文（降级方案） |
 
+### v5.0 新工具 (Skill Evolution)
+
+| 工具 | 说明 | 必需参数 |
+|------|------|----------|
+| `lobster_skill` | 查询/安装技能 | `action`, `skill_id/conversation_id` |
+
+### v5.0 新工具 (Multi-Agent)
+
+| 工具 | 说明 | 必需参数 |
+|------|------|----------|
+| `lobster_memory_write_public` | 写入公共记忆 | `content` |
+| `lobster_skill_search` | 搜索技能(self/public/mix) | `query`, `scope` |
+| `lobster_skill_publish` | 公开技能 | `skill_id` |
+| `lobster_skill_unpublish` | 私有化技能 | `skill_id` |
+
+### v5.0 新工具 (Engineering)
+
+| 工具 | 说明 | 必需参数 |
+|------|------|----------|
+| `lobster_viewer` | 打开Web UI | `action`, `port` |
+| `lobster_import` | 导入OpenClaw记忆 | `action` |
+
 ---
 
 ## 🚀 快速上手
@@ -517,6 +538,38 @@ messages = lobster_expand(db, "sum_abc123", max_depth=2)
 # → {"total_messages": 47, "messages": [...]}
 ```
 
+### v5.0 Python API
+
+```python
+# v5.0: Vector Embedder
+from src.vector.embedder import create_embedder
+embedder = create_embedder()  # 自动降级
+
+# v5.0: Hybrid Retriever
+from src.vector.retriever import HybridRetriever
+retriever = HybridRetriever(db, embedder)
+results = retriever.search("PostgreSQL", top_k=5)
+
+# v5.0: Skill Evolution
+from src.skills.task_detector import TaskDetector
+from src.skills.evolver import SkillEvolver
+detector = TaskDetector(db, llm_client)
+tasks = detector.detect_tasks("conv_123")
+
+evolver = SkillEvolver(db, llm_client)
+skill_id = evolver.evaluate_and_generate(task, "conv_123")
+
+# v5.0: Async Queue
+from src.async_queue.worker import AsyncWorker
+worker = AsyncWorker(db, embedder, llm_client)
+worker.start()
+worker.enqueue('embed', {'target_type': 'message', 'target_id': 'msg_xxx', 'content': '...'})
+
+# v5.0: Viewer Web UI
+from src.viewer.server import start_viewer
+server = start_viewer(db, port=18799, password="mypassword")
+```
+
 ---
 
 ## 📚 学术基础
@@ -544,6 +597,11 @@ messages = lobster_expand(db, "sum_abc123", max_depth=2)
 | `leaf_chunk_tokens` | 20,000 | 叶子压缩分块大小 |
 | `focus_interval` | 12 | Focus 定时触发间隔（轮） |
 | `urgent_threshold` | 0.85 | Focus 紧急触发阈值 |
+| `embed_provider` | OpenAI兼容API | 向量嵌入提供商 |
+| `embed_endpoint` | - | 嵌入API端点 |
+| `embed_model` | bge-m3 | 嵌入模型 |
+| `retrieval_half_life_days` | 14.0 | 检索衰减半衰期(天) |
+| `compression_half_life_hours` | 12 | 压缩衰减半衰期(小时) |
 
 ---
 
@@ -560,6 +618,10 @@ messages = lobster_expand(db, "sum_abc123", max_depth=2)
 export LOBSTER_LLM_PROVIDER=deepseek
 export LOBSTER_LLM_API_KEY=sk-xxx
 export LOBSTER_LLM_MODEL=deepseek-chat
+
+# LLM Fallback Chain (v5.0)
+export LOBSTER_LLM_SKILL_PROVIDER=openai     # 可选
+export LOBSTER_LLM_SUMMARY_PROVIDER=openai   # 可选
 ```
 
 ---
@@ -584,7 +646,7 @@ export LOBSTER_LLM_MODEL=deepseek-chat
 ├── index.ts                    # OpenClaw 插件入口（ContextEngine）
 ├── openclaw.plugin.json        # 插件配置
 ├── mcp_server/
-│   └── lobster_mcp_server.py   # MCP Server（14 个工具）
+│   └── lobster_mcp_server.py   # MCP Server（22 个工具）
 └── src/
     ├── database.py             # SQLite 存储层
     ├── dag_compressor.py       # DAG 压缩引擎
@@ -595,6 +657,19 @@ export LOBSTER_LLM_MODEL=deepseek-chat
     ├── llm_providers.py        # 8 个提供商适配
     ├── prompts.py              # Prompt 模板
     ├── agent_tools.py          # Python API
+    ├── vector/                  # v5.0: 向量嵌入
+    │   ├── embedder.py         # OpenAI兼容 + numpy离线
+    │   └── retriever.py        # RRF/MMR/Decay
+    ├── skills/                 # v5.0: 技能进化
+    │   ├── models.py          # Skill, TaskSummary
+    │   ├── task_detector.py   # 2h超时 + LLM判断
+    │   └── evolver.py         # 规则过滤→评分→SKILL.md
+    ├── async_queue/            # v5.0: 异步队列
+    │   └── worker.py          # 后台任务处理
+    ├── viewer/                 # v5.0: Web UI
+    │   └── server.py          # HTTP服务
+    ├── migration/              # v5.0: OpenClaw迁移
+    │   └── importer.py        # 🦐标识 + 断点续传
     └── pipeline/
         ├── tfidf_scorer.py     # TF-IDF 评分
         ├── semantic_dedup.py   # 语义去重
@@ -607,6 +682,7 @@ export LOBSTER_LLM_MODEL=deepseek-chat
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| **v5.0.0** ⭐ | 2026-04-05 | MemOS 4-Phase优化: 向量嵌入/技能进化/多智能体/工程化 |
 | **v4.0.89** ⭐ | 2026-03-24 | 记忆优先级排序：semantic > episodic > working，长期记忆优先注入 |
 | **v4.0.49** | 2026-03-23 | MCP 工具模式：禁用 lifecycle hooks，添加手动记忆管理指南 |
 | **v4.0.41** | 2026-03-22 | Issue #174 专家反馈修复（6 个优化） |
@@ -682,6 +758,12 @@ export LOBSTER_LLM_MODEL=deepseek-chat
   title={HiMem: Hierarchical Memory Management for Long-context LLMs},
   booktitle={NeurIPS 2024},
   year={2024}
+}
+
+@article{memos2026,
+  title={MemOS: Memory Operating System for AI Agents},
+  journal={https://memos-claw.openmem.net},
+  year={2026}
 }
 ```
 
