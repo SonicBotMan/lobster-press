@@ -27,7 +27,7 @@
     },
     "maxContextTokens": {
       "label": "Max Context Tokens",
-      "help": "最大上下文 token 数（默认 128000，Claude=200000，Gemini=1000000）"
+      "help": "最大上下文 token 数（默认 40000，Claude=200000，Gemini=1000000）"
     }
   },
   "configSchema": {
@@ -43,7 +43,7 @@
       "freshTailCount":   { "type": "integer", "minimum": 1 },
       "leafChunkTokens":  { "type": "integer", "minimum": 1000 },
       "namespace":        { "type": "string", "default": "default" },
-      "maxContextTokens": { "type": "integer", "minimum": 10000, "default": 128000 }
+      "maxContextTokens": { "type": "integer", "minimum": 10000, "default": 40000 }
     }
   }
 }

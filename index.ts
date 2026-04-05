@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { readFileSync, appendFileSync, writeFileSync, existsSync } from "node:fs";
 import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
+import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 
 // v4.0.19: 修复 __dirname 作用域问题（Issue #155 Bug #1）
 // __dirname 必须在模块顶层定义，ensureMcpServer 需要使用它
@@ -428,6 +429,7 @@ const lobsterPlugin = {
 
     // v4.0.48: Debug logging - write to file to bypass all loggers (ESM compatible)
     const debugLog = (msg: string) => {
+      if (process.env.LOBSTER_DEBUG !== "1") return;
       const logLine = `[${new Date().toISOString()}] [lobster-press] DEBUG: ${msg}\n`;
       try { appendFileSync('/tmp/lobster-debug.log', logLine); } catch {}
     };
@@ -952,6 +954,7 @@ ${JSON.stringify(fullConfig, null, 2)}
         name: "LobsterPress Memory Engine",
         version: LOBSTERPRESS_VERSION,  // v4.0.17: 从 package.json 读取（Issue #153 Bug #3）
         ownsCompaction: true,
+        kind: "context-engine",
       },
 
       // 关键：每次 turn 后自动检查上下文使用率
@@ -973,7 +976,7 @@ ${JSON.stringify(fullConfig, null, 2)}
         // v4.0.14: 删除无用的 _getDb() 调用（Issue #152 Bug #5）
         const threshold = (pluginConfig.contextThreshold as number) ?? 0.8;
         // v4.0.26: 优先读取 pluginConfig.maxContextTokens（Issue #167 Bug #2）
-        const tokenBudget = (pluginConfig.maxContextTokens as number) ?? params.tokenBudget ?? 128000;
+        const tokenBudget = (pluginConfig.maxContextTokens as number) ?? params.tokenBudget ?? 40000;
 
         // v4.0.0: 获取轮次数
         const turnCount = await this._getTurnCount(params.sessionId);
@@ -1422,7 +1425,7 @@ ${JSON.stringify(fullConfig, null, 2)}
         // 调用 lobster_assemble 获取相关记忆
         const result = await callMcp(pluginConfig, "lobster_assemble", {
           conversation_id: conversationId,
-          token_budget: pluginConfig.maxContextTokens ?? 128000,
+          token_budget: pluginConfig.maxContextTokens ?? 40000,
         });
         
         // 解析返回结果
@@ -1633,10 +1636,16 @@ ${JSON.stringify(fullConfig, null, 2)}
     });
     debugLog('agent_end hook registered');
 
-    console.log(`[${new Date().toISOString()}] [lobster-press] DEBUG: All lifecycle hooks registered successfully`);
     api.logger.info(`[lobster-press] Lifecycle hooks registered (before_agent_start + agent_end)`);
     // END: lifecycle hooks (v4.0.50: re-enabled for testing)
   },
 };
 
-export default lobsterPlugin;
+export default definePluginEntry({
+  id: "lobster-press",
+  name: "LobsterPress Memory Engine",
+  description: "Cognitive memory system for AI Agents: DAG compression, Ebbinghaus forgetting curve, semantic notes, contradiction detection",
+  kind: "memory",
+  configSchema: lobsterPlugin.configSchema,
+  register: (api) => lobsterPlugin.register(api),
+});
