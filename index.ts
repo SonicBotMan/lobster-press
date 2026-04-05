@@ -59,6 +59,35 @@ const pendingRequests = new Map<
   }
 >();
 
+// ─── Process Lifecycle Cleanup (v5.0.0: OpenClaw v2026.4.2 compatibility) ────
+// Clean up Python subprocess on SIGINT/SIGTERM to prevent orphaned processes
+function cleanupMcpProcess(signal: string): void {
+  if (mcpProcess) {
+    try {
+      // Fail all pending requests before killing
+      for (const [, pending] of pendingRequests) {
+        clearTimeout(pending.timer);
+        pending.reject(new Error(`lobster-press MCP killed by ${signal}`));
+      }
+      pendingRequests.clear();
+
+      // Kill the Python subprocess
+      mcpProcess.kill("SIGTERM");
+      mcpProcess = null;
+      mcpReady = false;
+      bootPromise = null;
+    } catch {
+      // Ignore errors during cleanup
+    }
+  }
+}
+
+// Register cleanup handlers (remove existing ones first to avoid duplicates)
+process.removeAllListeners("SIGINT");
+process.removeAllListeners("SIGTERM");
+process.on("SIGINT", () => { cleanupMcpProcess("SIGINT"); process.exit(130); });
+process.on("SIGTERM", () => { cleanupMcpProcess("SIGTERM"); process.exit(143); });
+
 // ─── IPC Helpers ─────────────────────────────────────────────────────────────
 
 function generateRequestId(): string {

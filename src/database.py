@@ -5,7 +5,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: 4.0.97
+Version: 5.0.0
 """
 
 import sqlite3
