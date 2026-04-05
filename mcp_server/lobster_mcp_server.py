@@ -45,6 +45,7 @@ LOBSTERPRESS_VERSION = "4.0.97"
 @dataclass
 class MCPTool:
     """MCP 工具定义"""
+
     name: str
     description: str
     input_schema: Dict[str, Any]
@@ -53,8 +54,14 @@ class MCPTool:
 class LobsterPressMCPServer:
     """LobsterPress MCP Server"""
 
-    def __init__(self, sessions_dir: str = None, db_path: str = None, llm_provider: str = None,
-                 llm_model: str = None, namespace: str = "default"):
+    def __init__(
+        self,
+        sessions_dir: str = None,
+        db_path: str = None,
+        llm_provider: str = None,
+        llm_model: str = None,
+        namespace: str = "default",
+    ):
         """初始化 MCP Server
 
         v3.6.0: 新增 namespace 参数（Issue #127 模块四）
@@ -66,28 +73,34 @@ class LobsterPressMCPServer:
             llm_model: LLM 模型名称
             namespace: 记忆命名空间（用于多 Agent/项目隔离）
         """
-        self.sessions_dir = Path(sessions_dir or os.path.expanduser("~/.openclaw/agents/main/sessions"))
+        self.sessions_dir = Path(
+            sessions_dir or os.path.expanduser("~/.openclaw/agents/main/sessions")
+        )
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
 
         # v3.2.2: OpenClaw 插件支持
         # v4.0.41: 修复 db_path 中 ~ 未展开的 Bug（Issue #181）
-        self.db_path = os.path.expanduser(db_path) if db_path else os.path.expanduser("~/.openclaw/lobster.db")
+        self.db_path = (
+            os.path.expanduser(db_path)
+            if db_path
+            else os.path.expanduser("~/.openclaw/lobster.db")
+        )
         self.llm_provider = llm_provider
         self.llm_model = llm_model
         self.namespace = namespace  # v3.6.0 新增
         self._db = None  # 懒加载数据库连接
-        
+
         # v4.0.12: Focus 定时触发的会话轮次计数器（Issue #150 Bug #5）
         self._turn_counters: dict = {}  # conversation_id -> turn_count_since_last_compress
-        
+
         # 统计数据
         self.stats = {
             "total_compressions": 0,
             "total_messages_processed": 0,
             "total_tokens_saved": 0,
-            "last_compression": None
+            "last_compression": None,
         }
-        
+
         # 配置
         self.config = {
             "weights": {
@@ -97,15 +110,15 @@ class LobsterPressMCPServer:
                 "preference": 0.15,
                 "context": 0.05,
                 "chitchat": 0.02,
-                "other": 0.03
+                "other": 0.03,
             },
             "strategy": "medium",
-            "max_tokens": 800000
+            "max_tokens": 800000,
         }
-        
+
         # 注册工具
         self.tools = self._register_tools()
-    
+
     def _register_tools(self) -> List[MCPTool]:
         """注册 MCP 工具"""
         return [
@@ -117,22 +130,22 @@ class LobsterPressMCPServer:
                     "properties": {
                         "session_id": {
                             "type": "string",
-                            "description": "会话 ID（文件名，不含扩展名）"
+                            "description": "会话 ID（文件名，不含扩展名）",
                         },
                         "strategy": {
                             "type": "string",
                             "enum": ["light", "medium", "aggressive"],
                             "description": "压缩策略：light（轻度）、medium（中度）、aggressive（激进）",
-                            "default": "medium"
+                            "default": "medium",
                         },
                         "dry_run": {
                             "type": "boolean",
                             "description": "是否仅预览，不实际压缩",
-                            "default": False
-                        }
+                            "default": False,
+                        },
                     },
-                    "required": ["session_id"]
-                }
+                    "required": ["session_id"],
+                },
             ),
             MCPTool(
                 name="preview_compression",
@@ -140,27 +153,20 @@ class LobsterPressMCPServer:
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "session_id": {
-                            "type": "string",
-                            "description": "会话 ID"
-                        },
+                        "session_id": {"type": "string", "description": "会话 ID"},
                         "strategy": {
                             "type": "string",
                             "enum": ["light", "medium", "aggressive"],
-                            "default": "medium"
-                        }
+                            "default": "medium",
+                        },
                     },
-                    "required": ["session_id"]
-                }
+                    "required": ["session_id"],
+                },
             ),
             MCPTool(
                 name="get_compression_stats",
                 description="获取压缩统计数据",
-                input_schema={
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
+                input_schema={"type": "object", "properties": {}, "required": []},
             ),
             MCPTool(
                 name="update_weights",
@@ -177,12 +183,12 @@ class LobsterPressMCPServer:
                                 "config": {"type": "number"},
                                 "preference": {"type": "number"},
                                 "context": {"type": "number"},
-                                "chitchat": {"type": "number"}
-                            }
+                                "chitchat": {"type": "number"},
+                            },
                         }
                     },
-                    "required": ["weights"]
-                }
+                    "required": ["weights"],
+                },
             ),
             MCPTool(
                 name="list_sessions",
@@ -193,11 +199,11 @@ class LobsterPressMCPServer:
                         "min_tokens": {
                             "type": "integer",
                             "description": "最小 Token 数阈值",
-                            "default": 10000
+                            "default": 10000,
                         }
                     },
-                    "required": []
-                }
+                    "required": [],
+                },
             ),
             # v3.2.2: OpenClaw 插件工具
             MCPTool(
@@ -207,11 +213,18 @@ class LobsterPressMCPServer:
                     "type": "object",
                     "properties": {
                         "query": {"type": "string", "description": "搜索关键词或短语"},
-                        "conversation_id": {"type": "string", "description": "限定搜索范围的会话 ID（可选）"},
-                        "limit": {"type": "integer", "description": "最多返回条数，默认 5", "default": 5}
+                        "conversation_id": {
+                            "type": "string",
+                            "description": "限定搜索范围的会话 ID（可选）",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "最多返回条数，默认 5",
+                            "default": 5,
+                        },
                     },
-                    "required": ["query"]
-                }
+                    "required": ["query"],
+                },
             ),
             MCPTool(
                 name="lobster_describe",
@@ -219,12 +232,21 @@ class LobsterPressMCPServer:
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "conversation_id": {"type": "string", "description": "会话 ID（可选，留空查全局）"},
-                        "summary_id": {"type": "string", "description": "摘要 ID（可选，查看单个摘要详情）"},
-                        "depth": {"type": "integer", "description": "深度过滤（可选，-1 = 所有深度）"}
+                        "conversation_id": {
+                            "type": "string",
+                            "description": "会话 ID（可选，留空查全局）",
+                        },
+                        "summary_id": {
+                            "type": "string",
+                            "description": "摘要 ID（可选，查看单个摘要详情）",
+                        },
+                        "depth": {
+                            "type": "integer",
+                            "description": "深度过滤（可选，-1 = 所有深度）",
+                        },
                     },
-                    "required": []
-                }
+                    "required": [],
+                },
             ),
             MCPTool(
                 name="lobster_expand",
@@ -232,11 +254,18 @@ class LobsterPressMCPServer:
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "summary_id": {"type": "string", "description": "要展开的摘要节点 ID"},
-                        "max_depth": {"type": "integer", "description": "最大展开层数，默认 2", "default": 2}
+                        "summary_id": {
+                            "type": "string",
+                            "description": "要展开的摘要节点 ID",
+                        },
+                        "max_depth": {
+                            "type": "integer",
+                            "description": "最大展开层数，默认 2",
+                            "default": 2,
+                        },
                     },
-                    "required": ["summary_id"]
-                }
+                    "required": ["summary_id"],
+                },
             ),
             # v3.3.0: 自动压缩工具（调用真实 DAGCompressor）
             # v4.0.13: current_tokens 和 token_budget 变为可选（Issue #151 Bug #4）
@@ -252,12 +281,22 @@ class LobsterPressMCPServer:
                     "type": "object",
                     "properties": {
                         "conversation_id": {"type": "string", "description": "对话 ID"},
-                        "current_tokens": {"type": "integer", "description": "当前 token 数量（可选，缺少时自动计算）"},
-                        "token_budget": {"type": "integer", "description": "token 预算（可选，默认 128000）"},
-                        "force": {"type": "boolean", "description": "是否强制压缩（忽略阈值）", "default": False}
+                        "current_tokens": {
+                            "type": "integer",
+                            "description": "当前 token 数量（可选，缺少时自动计算）",
+                        },
+                        "token_budget": {
+                            "type": "integer",
+                            "description": "token 预算（可选，默认 128000）",
+                        },
+                        "force": {
+                            "type": "boolean",
+                            "description": "是否强制压缩（忽略阈值）",
+                            "default": False,
+                        },
                     },
-                    "required": ["conversation_id"]
-                }
+                    "required": ["conversation_id"],
+                },
             ),
             # v3.6.0: 按三层记忆模型拼装上下文（Issue #127 模块一）
             MCPTool(
@@ -273,12 +312,15 @@ class LobsterPressMCPServer:
                         "token_budget": {"type": "integer", "default": 8000},
                         "tiers": {
                             "type": "array",
-                            "items": {"type": "string", "enum": ["working", "episodic", "semantic"]},
-                            "default": ["semantic", "episodic", "working"]
-                        }
+                            "items": {
+                                "type": "string",
+                                "enum": ["working", "episodic", "semantic"],
+                            },
+                            "default": ["semantic", "episodic", "working"],
+                        },
                     },
-                    "required": ["conversation_id"]
-                }
+                    "required": ["conversation_id"],
+                },
             ),
             # v3.6.0: 记忆纠错（Issue #127 模块三）
             MCPTool(
@@ -287,15 +329,21 @@ class LobsterPressMCPServer:
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "target_type": {"type": "string", "enum": ["message", "summary"]},
+                        "target_type": {
+                            "type": "string",
+                            "enum": ["message", "summary"],
+                        },
                         "target_id": {"type": "string", "description": "目标 ID"},
-                        "correction_type": {"type": "string", "enum": ["content", "metadata", "delete"]},
+                        "correction_type": {
+                            "type": "string",
+                            "enum": ["content", "metadata", "delete"],
+                        },
                         "old_value": {"type": "string", "description": "旧值"},
                         "new_value": {"type": "string", "description": "新值"},
-                        "reason": {"type": "string", "description": "纠错原因"}
+                        "reason": {"type": "string", "description": "纠错原因"},
                     },
-                    "required": ["target_type", "target_id", "correction_type"]
-                }
+                    "required": ["target_type", "target_id", "correction_type"],
+                },
             ),
             # v3.6.0: 主动衰减清理（Issue #127 模块二）
             MCPTool(
@@ -306,16 +354,16 @@ class LobsterPressMCPServer:
                     "properties": {
                         "conversation_id": {
                             "type": "string",
-                            "description": "对话 ID（必需，防止跨 namespace 误删）"
+                            "description": "对话 ID（必需，防止跨 namespace 误删）",
                         },
                         "days_threshold": {
                             "type": "integer",
                             "default": 30,
-                            "description": "未访问天数阈值"
-                        }
+                            "description": "未访问天数阈值",
+                        },
                     },
-                    "required": ["conversation_id"]
-                }
+                    "required": ["conversation_id"],
+                },
             ),
             MCPTool(
                 name="lobster_status",
@@ -329,11 +377,11 @@ class LobsterPressMCPServer:
                     "properties": {
                         "conversation_id": {
                             "type": "string",
-                            "description": "指定会话（留空返回全局统计）"
+                            "description": "指定会话（留空返回全局统计）",
                         }
                     },
-                    "required": []
-                }
+                    "required": [],
+                },
             ),
             MCPTool(
                 name="lobster_prune",
@@ -346,16 +394,16 @@ class LobsterPressMCPServer:
                     "properties": {
                         "conversation_id": {
                             "type": "string",
-                            "description": "对话 ID（必需，防止误删）"
+                            "description": "对话 ID（必需，防止误删）",
                         },
                         "dry_run": {
                             "type": "boolean",
                             "default": True,
-                            "description": "试运行（只统计，不删除）"
-                        }
+                            "description": "试运行（只统计，不删除）",
+                        },
                     },
-                    "required": ["conversation_id"]
-                }
+                    "required": ["conversation_id"],
+                },
             ),
             # v4.0.20: 消息入库工具（Issue #156 Bug #2）
             MCPTool(
@@ -364,130 +412,267 @@ class LobsterPressMCPServer:
                 input_schema={
                     "type": "object",
                     "properties": {
-                        "conversation_id": {
-                            "type": "string",
-                            "description": "对话 ID"
-                        },
+                        "conversation_id": {"type": "string", "description": "对话 ID"},
                         "messages": {
                             "type": "array",
                             "items": {"type": "object"},
-                            "description": "消息列表（每个消息包含 role, content, timestamp 等字段）"
-                        }
+                            "description": "消息列表（每个消息包含 role, content, timestamp 等字段）",
+                        },
                     },
-                    "required": ["conversation_id", "messages"]
-                }
-            )
+                    "required": ["conversation_id", "messages"],
+                },
+            ),
+            # Phase 2.4: 技能管理工具（借鉴 MemOS skill_get/skill_install）
+            MCPTool(
+                name="lobster_skill",
+                description="查询或安装技能（借鉴 MemOS skill_get/skill_install）",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["get", "install", "list"],
+                            "description": "操作类型：get(查询技能详情), install(为任务生成技能), list(列出技能)",
+                        },
+                        "skill_id": {
+                            "type": "string",
+                            "description": "技能 ID（get/install 时需要）",
+                        },
+                        "conversation_id": {
+                            "type": "string",
+                            "description": "对话 ID（install 时需要）",
+                        },
+                        "task_goal": {
+                            "type": "string",
+                            "description": "任务目标（install 时可选，会自动检测）",
+                        },
+                        "owner": {
+                            "type": "string",
+                            "description": "技能所有者（list 时可选，默认 default）",
+                        },
+                        "visibility": {
+                            "type": "string",
+                            "description": "可见性过滤（list 时可选）",
+                        },
+                    },
+                    "required": ["action"],
+                },
+            ),
+            # Phase 3.2: 多 Agent 公共记忆工具
+            MCPTool(
+                name="lobster_memory_write_public",
+                description="写入公共记忆（owner='public'），所有 Agent 可检索",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "content": {"type": "string", "description": "记忆内容"},
+                        "summary": {"type": "string", "description": "可选摘要"},
+                        "conversation_id": {"type": "string", "description": "对话 ID"},
+                    },
+                    "required": ["content"],
+                },
+            ),
+            # Phase 3.2: 技能搜索工具
+            MCPTool(
+                name="lobster_skill_search",
+                description="搜索技能，支持 self/public/mix 范围",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "搜索关键词"},
+                        "scope": {
+                            "type": "string",
+                            "enum": ["mix", "self", "public"],
+                            "default": "mix",
+                            "description": "搜索范围：mix(自己的+公共), self(仅自己), public(仅公共)",
+                        },
+                        "limit": {"type": "integer", "default": 20},
+                    },
+                    "required": ["query"],
+                },
+            ),
+            # Phase 3.2: 技能发布工具
+            MCPTool(
+                name="lobster_skill_publish",
+                description="将技能设为公开，其他 Agent 可发现",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "skill_id": {"type": "string", "description": "技能 ID"}
+                    },
+                    "required": ["skill_id"],
+                },
+            ),
+            # Phase 3.2: 技能取消发布工具
+            MCPTool(
+                name="lobster_skill_unpublish",
+                description="将技能设为私有",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "skill_id": {"type": "string", "description": "技能 ID"}
+                    },
+                    "required": ["skill_id"],
+                },
+            ),
+            # Phase 4.4: Memory Viewer Web UI 工具
+            MCPTool(
+                name="lobster_viewer",
+                description="打开 Memory Viewer Web UI",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["start", "stop", "status"],
+                            "default": "status",
+                        },
+                        "port": {
+                            "type": "integer",
+                            "default": 18799,
+                            "description": "Viewer 服务端口",
+                        },
+                        "password": {
+                            "type": "string",
+                            "description": "访问密码（可选）",
+                        },
+                    },
+                },
+            ),
+            # Phase 4.4: OpenClaw 原生记忆导入工具
+            MCPTool(
+                name="lobster_import",
+                description="导入 OpenClaw 原生记忆（🦐 标识）",
+                input_schema={
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["scan", "start", "stop"],
+                            "description": "操作：scan(扫描), start(开始导入), stop(停止)",
+                        },
+                        "checkpoint_file": {
+                            "type": "string",
+                            "description": "断点文件路径（用于续传）",
+                        },
+                    },
+                    "required": ["action"],
+                },
+            ),
         ]
-    
+
     async def handle_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
         """处理 MCP 请求
-        
+
         Args:
             request: MCP 请求
-        
+
         Returns:
             MCP 响应
         """
         method = request.get("method")
         params = request.get("params", {})
-        
+
         try:
             if method == "tools/list":
-                return {
-                    "tools": [asdict(tool) for tool in self.tools]
-                }
-            
+                return {"tools": [asdict(tool) for tool in self.tools]}
+
             elif method == "tools/call":
                 tool_name = params.get("name")
                 arguments = params.get("arguments", {})
-                
+
                 result = await self._call_tool(tool_name, arguments)
                 return {
                     "content": [
                         {
                             "type": "text",
-                            "text": json.dumps(result, ensure_ascii=False, indent=2)
+                            "text": json.dumps(result, ensure_ascii=False, indent=2),
                         }
                     ]
                 }
-            
+
             elif method == "resources/list":
                 return await self._list_resources()
-            
+
             elif method == "resources/read":
                 return await self._read_resource(params.get("uri"))
-            
+
             else:
                 return {"error": f"Unknown method: {method}"}
-        
+
         except Exception as e:
             return {"error": str(e)}
-    
-    async def _call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+
+    async def _call_tool(
+        self, tool_name: str, arguments: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """调用工具"""
         if tool_name == "compress_session":
             return await self._compress_session(
                 arguments.get("session_id"),
                 arguments.get("strategy", "medium"),
-                arguments.get("dry_run", False)
+                arguments.get("dry_run", False),
             )
-        
+
         elif tool_name == "preview_compression":
             return await self._preview_compression(
-                arguments.get("session_id"),
-                arguments.get("strategy", "medium")
+                arguments.get("session_id"), arguments.get("strategy", "medium")
             )
-        
+
         elif tool_name == "get_compression_stats":
             return self._get_stats()
-        
+
         elif tool_name == "update_weights":
             return self._update_weights(arguments.get("weights", {}))
-        
+
         elif tool_name == "list_sessions":
             return await self._list_sessions(arguments.get("min_tokens", 10000))
-        
+
         # v3.2.2: OpenClaw 插件工具
         elif tool_name == "lobster_grep":
             from agent_tools import lobster_grep
+
             db = self._get_db()
             results = lobster_grep(
                 db,
                 arguments["query"],
                 conversation_id=arguments.get("conversation_id"),
-                limit=arguments.get("limit", 5)
+                limit=arguments.get("limit", 5),
             )
             return {"results": results}
-        
+
         elif tool_name == "lobster_describe":
             from agent_tools import lobster_describe
+
             db = self._get_db()
             # v4.0.13: 添加 summary_id 和 depth 参数支持（Issue #151 Bug #1）
             return lobster_describe(
                 db,
                 summary_id=arguments.get("summary_id"),
                 conversation_id=arguments.get("conversation_id"),
-                depth=arguments.get("depth")
+                depth=arguments.get("depth"),
             )
-        
+
         # v4.0.11: 修复 max_depth 参数未传递（Issue #146）
         elif tool_name == "lobster_expand":
             from agent_tools import lobster_expand
+
             db = self._get_db()
             summary_id = arguments["summary_id"]
             max_depth = arguments.get("max_depth", 2)  # 获取 max_depth 参数
             return lobster_expand(db, summary_id, max_depth=max_depth)
-        
+
         # v3.3.0: 自动压缩工具（调用真实 DAGCompressor）
         elif tool_name == "lobster_compress":
             from dag_compressor import DAGCompressor
+
             db = self._get_db()
             llm = self._get_llm() if self.llm_provider else None
             compressor = DAGCompressor(db, llm_client=llm)
 
             conversation_id = arguments["conversation_id"]
             force = arguments.get("force", False)
-            
+
             # v4.0.13: current_tokens 和 token_budget 变为可选，缺少时自动计算（Issue #151 Bug #4）
             if "current_tokens" in arguments and "token_budget" in arguments:
                 current_tokens = arguments["current_tokens"]
@@ -495,9 +680,9 @@ class LobsterPressMCPServer:
             else:
                 # 自动计算 current_tokens
                 messages = db.get_messages(conversation_id)
-                current_tokens = sum(m.get('token_count', 0) for m in messages)
+                current_tokens = sum(m.get("token_count", 0) for m in messages)
                 token_budget = arguments.get("token_budget", 128000)  # 默认 128K
-            
+
             # v4.0.13: 修复双层计数不一致（Issue #151 Bug #2）
             # 当 force=true 时，跳过所有阈值判断，直接执行压缩
             # 当 force=false 时，使用 Python 层的 Focus 触发逻辑
@@ -511,18 +696,18 @@ class LobsterPressMCPServer:
                 # Python 层自主判断是否需要压缩
                 conv_turns = self._turn_counters.get(conversation_id, 0) + 1
                 self._turn_counters[conversation_id] = conv_turns
-                
+
                 usage_ratio = current_tokens / token_budget if token_budget > 0 else 0
-                
+
                 # Focus 定时触发: 每 12 轮主动压缩一次
-                scheduled_trigger = (conv_turns % 12 == 0)
-                
+                scheduled_trigger = conv_turns % 12 == 0
+
                 # Focus 紧急触发: 上下文使用率 > 85%
                 urgent_trigger = usage_ratio > 0.85
-                
+
                 # 决定是否执行压缩
                 should_compress = scheduled_trigger or urgent_trigger
-            
+
             # 如果不应该压缩，直接返回
             if not should_compress:
                 return {
@@ -534,8 +719,8 @@ class LobsterPressMCPServer:
                     "trigger_status": {
                         "force": force,
                         "scheduled": scheduled_trigger,
-                        "urgent": urgent_trigger
-                    }
+                        "urgent": urgent_trigger,
+                    },
                 }
             # v3.6.0: 删除死代码 threshold（Issue #126 Bug 2）
             # 阈值判断由 TypeScript 层负责，Python 层直接执行
@@ -554,38 +739,39 @@ class LobsterPressMCPServer:
                     did_compress = compressor.incremental_compact(
                         conversation_id,
                         context_threshold=0.0,  # v3.4.0: 始终为 0，由 TS 层控制阈值
-                        token_budget=token_budget
+                        token_budget=token_budget,
                     )
 
                     # v3.4.0: 返回真实的 tokens_after（修复 Bug #124）
                     messages_after = db.get_messages(conversation_id)
-                    tokens_after = sum(m.get('token_count', 0) for m in messages_after)
+                    tokens_after = sum(m.get("token_count", 0) for m in messages_after)
                     tokens_saved = current_tokens - tokens_after
 
                     # v4.0.12: 巻加触发信息 + 重置计数器
                     if did_compress:
                         self._turn_counters[conversation_id] = 0  # 重置计数器
-                    
+
                     return {
                         "compressed": did_compress,
                         "conversation_id": conversation_id,
                         "tokens_before": current_tokens,
                         "tokens_after": tokens_after,  # 真实值
-                        "tokens_saved": tokens_saved,   # 真实值
+                        "tokens_saved": tokens_saved,  # 真实值
                         "token_budget": token_budget,
                         "attempt": attempt + 1,
                         "focus_trigger": {
                             "turn_count": conv_turns,
                             "scheduled": scheduled_trigger,
                             "urgent": urgent_trigger,
-                            "force": force
-                        }
+                            "force": force,
+                        },
                     }
                 except Exception as e:
                     last_error = str(e)
                     if attempt < max_retries - 1:
                         # 等待后重试
                         import asyncio
+
                         await asyncio.sleep(1 * (attempt + 1))
                         continue
 
@@ -594,7 +780,7 @@ class LobsterPressMCPServer:
                 "compressed": False,
                 "error": last_error,
                 "retries": max_retries,
-                "conversation_id": conversation_id
+                "conversation_id": conversation_id,
             }
 
         # v3.6.0: 按三层记忆模型拼装上下文（Issue #127 模块一）
@@ -606,67 +792,91 @@ class LobsterPressMCPServer:
             conversation_id = arguments["conversation_id"]
             token_budget = arguments.get("token_budget", 8000)
             tiers = arguments.get("tiers", ["semantic", "episodic", "working"])
-            
+
             # 按比例分配预算：semantic:episodic:working = 30%:30%:40%
             tier_ratios = {"semantic": 0.30, "episodic": 0.30, "working": 0.40}
-            tier_budgets = {t: int(token_budget * tier_ratios.get(t, 0.33)) for t in tiers}
+            tier_budgets = {
+                t: int(token_budget * tier_ratios.get(t, 0.33)) for t in tiers
+            }
 
             # 获取三层记忆
             context = db.get_context_by_tier(conversation_id, tiers)
-            
+
             # v4.0.94: 对 working 层进行压缩处理
-            if 'working' in context and context['working']:
+            if "working" in context and context["working"]:
                 try:
                     # 1. EM-LLM 事件分割
                     from pipeline.event_segmenter import EventSegmenter
+
                     segmenter = EventSegmenter()
-                    episodes = segmenter.segment(context['working'])
-                    
+                    episodes = segmenter.segment(context["working"])
+
                     # 2. 意图提取和摘要生成（v4.0.95）
                     from pipeline.intent_extractor import IntentExtractor
+
                     intent_extractor = IntentExtractor()
-                    intents_data = intent_extractor.extract_intents(context['working'])
-                    intent_summary = intent_extractor.generate_summary(intents_data, max_length=500)
-                    
+                    intents_data = intent_extractor.extract_intents(context["working"])
+                    intent_summary = intent_extractor.generate_summary(
+                        intents_data, max_length=500
+                    )
+
                     # 3. CMV 三遍压缩每个情节
                     from three_pass_trimmer import ThreePassTrimmer
+
                     trimmer = ThreePassTrimmer()
                     compressed_episodes = []
                     compression_stats = []
-                    
+
                     for episode in episodes:
                         trimmed, stats = trimmer.trim(episode)
                         compressed_episodes.append(trimmed)
                         compression_stats.append(stats)
-                    
+
                     # 4. 合并压缩后的情节
-                    context['working'] = []
+                    context["working"] = []
                     for episode in compressed_episodes:
-                        context['working'].extend(episode)
-                    
+                        context["working"].extend(episode)
+
                     # 5. 将意图摘要添加到 working 层开头（作为元信息）
                     if intent_summary:
-                        context['working'].insert(0, {
-                            'role': 'system',
-                            'content': f'[LobsterPress Intent Summary]\n{intent_summary}',
-                            'seq': -1,
-                            'token_count': len(intent_summary) // 4,  # 估算 token 数
-                        })
-                    
+                        context["working"].insert(
+                            0,
+                            {
+                                "role": "system",
+                                "content": f"[LobsterPress Intent Summary]\n{intent_summary}",
+                                "seq": -1,
+                                "token_count": len(intent_summary)
+                                // 4,  # 估算 token 数
+                            },
+                        )
+
                     # 记录压缩统计
-                    total_original = sum(s.get('original_tokens', 0) for s in compression_stats)
-                    total_trimmed = sum(s.get('trimmed_tokens', 0) for s in compression_stats)
-                    total_saved = sum(s.get('pass1_saved', 0) + s.get('pass2_saved', 0) + s.get('pass3_saved', 0) for s in compression_stats)
-                    
-                    print(f"[lobster_assemble] 压缩完成: {len(context['working'])} 条消息, "
-                          f"tokens {total_original} → {total_trimmed} (节省 {total_saved})")
-                    print(f"[lobster_assemble] 意图提取: {len(intents_data['user_intents'])} 个用户意图, "
-                          f"{len(intents_data['assistant_conclusions'])} 个 assistant 结论")
-                    
+                    total_original = sum(
+                        s.get("original_tokens", 0) for s in compression_stats
+                    )
+                    total_trimmed = sum(
+                        s.get("trimmed_tokens", 0) for s in compression_stats
+                    )
+                    total_saved = sum(
+                        s.get("pass1_saved", 0)
+                        + s.get("pass2_saved", 0)
+                        + s.get("pass3_saved", 0)
+                        for s in compression_stats
+                    )
+
+                    print(
+                        f"[lobster_assemble] 压缩完成: {len(context['working'])} 条消息, "
+                        f"tokens {total_original} → {total_trimmed} (节省 {total_saved})"
+                    )
+                    print(
+                        f"[lobster_assemble] 意图提取: {len(intents_data['user_intents'])} 个用户意图, "
+                        f"{len(intents_data['assistant_conclusions'])} 个 assistant 结论"
+                    )
+
                 except Exception as e:
                     # 降级：使用原始内容
                     print(f"[lobster_assemble] 压缩失败，降级使用原始内容: {e}")
-            
+
             assembled = []
             used_tokens = 0
 
@@ -675,7 +885,7 @@ class LobsterPressMCPServer:
                 tier_used = 0
                 tier_budget = tier_budgets[tier]
                 for item in context.get(tier, []):
-                    item_tokens = item.get('token_count', 0)
+                    item_tokens = item.get("token_count", 0)
                     if tier_used + item_tokens > tier_budget:
                         # 当前层预算用完，继续下一层
                         break
@@ -688,9 +898,8 @@ class LobsterPressMCPServer:
                 "total_tokens": used_tokens,
                 "token_budget": token_budget,
                 "tier_breakdown": {
-                    t: len([x for x in assembled if x['tier'] == t])
-                    for t in tiers
-                }
+                    t: len([x for x in assembled if x["tier"] == t]) for t in tiers
+                },
             }
 
         # v3.6.0: 记忆纠错（Issue #127 模块三）
@@ -702,7 +911,7 @@ class LobsterPressMCPServer:
                 correction_type=arguments["correction_type"],
                 old_value=arguments.get("old_value"),
                 new_value=arguments.get("new_value"),
-                reason=arguments.get("reason")
+                reason=arguments.get("reason"),
             )
             return result
 
@@ -715,7 +924,7 @@ class LobsterPressMCPServer:
             db = self._get_db()
             result = db.sweep_decayed_messages(
                 conversation_id=conversation_id,
-                days_threshold=arguments.get("days_threshold", 30)
+                days_threshold=arguments.get("days_threshold", 30),
             )
             return result
 
@@ -727,23 +936,32 @@ class LobsterPressMCPServer:
 
             # 消息层级分布（使用参数化查询）
             if conv_id:
-                db.cursor.execute("""
+                db.cursor.execute(
+                    """
                     SELECT memory_tier, COUNT(*) as cnt, SUM(token_count) as tokens
                     FROM messages
                     WHERE conversation_id = ?
                     GROUP BY memory_tier
-                """, (conv_id,))
+                """,
+                    (conv_id,),
+                )
             else:
                 db.cursor.execute("""
                     SELECT memory_tier, COUNT(*) as cnt, SUM(token_count) as tokens
                     FROM messages
                     GROUP BY memory_tier
                 """)
-            tier_dist = {row[0]: {'count': row[1], 'tokens': row[2]} for row in db.cursor.fetchall()}
+            tier_dist = {
+                row[0]: {"count": row[1], "tokens": row[2]}
+                for row in db.cursor.fetchall()
+            }
 
             # 实体数量（使用参数化查询）
             if conv_id:
-                db.cursor.execute("SELECT COUNT(*) FROM entities WHERE conversation_id = ?", (conv_id,))
+                db.cursor.execute(
+                    "SELECT COUNT(*) FROM entities WHERE conversation_id = ?",
+                    (conv_id,),
+                )
             else:
                 db.cursor.execute("SELECT COUNT(*) FROM entities")
             entity_count = db.cursor.fetchone()[0]
@@ -753,14 +971,17 @@ class LobsterPressMCPServer:
             try:
                 if conv_id:
                     # corrections 表无 conversation_id，需通过 target_id 关联查询
-                    db.cursor.execute("""
+                    db.cursor.execute(
+                        """
                         SELECT COUNT(*) FROM corrections
                         WHERE target_id IN (
                             SELECT message_id FROM messages WHERE conversation_id = ?
                             UNION
                             SELECT summary_id FROM summaries WHERE conversation_id = ?
                         )
-                    """, (conv_id, conv_id))
+                    """,
+                        (conv_id, conv_id),
+                    )
                 else:
                     db.cursor.execute("SELECT COUNT(*) FROM corrections")
                 correction_count = db.cursor.fetchone()[0]
@@ -786,18 +1007,23 @@ class LobsterPressMCPServer:
             dry_run = arguments.get("dry_run", True)
 
             # 查询 decayed 消息
-            db.cursor.execute("""
+            db.cursor.execute(
+                """
                 SELECT message_id, content FROM messages
                 WHERE conversation_id = ? AND memory_tier = 'decayed'
-            """, (conversation_id,))
+            """,
+                (conversation_id,),
+            )
             decayed_messages = db.cursor.fetchall()
 
             if dry_run:
                 return {
                     "dry_run": True,
                     "decayed_count": len(decayed_messages),
-                    "message_ids": [m[0] for m in decayed_messages[:10]],  # 只返回前 10 个
-                    "warning": "This is a dry run. No messages were deleted."
+                    "message_ids": [
+                        m[0] for m in decayed_messages[:10]
+                    ],  # 只返回前 10 个
+                    "warning": "This is a dry run. No messages were deleted.",
                 }
 
             # 实际删除
@@ -805,37 +1031,43 @@ class LobsterPressMCPServer:
             deleted_count = 0
             for msg_id, _ in decayed_messages:
                 # 先查 rowid
-                db.cursor.execute("SELECT id FROM messages WHERE message_id = ?", (msg_id,))
+                db.cursor.execute(
+                    "SELECT id FROM messages WHERE message_id = ?", (msg_id,)
+                )
                 row = db.cursor.fetchone()
                 if row:
                     rowid = row[0]
                     # 用 rowid 删除 FTS 记录
-                    db.cursor.execute("DELETE FROM messages_fts WHERE rowid = ?", (rowid,))
+                    db.cursor.execute(
+                        "DELETE FROM messages_fts WHERE rowid = ?", (rowid,)
+                    )
                 # 删除主表记录
-                db.cursor.execute("DELETE FROM messages WHERE message_id = ?", (msg_id,))
+                db.cursor.execute(
+                    "DELETE FROM messages WHERE message_id = ?", (msg_id,)
+                )
                 deleted_count += 1
             db.conn.commit()
 
             return {
                 "dry_run": False,
                 "deleted_count": deleted_count,
-                "warning": f"Permanently deleted {deleted_count} decayed messages."
+                "warning": f"Permanently deleted {deleted_count} decayed messages.",
             }
 
         # v4.0.20: 消息入库（Issue #156 Bug #2）
         elif tool_name == "lobster_ingest":
             conversation_id = arguments.get("conversation_id")
             messages = arguments.get("messages", [])
-            
+
             if not conversation_id:
                 raise ValueError("conversation_id is required for lobster_ingest")
-            
+
             if not messages:
                 return {"ingested": 0, "message": "No messages to ingest"}
-            
+
             db = self._get_db()
             ingested_count = 0
-            
+
             for msg in messages:
                 # 构建 message 对象
                 message_obj = {
@@ -846,16 +1078,40 @@ class LobsterPressMCPServer:
                     "timestamp": msg.get("timestamp"),
                     "seq": msg.get("seq"),
                 }
-                
+
                 # 使用 save_message 存入数据库
                 db.save_message(message_obj)
                 ingested_count += 1
-            
+
             return {
                 "ingested": ingested_count,
                 "conversation_id": conversation_id,
-                "message": f"Successfully ingested {ingested_count} messages"
+                "message": f"Successfully ingested {ingested_count} messages",
             }
+
+        # Phase 2.4: 技能管理工具
+        elif tool_name == "lobster_skill":
+            return await self._handle_lobster_skill(arguments)
+
+        # Phase 3.2: 多 Agent 公共记忆工具
+        elif tool_name == "lobster_memory_write_public":
+            return await self._handle_memory_write_public(arguments)
+
+        # Phase 3.2: 技能搜索工具
+        elif tool_name == "lobster_skill_search":
+            return await self._handle_skill_search(arguments)
+
+        # Phase 3.2: 技能发布/取消发布工具
+        elif tool_name == "lobster_skill_publish":
+            return await self._handle_skill_publish(arguments, visibility="public")
+        elif tool_name == "lobster_skill_unpublish":
+            return await self._handle_skill_publish(arguments, visibility="private")
+
+        # Phase 4.4: Memory Viewer 工具
+        elif tool_name == "lobster_viewer":
+            return await self._handle_lobster_viewer(arguments)
+        elif tool_name == "lobster_import":
+            return await self._handle_lobster_import(arguments)
 
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
@@ -869,40 +1125,57 @@ class LobsterPressMCPServer:
                 sys.path.insert(0, str(src_dir))
 
             from database import LobsterDatabase
+
             # v3.6.0: 传递 namespace 到数据库（Issue #127 模块四）
             self._db = LobsterDatabase(self.db_path, namespace=self.namespace)
         return self._db
-    
+
+    def _get_llm(self):
+        """获取 LLM 客户端（懒加载）"""
+        if not hasattr(self, "_llm_client") or self._llm_client is None:
+            from llm_client import create_llm_client
+
+            self._llm_client = create_llm_client(
+                provider=self.llm_provider, model=self.llm_model
+            )
+        return self._llm_client
+
     def _validate_session_id(self, session_id: str) -> str:
         """验证 session_id 防止路径遍历攻击（修复 Issue #12）
-        
+
         Args:
             session_id: 会话 ID
-        
+
         Returns:
             验证后的会话 ID
-        
+
         Raises:
             ValueError: 无效的会话 ID
         """
         if not session_id:
             raise ValueError("Session ID cannot be empty")
-        
+
         # 只允许字母、数字、下划线、连字符
-        if not re.match(r'^[a-zA-Z0-9_-]+$', session_id):
-            raise ValueError(f"Invalid session_id: {session_id} (only alphanumeric, underscore, hyphen allowed)")
-        
+        if not re.match(r"^[a-zA-Z0-9_-]+$", session_id):
+            raise ValueError(
+                f"Invalid session_id: {session_id} (only alphanumeric, underscore, hyphen allowed)"
+            )
+
         # 防止路径遍历
-        if '..' in session_id or '/' in session_id or '\\' in session_id:
-            raise ValueError(f"Invalid session_id: {session_id} (path traversal detected)")
-        
+        if ".." in session_id or "/" in session_id or "\\" in session_id:
+            raise ValueError(
+                f"Invalid session_id: {session_id} (path traversal detected)"
+            )
+
         # 长度限制
         if len(session_id) > 255:
             raise ValueError(f"Session ID too long: {len(session_id)} > 255")
-        
+
         return session_id
-    
-    async def _compress_session(self, session_id: str, strategy: str, dry_run: bool) -> Dict[str, Any]:
+
+    async def _compress_session(
+        self, session_id: str, strategy: str, dry_run: bool
+    ) -> Dict[str, Any]:
         """压缩会话（v3.3.0: 使用真实 DAGCompressor，v3.4.0: 修复 dry_run）"""
         # 验证 session_id（修复 Issue #12）
         session_id = self._validate_session_id(session_id)
@@ -916,7 +1189,7 @@ class LobsterPressMCPServer:
             db = self._get_db()
             messages = db.get_messages(session_id)
             summaries = db.get_summaries(session_id)
-            total_tokens = sum(m.get('token_count', 0) for m in messages)
+            total_tokens = sum(m.get("token_count", 0) for m in messages)
 
             return {
                 "status": "preview",
@@ -926,20 +1199,21 @@ class LobsterPressMCPServer:
                 "summary_count": len(summaries),
                 "estimated_tokens": total_tokens,
                 "dry_run": True,
-                "note": "No compression performed. Call without dry_run=True to compress."
+                "note": "No compression performed. Call without dry_run=True to compress.",
             }
 
         # v3.3.0: 调用真实 DAGCompressor（不再使用假 DAG）
         from dag_compressor import DAGCompressor
+
         db = self._get_db()
         llm = self._get_llm() if self.llm_provider else None
         compressor = DAGCompressor(db, llm_client=llm)
 
         # 根据策略决定阈值
         thresholds = {
-            "light": 0.9,      # 只在 90% 时触发
-            "medium": 0.75,    # 在 75% 时触发
-            "aggressive": 0.5  # 在 50% 时触发
+            "light": 0.9,  # 只在 90% 时触发
+            "medium": 0.75,  # 在 75% 时触发
+            "aggressive": 0.5,  # 在 50% 时触发
         }
         threshold = thresholds.get(strategy, 0.75)
 
@@ -953,12 +1227,12 @@ class LobsterPressMCPServer:
                 did_compress = compressor.incremental_compact(
                     conversation_id=session_id,
                     context_threshold=threshold,
-                    token_budget=128000
+                    token_budget=128000,
                 )
 
                 # 获取压缩后的统计
                 messages = db.get_messages(session_id)
-                estimated_tokens = sum(m.get('token_count', 0) for m in messages)
+                estimated_tokens = sum(m.get("token_count", 0) for m in messages)
 
                 return {
                     "status": "success" if did_compress else "skipped",
@@ -969,13 +1243,14 @@ class LobsterPressMCPServer:
                     "message_count": len(messages),
                     "estimated_tokens": estimated_tokens,
                     "method": "real_dag_v3.4.0",
-                    "attempt": attempt + 1
+                    "attempt": attempt + 1,
                 }
             except Exception as e:
                 last_error = str(e)
                 if attempt < max_retries - 1:
                     # 等待后重试
                     import asyncio
+
                     await asyncio.sleep(1 * (attempt + 1))
                     continue
 
@@ -985,104 +1260,98 @@ class LobsterPressMCPServer:
             "error": last_error,
             "retries": max_retries,
             "session_id": session_id,
-            "strategy": strategy
+            "strategy": strategy,
         }
-    
-    async def _preview_compression(self, session_id: str, strategy: str) -> Dict[str, Any]:
+
+    async def _preview_compression(
+        self, session_id: str, strategy: str
+    ) -> Dict[str, Any]:
         """预览压缩效果"""
         return await self._compress_session(session_id, strategy, dry_run=True)
-    
+
     def _get_stats(self) -> Dict[str, Any]:
         """获取统计数据"""
-        return {
-            "stats": self.stats,
-            "config": self.config
-        }
-    
+        return {"stats": self.stats, "config": self.config}
+
     def _update_weights(self, weights: Dict[str, float]) -> Dict[str, Any]:
         """更新权重配置"""
         # 验证权重
         for key, value in weights.items():
             if key in self.config["weights"]:
                 self.config["weights"][key] = value
-        
-        return {
-            "status": "success",
-            "updated_weights": self.config["weights"]
-        }
-    
+
+        return {"status": "success", "updated_weights": self.config["weights"]}
+
     async def _list_sessions(self, min_tokens: int) -> Dict[str, Any]:
         """列出会话"""
         sessions = []
-        
+
         for session_file in self.sessions_dir.glob("*.jsonl"):
             if session_file.name.endswith((".backup.", ".reset.", ".deleted.")):
                 continue
-            
+
             # 估算 Token 数
             messages = []
-            with open(session_file, 'r', encoding='utf-8') as f:
+            with open(session_file, "r", encoding="utf-8") as f:
                 for line in f:
                     if line.strip():
                         messages.append(json.loads(line))
-            
+
             estimated_tokens = self._estimate_tokens(messages)
-            
+
             if estimated_tokens >= min_tokens:
-                sessions.append({
-                    "session_id": session_file.stem,
-                    "messages": len(messages),
-                    "estimated_tokens": estimated_tokens,
-                    "file_size": session_file.stat().st_size,
-                    "modified": datetime.fromtimestamp(session_file.stat().st_mtime).isoformat()
-                })
-        
+                sessions.append(
+                    {
+                        "session_id": session_file.stem,
+                        "messages": len(messages),
+                        "estimated_tokens": estimated_tokens,
+                        "file_size": session_file.stat().st_size,
+                        "modified": datetime.fromtimestamp(
+                            session_file.stat().st_mtime
+                        ).isoformat(),
+                    }
+                )
+
         # 按 Token 数排序
         sessions.sort(key=lambda x: x["estimated_tokens"], reverse=True)
-        
-        return {
-            "sessions": sessions,
-            "total": len(sessions)
-        }
-    
+
+        return {"sessions": sessions, "total": len(sessions)}
+
     async def _list_resources(self) -> Dict[str, Any]:
         """列出资源"""
         resources = []
-        
+
         for session_file in self.sessions_dir.glob("*.jsonl"):
             if not session_file.name.endswith((".backup.", ".reset.", ".deleted.")):
-                resources.append({
-                    "uri": f"lobster://sessions/{session_file.stem}",
-                    "name": session_file.stem,
-                    "mimeType": "application/jsonl"
-                })
-        
+                resources.append(
+                    {
+                        "uri": f"lobster://sessions/{session_file.stem}",
+                        "name": session_file.stem,
+                        "mimeType": "application/jsonl",
+                    }
+                )
+
         return {"resources": resources}
-    
+
     async def _read_resource(self, uri: str) -> Dict[str, Any]:
         """读取资源"""
         if not uri.startswith("lobster://sessions/"):
             raise ValueError(f"Invalid resource URI: {uri}")
-        
+
         session_id = uri.replace("lobster://sessions/", "")
-        session_file = self.sessions_dir / f"{session_id}.jsonl"
-        
+        validated_id = self._validate_session_id(session_id)
+        session_file = self.sessions_dir / f"{validated_id}.jsonl"
+
         if not session_file.exists():
-            raise FileNotFoundError(f"Session not found: {session_id}")
-        
-        with open(session_file, 'r', encoding='utf-8') as f:
+            raise FileNotFoundError(f"Session not found: {validated_id}")
+
+        with open(session_file, "r", encoding="utf-8") as f:
             content = f.read()
-        
+
         return {
-            "contents": [
-                {
-                    "uri": uri,
-                    "mimeType": "application/jsonl",
-                    "text": content
-                }
-            ]
+            "contents": [{"uri": uri, "mimeType": "application/jsonl", "text": content}]
         }
-    
+
     def _estimate_tokens(self, messages: List[Dict]) -> int:
         """估算 Token 数"""
         total_chars = 0
@@ -1094,19 +1363,21 @@ class LobsterPressMCPServer:
                 for part in content:
                     if isinstance(part, dict) and "text" in part:
                         total_chars += len(part["text"])
-        
+
         # 简单估算：3 字符 = 1 token
         return total_chars // 3
-    
+
     def _score_message(self, msg: Dict) -> float:
         """评分消息重要性"""
         content = msg.get("content", "")
         if isinstance(content, list):
-            content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
-        
+            content = " ".join(
+                p.get("text", "") for p in content if isinstance(p, dict)
+            )
+
         content_lower = content.lower()
         score = 0.0
-        
+
         # 关键词评分
         patterns = {
             "decision": ["决定", "方案", "选择", "决定采用", "decide", "choose"],
@@ -1114,13 +1385,274 @@ class LobsterPressMCPServer:
             "config": ["配置", "设置", "更新", "config", "setting", "update"],
             "preference": ["偏好", "喜欢", "希望", "prefer", "like", "want"],
         }
-        
+
         for category, keywords in patterns.items():
             for keyword in keywords:
                 if keyword in content_lower:
                     score += self.config["weights"].get(category, 0.1)
-        
+
         return score
+
+    async def _handle_lobster_skill(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """处理 lobster_skill 工具调用"""
+        action = args.get("action")
+        db = self._get_db()
+
+        llm_client = None
+        if self.llm_provider:
+            from llm_client import create_llm_client
+
+            llm_client = create_llm_client(
+                provider=self.llm_provider, model=self.llm_model, fallback=True
+            )
+
+        if action == "get":
+            skill_id = args.get("skill_id")
+            if not skill_id:
+                return {"error": "skill_id is required for get action"}
+
+            skill = db.get_skill(skill_id)
+            if not skill:
+                return {"error": f"Skill not found: {skill_id}"}
+
+            db.cursor.execute(
+                """
+                SELECT content, quality_score FROM skill_versions
+                WHERE skill_id = ? ORDER BY version DESC LIMIT 1
+            """,
+                (skill_id,),
+            )
+            row = db.cursor.fetchone()
+
+            return {
+                "skill": skill,
+                "content": row[0] if row else None,
+                "quality_score": row[1] if row else 0.0,
+            }
+
+        elif action == "list":
+            owner = args.get("owner", "default")
+            visibility = args.get("visibility")
+
+            skills = db.get_skills_by_owner(owner, include_public=True)
+
+            if visibility:
+                skills = [s for s in skills if s.get("visibility") == visibility]
+
+            return {"skills": skills, "count": len(skills)}
+
+        elif action == "install":
+            conversation_id = args.get("conversation_id")
+            task_goal = args.get("task_goal")
+
+            if not conversation_id:
+                return {"error": "conversation_id is required for install action"}
+
+            from src.skills.task_detector import TaskDetector
+
+            detector = TaskDetector(db, llm_client)
+            tasks = detector.detect_tasks(conversation_id)
+
+            if not tasks:
+                return {"error": "No tasks detected in conversation"}
+
+            from src.skills.evolver import SkillEvolver
+
+            evolver = SkillEvolver(db, llm_client)
+
+            target_task = None
+            if task_goal:
+                for t in tasks:
+                    if task_goal.lower() in t.get("goal", "").lower():
+                        target_task = t
+                        break
+
+            if not target_task:
+                target_task = tasks[-1]
+
+            skill_id = evolver.evaluate_and_generate(
+                target_task, conversation_id, owner="default"
+            )
+
+            if not skill_id:
+                return {"status": "skipped", "reason": "Task did not pass evaluation"}
+
+            return {
+                "status": "installed",
+                "skill_id": skill_id,
+                "skill_name": target_task.get("goal", "")[:50],
+            }
+
+        else:
+            return {"error": f"Unknown action: {action}"}
+
+    async def _handle_memory_write_public(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """写入公共记忆"""
+        import hashlib
+
+        content = args["content"]
+        summary = args.get("summary", "")
+        conversation_id = args.get("conversation_id", "public")
+
+        msg_id = f"pub_{hashlib.sha256(content.encode()).hexdigest()[:16]}"
+        now = datetime.utcnow().isoformat()
+
+        self._get_db().save_message(
+            {
+                "id": msg_id,
+                "conversationId": conversation_id,
+                "role": "system",
+                "content": content,
+                "timestamp": now,
+                "summary": summary,
+                "public": True,
+                "owner": "public",
+            }
+        )
+
+        return {"status": "ok", "message_id": msg_id, "owner": "public"}
+
+    async def _handle_skill_search(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """搜索技能"""
+        query = args.get("query", "*")
+        scope = args.get("scope", "mix")
+        limit = args.get("limit", 20)
+        owner = args.get("owner", "default")
+
+        db = self._get_db()
+
+        if scope == "self":
+            skills = db.get_skills_by_owner(owner, include_public=False)
+            if query != "*":
+                skills = [
+                    s for s in skills if query.lower() in s.get("name", "").lower()
+                ]
+        elif scope == "public":
+            skills = db.get_skills_by_owner("public", include_public=True)
+            skills = [s for s in skills if s.get("visibility") == "public"]
+            if query != "*":
+                skills = [
+                    s for s in skills if query.lower() in s.get("name", "").lower()
+                ]
+        else:
+            skills = db.search_skills(query, owner=owner, visibility=None, limit=limit)
+
+        return {"skills": skills[:limit], "count": len(skills), "scope": scope}
+
+    async def _handle_skill_publish(
+        self, args: Dict[str, Any], visibility: str
+    ) -> Dict[str, Any]:
+        """发布/取消发布技能"""
+        skill_id = args.get("skill_id")
+
+        if not skill_id:
+            return {"error": "skill_id is required"}
+
+        db = self._get_db()
+        skill = db.get_skill(skill_id)
+
+        if not skill:
+            return {"error": f"Skill not found: {skill_id}"}
+
+        db.cursor.execute(
+            """
+            UPDATE skills SET visibility = ?, updated_at = ?
+            WHERE skill_id = ?
+        """,
+            (visibility, datetime.utcnow().isoformat(), skill_id),
+        )
+        db.conn.commit()
+
+        return {"status": "ok", "skill_id": skill_id, "visibility": visibility}
+
+    async def _handle_lobster_viewer(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """处理 lobster_viewer 工具"""
+        from src.viewer.server import start_viewer
+
+        action = args.get("action", "status")
+        port = args.get("port", 18799)
+        password = args.get("password")
+
+        if not hasattr(self, "_viewer_server"):
+            self._viewer_server = None
+
+        if action == "start":
+            if self._viewer_server is not None:
+                return {"status": "already_running", "port": port}
+
+            db = self._get_db()
+            self._viewer_server = start_viewer(
+                db, port=port, password=password, owner="default"
+            )
+            # 在后台线程运行
+            import threading
+
+            t = threading.Thread(target=self._viewer_server.serve_forever, daemon=True)
+            t.start()
+
+            return {
+                "status": "started",
+                "port": port,
+                "url": f"http://127.0.0.1:{port}",
+            }
+
+        elif action == "stop":
+            if self._viewer_server is None:
+                return {"status": "not_running"}
+
+            self._viewer_server.shutdown()
+            self._viewer_server = None
+            return {"status": "stopped"}
+
+        else:  # status
+            return {
+                "status": "running" if self._viewer_server else "stopped",
+                "port": port,
+            }
+
+    async def _handle_lobster_import(self, args: Dict[str, Any]) -> Dict[str, Any]:
+        """处理 lobster_import 工具"""
+        from src.migration.importer import MemoryImporter
+
+        action = args.get("action")
+        checkpoint_file = args.get("checkpoint_file")
+
+        if not hasattr(self, "_importer"):
+            self._importer = None
+
+        db = self._get_db()
+
+        if action == "scan":
+            importer = MemoryImporter(db)
+            stats = importer.scan()
+            return {"status": "ok", "scan": stats}
+
+        elif action == "start":
+            if self._importer is not None:
+                return {"status": "already_running"}
+
+            importer = MemoryImporter(db)
+            self._importer = importer
+
+            # 在后台线程运行
+            import threading
+
+            def run_import():
+                importer.import_memories(checkpoint_file=checkpoint_file)
+                self._importer = None
+
+            t = threading.Thread(target=run_import, daemon=True)
+            t.start()
+
+            return {"status": "started"}
+
+        elif action == "stop":
+            # 简单实现：标记停止（实际需要在 worker 中检查）
+            self._importer = None
+            return {"status": "stopped"}
+
+        else:
+            return {"error": f"Unknown action: {action}"}
 
 
 def emit(obj: Dict[str, Any]) -> None:
@@ -1133,14 +1665,18 @@ async def main():
     """主入口"""
     import argparse
     import time
-    
+
     parser = argparse.ArgumentParser(description="LobsterPress MCP Server")
     parser.add_argument("--sessions-dir", help="会话目录")
     parser.add_argument("--db", dest="db_path", help="LobsterPress 数据库路径")
     parser.add_argument("--provider", dest="llm_provider", help="LLM 提供商")
     parser.add_argument("--model", dest="llm_model", help="LLM 模型名称")
-    parser.add_argument("--namespace", dest="namespace", default="default",
-                        help="记忆命名空间（用于多 Agent/项目隔离）")
+    parser.add_argument(
+        "--namespace",
+        dest="namespace",
+        default="default",
+        help="记忆命名空间（用于多 Agent/项目隔离）",
+    )
     parser.add_argument("--test", action="store_true", help="测试模式")
 
     args = parser.parse_args()
@@ -1150,69 +1686,77 @@ async def main():
         db_path=args.db_path,
         llm_provider=args.llm_provider,
         llm_model=args.llm_model,
-        namespace=args.namespace  # v3.6.0 新增
+        namespace=args.namespace,  # v3.6.0 新增
     )
-    
+
     if args.test:
         # 测试模式
         print("=== LobsterPress MCP Server 测试 ===")
         print("\n可用工具:")
         for tool in server.tools:
             print(f"  - {tool.name}: {tool.description}")
-        
+
         # 测试 list_sessions
         result = await server._call_tool("list_sessions", {"min_tokens": 1000})
         print(f"\n找到 {result['total']} 个可压缩会话")
         for session in result["sessions"][:3]:
             print(f"  - {session['session_id']}: {session['estimated_tokens']} tokens")
-        
+
         print("\n✅ MCP Server 正常工作")
     else:
         # Phase 1 (Issue #115): 发送 ready handshake
         emit({"type": "lobster-press/ready", "ts": time.time()})
-        
+
         # MCP 协议模式（读取 stdin）
         for line in sys.stdin:
             line = line.strip()
             if not line:
                 continue
-            
+
             request_id = None
             try:
                 req = json.loads(line)
                 request_id = req.get("requestId") or req.get("id")
                 method = req.get("method")
-                
+
                 if method == "tools/call":
                     params = req.get("params", {})
                     tool_name = params.get("name")
                     arguments = params.get("arguments", {})
                     result = await server._call_tool(tool_name, arguments)
-                    emit({
-                        "requestId": request_id,
-                        "status": "ok",
-                        "result": result,
-                    })
+                    emit(
+                        {
+                            "requestId": request_id,
+                            "status": "ok",
+                            "result": result,
+                        }
+                    )
                 else:
                     # 其他方法使用原有处理逻辑
                     response = await server.handle_request(req)
-                    emit({
-                        "requestId": request_id,
-                        "status": "ok",
-                        "result": response,
-                    })
+                    emit(
+                        {
+                            "requestId": request_id,
+                            "status": "ok",
+                            "result": response,
+                        }
+                    )
             except json.JSONDecodeError as e:
-                emit({
-                    "requestId": request_id,
-                    "status": "error",
-                    "error": f"Invalid JSON: {e}",
-                })
+                emit(
+                    {
+                        "requestId": request_id,
+                        "status": "error",
+                        "error": f"Invalid JSON: {e}",
+                    }
+                )
             except Exception as e:
-                emit({
-                    "requestId": request_id,
-                    "status": "error",
-                    "error": str(e),
-                })
+                emit(
+                    {
+                        "requestId": request_id,
+                        "status": "error",
+                        "error": str(e),
+                    }
+                )
 
 
 if __name__ == "__main__":

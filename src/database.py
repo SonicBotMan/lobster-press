@@ -34,6 +34,11 @@ TFIDFScorer = None  # 将在 _get_tfidf_scorer() 中延迟导入
 class LobsterDatabase:
     """LobsterPress 数据库 - 无损存储层"""
 
+    # v5.0: 双半衰期参数常量
+    COMPRESSION_HALF_LIFE_HOURS = 12  # 压缩评分的时间窗口（12h）
+    RETRIEVAL_HALF_LIFE_DAYS = 14.0  # 检索衰减的半衰期（14d = 336h）
+    RETRIEVAL_HALF_LIFE_HOURS = 336.0  # 检索衰减的半衰期（小时）
+
     def __init__(self, db_path: str = "lobster_press.db", namespace: str = "default"):
         """初始化数据库
 
@@ -46,13 +51,14 @@ class LobsterDatabase:
         """
         self.db_path = db_path
         self.namespace = namespace  # v3.6.0 新增
+        self.owner = "default"  # v5.0.0: 多智能体协同
         self.trimmer = ThreePassTrimmer()  # v4.0.0 新增
         self._tfidf_scorer = None  # v4.0.41: 延迟加载（Issue #181）
         self._turn_counts = {}  # Fix 7: 本地计数器缓存（Issue #174）
         self.conn = None
         self.cursor = None
         self._init_database()
-    
+
     def _get_tfidf_scorer(self):
         """延迟加载 TFIDFScorer（v4.0.41 Issue #181）"""
         if self._tfidf_scorer is None:
@@ -65,12 +71,12 @@ class LobsterDatabase:
                 TFIDFScorer = _TFIDFScorer
             self._tfidf_scorer = TFIDFScorer()
         return self._tfidf_scorer
-    
+
     def _init_database(self):
         """初始化数据库结构 - 借鉴 lossless-claw"""
         self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
-        
+
         # 消息表（永久保存）
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS messages (
@@ -91,7 +97,7 @@ class LobsterDatabase:
                 FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id)
             );
         """)
-        
+
         # 摘要表（DAG 结构）
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS summaries (
@@ -109,7 +115,7 @@ class LobsterDatabase:
                 FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id)
             );
         """)
-        
+
         # 对话表
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS conversations (
@@ -120,7 +126,7 @@ class LobsterDatabase:
                 metadata TEXT
             );
         """)
-        
+
         # 摘要-消息关系（叶子摘要）
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS summary_messages (
@@ -131,7 +137,7 @@ class LobsterDatabase:
                 FOREIGN KEY (message_id) REFERENCES messages(message_id)
             );
         """)
-        
+
         # 摘要-摘要关系（压缩摘要）
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS summary_parents (
@@ -142,7 +148,7 @@ class LobsterDatabase:
                 FOREIGN KEY (parent_summary_id) REFERENCES summaries(summary_id)
             );
         """)
-        
+
         # 上下文项（当前可见内容）
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS context_items (
@@ -154,7 +160,7 @@ class LobsterDatabase:
                 FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id)
             );
         """)
-        
+
         # FTS5 全文搜索 - 消息
         self.cursor.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts 
@@ -165,7 +171,7 @@ class LobsterDatabase:
                 content_rowid='id'
             );
         """)
-        
+
         # FTS5 全文搜索 - 摘要
         self.cursor.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS summaries_fts 
@@ -176,7 +182,7 @@ class LobsterDatabase:
                 content_rowid='id'
             );
         """)
-        
+
         # 大文件表（借鉴 lossless-claw）
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS large_files (
@@ -191,20 +197,98 @@ class LobsterDatabase:
                 created_at TEXT NOT NULL
             );
         """)
-        
+
+        # Phase 1: 向量嵌入表
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS embeddings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chunk_id TEXT UNIQUE NOT NULL,
+                target_type TEXT NOT NULL,
+                target_id TEXT NOT NULL,
+                vector BLOB NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (target_id) REFERENCES messages(message_id)
+            );
+        """)
+
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_embeddings_target
+            ON embeddings(target_type, target_id);
+        """)
+
+        # Phase 2: 技能进化表
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS skills (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                skill_id TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                owner TEXT NOT NULL DEFAULT 'default',
+                visibility TEXT DEFAULT 'private',
+                quality_score REAL DEFAULT 0.0,
+                current_version INTEGER DEFAULT 1,
+                steps TEXT,
+                warnings TEXT,
+                script TEXT,
+                source_task_ids TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+        """)
+
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS skill_versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                skill_id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                quality_score REAL DEFAULT 0.0,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (skill_id) REFERENCES skills(skill_id)
+            );
+        """)
+
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS task_skills (
+                task_id TEXT NOT NULL,
+                skill_id TEXT NOT NULL,
+                PRIMARY KEY (task_id, skill_id)
+            );
+        """)
+
+        # FTS5 技能搜索
+        self.cursor.execute("""
+            CREATE VIRTUAL TABLE IF NOT EXISTS skills_fts
+            USING fts5(
+                skill_id,
+                name,
+                description,
+                content='skills',
+                content_rowid='id'
+            );
+        """)
+
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_skills_owner ON skills(owner);
+        """)
+
+        self.cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_skill_versions ON skill_versions(skill_id);
+        """)
+
         # 创建索引
         self.cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_messages_conversation 
             ON messages(conversation_id, seq);
         """)
-        
+
         self.cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_summaries_conversation 
             ON summaries(conversation_id, depth);
         """)
-        
+
         self.conn.commit()
-        
+
         # v2.5.0 迁移
         self.migrate_v25()
 
@@ -217,10 +301,11 @@ class LobsterDatabase:
         self.migrate_v32()  # 记忆纠错系统
         self.migrate_v40()  # v4.0.0 R³Mem 可逆三层压缩
         self.migrate_v41()  # v4.0.96 C-HLR+ 遗忘曲线
-    
+        self.migrate_v50()  # v5.0.0: 多智能体协同
+
     def migrate_v25(self):
         """v2.5.0 schema 迁移
-        
+
         为已有数据库添加新字段（向前兼容）
         """
         migrations = [
@@ -229,19 +314,19 @@ class LobsterDatabase:
             "ALTER TABLE messages ADD COLUMN structural_bonus REAL DEFAULT 0.0",
             "ALTER TABLE messages ADD COLUMN compression_exempt INTEGER DEFAULT 0",
         ]
-        
+
         for sql in migrations:
             try:
                 self.cursor.execute(sql)
             except sqlite3.OperationalError:
                 # 字段已存在，跳过
                 pass
-        
+
         self.conn.commit()
-    
+
     def migrate_v26(self):
         """v2.6.0 schema 迁移：支持遗忘曲线动态评分
-        
+
         新增字段：
         - last_accessed_at: 最后访问时间（记忆巩固）
         - access_count: 访问次数
@@ -252,14 +337,14 @@ class LobsterDatabase:
             "ALTER TABLE messages ADD COLUMN access_count INTEGER DEFAULT 0",
             "ALTER TABLE messages ADD COLUMN stability REAL DEFAULT 14.0",
         ]
-        
+
         for sql in migrations:
             try:
                 self.cursor.execute(sql)
             except sqlite3.OperationalError:
                 # 字段已存在，跳过
                 pass
-        
+
         self.conn.commit()
 
     def migrate_v32(self):
@@ -282,27 +367,27 @@ class LobsterDatabase:
                 applied_at TEXT
             )
         """)
-        
+
         self.cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_corrections_target 
             ON corrections(target_type, target_id)
         """)
-        
+
         self.conn.commit()
 
     def migrate_v40(self):
         """v4.0.0 schema 迁移：R³Mem 可逆三层压缩
-        
+
         v4.0.2 修订：移除 v3.x 已处理的字段（memory_tier, namespace），
         只保留 v4.0.0 真正新增的表和字段（Issue #136 Bug 6）
-        
+
         新增表：
         - entities: 实体追踪（人名、文件名、概念等）
         - entity_mentions: 实体-消息关联
-        
+
         新增字段：
         - summaries.r3_layer: R³Mem 层级（1=document, 2=paragraph, 3=entity）
-        
+
         Ref: arXiv:2502.15957 — R³Mem: Bridging Memory Retention and Retrieval
         """
         migrations = [
@@ -336,14 +421,14 @@ class LobsterDatabase:
             "CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(entity_name)",
             # 注意：memory_tier 已由 migrate_v30 处理，namespace 已由 migrate_v31 处理
         ]
-        
+
         for sql in migrations:
             try:
                 self.cursor.execute(sql)
             except sqlite3.OperationalError:
                 # 字段或索引已存在，忽略
                 pass
-        
+
         self.conn.commit()
 
     def migrate_v30(self):
@@ -410,51 +495,101 @@ class LobsterDatabase:
 
         self.conn.commit()
 
+    def migrate_v50(self):
+        """v5.0.0 schema 迁移：多智能体协同
+
+        借鉴 MemOS: owner 字段隔离 Agent 记忆（格式 'agent:{agentId}'）
+        检索时自动过滤为当前 Agent + public
+
+        新增字段:
+        - messages.owner: 消息所有者
+        - summaries.owner: 摘要所有者
+        - notes.owner: 笔记所有者
+        """
+        migrations = [
+            "ALTER TABLE messages ADD COLUMN owner TEXT DEFAULT 'default'",
+            "ALTER TABLE summaries ADD COLUMN owner TEXT DEFAULT 'default'",
+            "ALTER TABLE notes ADD COLUMN owner TEXT DEFAULT 'default'",
+        ]
+
+        for sql in migrations:
+            try:
+                self.cursor.execute(sql)
+            except sqlite3.OperationalError:
+                pass
+
+        index_migrations = [
+            "CREATE INDEX IF NOT EXISTS idx_messages_owner ON messages(owner)",
+            "CREATE INDEX IF NOT EXISTS idx_summaries_owner ON summaries(owner)",
+            "CREATE INDEX IF NOT EXISTS idx_notes_owner ON notes(owner)",
+        ]
+
+        for sql in index_migrations:
+            try:
+                self.cursor.execute(sql)
+            except sqlite3.OperationalError:
+                pass
+
+        self.conn.commit()
+
     # ==================== 消息操作 ====================
-    
+
     def save_message(self, message: Dict) -> str:
         """保存消息（永久存储）
-        
+
         Phase 3 (Issue #115): 使用事务确保消息和 FTS 索引的原子性
-        
+
         Args:
             message: 消息对象（v2.5.0 支持 msg_type, tfidf_score, compression_exempt）
-        
+
         Returns:
             message_id
         """
-        message_id = message.get('id') or self._generate_id('msg')
-        conversation_id = message.get('conversationId')
-        seq = message.get('seq', 0)
-        role = message.get('role', 'user')
+        message_id = message.get("id") or self._generate_id("msg")
+        conversation_id = message.get("conversationId")
+        seq = message.get("seq", 0)
+        role = message.get("role", "user")
         content = self._extract_content(message)
         token_count = self._estimate_tokens(content)
-        created_at = message.get('timestamp') or datetime.utcnow().isoformat()
+        created_at = message.get("timestamp") or datetime.utcnow().isoformat()
         metadata = json.dumps(message, ensure_ascii=False)
-        
+
         # v2.5.0 新字段
-        msg_type = message.get('msg_type', 'unknown')
-        tfidf_score = message.get('tfidf_score', 0.0)
-        structural_bonus = message.get('structural_bonus', 0.0)
-        compression_exempt = 1 if message.get('compression_exempt', False) else 0
-        
+        msg_type = message.get("msg_type", "unknown")
+        tfidf_score = message.get("tfidf_score", 0.0)
+        structural_bonus = message.get("structural_bonus", 0.0)
+        compression_exempt = 1 if message.get("compression_exempt", False) else 0
+
         # v4.0.34: 自动计算 TF-IDF 分数（Issue #173 修复一）
         # 若调用方已传入分数（>0），优先使用；否则用当前对话语料重新评分
         if tfidf_score == 0.0 and content:
             try:
-                corpus_msgs = self.get_messages(conversation_id) if conversation_id else []
-                corpus_texts = [self._extract_content(m) for m in corpus_msgs] + [content]
+                corpus_msgs = (
+                    self.get_messages(conversation_id) if conversation_id else []
+                )
+                corpus_texts = [self._extract_content(m) for m in corpus_msgs] + [
+                    content
+                ]
                 scored = self._get_tfidf_scorer().score_messages(
-                    [{"content": t, "role": "user", "msg_type": "unknown"} for t in corpus_texts]
+                    [
+                        {"content": t, "role": "user", "msg_type": "unknown"}
+                        for t in corpus_texts
+                    ]
                 )
                 if scored:
                     last = scored[-1]
                     # v4.0.41: ScoredMessage 是 dataclass，不是 dict（Issue #181）
-                    tfidf_score = last.tfidf_score if hasattr(last, 'tfidf_score') else 0.0
-                    structural_bonus = last.structural_bonus if hasattr(last, 'structural_bonus') else 0.0
+                    tfidf_score = (
+                        last.tfidf_score if hasattr(last, "tfidf_score") else 0.0
+                    )
+                    structural_bonus = (
+                        last.structural_bonus
+                        if hasattr(last, "structural_bonus")
+                        else 0.0
+                    )
             except Exception as e:
                 print(f"⚠️ TF-IDF 计算失败: {e}")
-        
+
         # Phase 3: 使用事务确保原子性
         with self.conn:
             # Bug 1 修复：查询是否已存在（区分 INSERT vs REPLACE）
@@ -463,20 +598,35 @@ class LobsterDatabase:
             )
             existing = self.cursor.fetchone()
             old_rowid = existing[0] if existing else None
-            
+
             # 执行 UPSERT
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 INSERT OR REPLACE INTO messages
                 (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
                  msg_type, tfidf_score, structural_bonus, compression_exempt)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (message_id, conversation_id, seq, role, content, token_count, created_at, metadata,
-                  msg_type, tfidf_score, structural_bonus, compression_exempt))
+            """,
+                (
+                    message_id,
+                    conversation_id,
+                    seq,
+                    role,
+                    content,
+                    token_count,
+                    created_at,
+                    metadata,
+                    msg_type,
+                    tfidf_score,
+                    structural_bonus,
+                    compression_exempt,
+                ),
+            )
 
             new_rowid = self.cursor.lastrowid
 
             # Fix 7: 更新本地计数器（Issue #174）
-            if role == 'user' and old_rowid is None:  # 只在新插入 user 消息时更新
+            if role == "user" and old_rowid is None:  # 只在新插入 user 消息时更新
                 if conversation_id in self._turn_counts:
                     self._turn_counts[conversation_id] += 1
                 # else: 没有缓存时不立即查询，等下次 get_turn_count 时再加载
@@ -488,18 +638,18 @@ class LobsterDatabase:
                 )
             self.cursor.execute(
                 "INSERT INTO messages_fts (rowid, message_id, content) VALUES (?, ?, ?)",
-                (new_rowid, message_id, content)
+                (new_rowid, message_id, content),
             )
-        
+
         return message_id
-    
+
     def get_messages(self, conversation_id: str, limit: int = None) -> List[Dict]:
         """获取对话的所有消息
-        
+
         Args:
             conversation_id: 对话 ID
             limit: 最大消息数
-        
+
         Returns:
             消息列表
         """
@@ -514,46 +664,47 @@ class LobsterDatabase:
         else:
             self.cursor.execute(query, (conversation_id,))
         rows = self.cursor.fetchall()
-        
-        return [self._row_to_dict(row, 'messages') for row in rows]
-    
+
+        return [self._row_to_dict(row, "messages") for row in rows]
+
     def get_messages_with_dynamic_score(
         self, conversation_id: str, current_time: datetime = None
     ) -> List[Dict]:
         """
         v2.6.0：获取消息列表，附带实时计算的动态重要性分数（遗忘曲线）
-        
+
         Args:
             conversation_id: 对话 ID
             current_time: 当前时间（用于测试）
-        
+
         Returns:
             带 dynamic_score 字段的消息列表
         """
         if current_time is None:
             current_time = datetime.utcnow()
-        
+
         messages = self.get_messages(conversation_id)
         for msg in messages:
-            msg['dynamic_score'] = self._compute_retention(msg, current_time)
-        
+            msg["dynamic_score"] = self._compute_retention(msg, current_time)
+
         return messages
-    
+
     def touch_message(self, message_id: str):
         """
         v4.0.0: 更新访问记录 + C-HLR+ 间隔重复稳定性增长
-        
+
         稳定性增长从固定 *1.3 改为对数增长：
         new_stability = old_stability * (1 + 0.5 / sqrt(access_count + 1))
         首次访问时增幅最大（+50%），随后收益递减（避免无限增长）
-        
+
         Ref: arXiv:2004.11327 — Adaptive Forgetting Curves
-        
+
         Args:
             message_id: 消息 ID
         """
         now = datetime.utcnow().isoformat()
-        self.cursor.execute("""
+        self.cursor.execute(
+            """
             UPDATE messages
             SET last_accessed_at = ?,
                 access_count = COALESCE(access_count, 0) + 1,
@@ -561,104 +712,120 @@ class LobsterDatabase:
                     1.0 + 0.5 / SQRT(COALESCE(access_count, 0) + 1.0)
                 )
             WHERE message_id = ?
-        """, (now, message_id))
+        """,
+            (now, message_id),
+        )
         self.conn.commit()
-    
-    def _compute_retention(self, msg: Dict, current_time: datetime) -> float:
+
+    def _compute_retention(
+        self, msg: Dict, current_time: datetime, half_life_override: float = None
+    ) -> float:
         """
-        v4.0.0: C-HLR+ 自适应遗忘曲线
-        
-        半衰期公式（复杂度驱动）：
-            h = base_h * (1 + α * complexity) * spaced_repetition_bonus
-        
-        保留概率：
-            R(t) = base_score * 2^(-delta_t / h)
-        
-        complexity = 词汇丰富度(0-1) × 句子数量因子 × 结构深度因子
-        spaced_repetition_bonus = 1 + 0.5 * log(1 + access_count)
-        
-        对比原实现：
-        - 原版：R(t) = base_score * e^(-t / stability)，stability 为固定常数
-        - v4.0：半衰期随内容复杂度动态调整，指数底数从 e 改为 2（更符合记忆研究惯例）
-        
+        v5.0: 双半衰期参数
+
+        Compression scoring (default, half_life_override=None):
+            使用 C-HLR+ 自适应半衰期算法
+            基础半衰期按消息类型区分，覆盖 3-120 天
+            在 leaf_compact 排序中，12h 窗口内保留率差异最大
+            这确保短半衰期内容（如 chitchat）优先进入压缩队列
+
+        Retrieval decay (half_life_override=336.0 for 14 days):
+            由 HybridRetriever._apply_retrieval_decay() 调用
+            Formula: score × (0.3 + 0.7 × 0.5^(t/14d))
+            α=0.3 地板值确保极老内容仍保留 30% 分数
+
         Ref: arXiv:2004.11327 — Adaptive Forgetting Curves for Spaced Repetition
-        
+
         Args:
             msg: 消息字典
             current_time: 当前时间
-        
+            half_life_override: 半衰期覆盖值（小时）
+                - None: 使用 C-HLR+ 压缩评分（默认）
+                - 336.0: 使用 14d 检索衰减公式
+
         Returns:
             动态保留率（0.0 - base_score）
         """
         # ── 基础半衰期（天），按消息类型，与 v2.6 保持一致 ──
         BASE_HALF_LIFE = {
-            'decision': 90.0,
-            'config':   120.0,
-            'code':     60.0,
-            'error':    30.0,
-            'chitchat': 3.0,
-            'question': 7.0,
-            'fact':     14.0,
-            'unknown':  14.0,
+            "decision": 90.0,
+            "config": 120.0,
+            "code": 60.0,
+            "error": 30.0,
+            "chitchat": 3.0,
+            "question": 7.0,
+            "fact": 14.0,
+            "unknown": 14.0,
         }
-        
+
         # ── Step 1: 基础参数 ──
-        base_score = msg.get('tfidf_score', 1.0) + msg.get('structural_bonus', 0.0)
+        base_score = msg.get("tfidf_score", 1.0) + msg.get("structural_bonus", 0.0)
         if base_score <= 0:
             base_score = 1.0
-        
-        msg_type = msg.get('msg_type', 'unknown')
-        base_h = BASE_HALF_LIFE.get(msg_type, 14.0)
-        
-        # ── Step 2: 内容复杂度因子（C-HLR+ 核心创新）──
-        content = msg.get('content', '')
-        if not isinstance(content, str):
-            content = str(content)
-        
-        complexity = self._compute_complexity(content)  # 返回 [0.0, 3.0]
-        alpha = 0.5  # 复杂度权重系数（论文推荐值）
-        
-        # ── Step 3: 间隔重复加成（已被 touch_message 动态更新）──
-        access_count = msg.get('access_count', 0) or 0
-        spaced_bonus = 1.0 + 0.5 * math.log1p(access_count)
-        
-        # ── Step 4: 自适应半衰期 ──
-        adaptive_h = base_h * (1.0 + alpha * complexity) * spaced_bonus
-        
-        # ── Step 5: 时间衰减（以 2 为底，符合记忆研究惯例）──
-        ref_time_str = msg.get('last_accessed_at') or msg.get('created_at', '')
+
+        # ── Step 2: 计算时间差 ──
+        ref_time_str = msg.get("last_accessed_at") or msg.get("created_at", "")
         try:
             ref_time = datetime.fromisoformat(ref_time_str)
-            delta_days = max((current_time - ref_time).total_seconds() / 86400.0, 0.0)
+            delta_hours = max((current_time - ref_time).total_seconds() / 3600.0, 0.0)
         except Exception:
-            delta_days = 0.0
-        
+            delta_hours = 0.0
+
         # compression_exempt 消息不衰减
-        if msg.get('compression_exempt'):
+        if msg.get("compression_exempt"):
             return base_score
-        
+
+        # ── 检索衰减模式（half_life_override=336.0 for 14 days）──
+        if half_life_override is not None:
+            alpha = 0.3  # 地板值
+            decay_factor = alpha + (1.0 - alpha) * math.pow(
+                0.5, delta_hours / half_life_override
+            )
+            return base_score * decay_factor
+
+        # ── C-HLR+ 压缩评分模式（默认）──
+        msg_type = msg.get("msg_type", "unknown")
+        base_h = BASE_HALF_LIFE.get(msg_type, 14.0)
+
+        # ── Step 3: 内容复杂度因子（C-HLR+ 核心创新）──
+        content = msg.get("content", "")
+        if not isinstance(content, str):
+            content = str(content)
+
+        complexity = self._compute_complexity(content)  # 返回 [0.0, 3.0]
+        alpha = 0.5  # 复杂度权重系数（论文推荐值）
+
+        # ── Step 4: 间隔重复加成（已被 touch_message 动态更新）──
+        access_count = msg.get("access_count", 0) or 0
+        spaced_bonus = 1.0 + 0.5 * math.log1p(access_count)
+
+        # ── Step 5: 自适应半衰期 ──
+        adaptive_h = base_h * (1.0 + alpha * complexity) * spaced_bonus
+
+        # ── Step 6: 时间衰减（以 2 为底，符合记忆研究惯例）──
+        delta_days = delta_hours / 24.0
         retention = base_score * math.pow(2.0, -delta_days / adaptive_h)
         return retention
-    
+
     def _compute_complexity(self, content: str) -> float:
         """
         v4.0.0: 计算文本复杂度分数（C-HLR+ 辅助方法）
-        
+
         三个维度的加权组合：
         1. 词汇丰富度 = unique_words / total_words（type-token ratio）
         2. 长度因子 = min(len(content) / 500, 1.0)（归一化到 [0,1]）
         3. 结构深度 = 是否含代码块/列表/嵌套结构
-        
+
         Returns:
             complexity in [0.0, 3.0]
-        
+
         Ref: arXiv:2004.11327
         """
         if not content or len(content) < 20:
             return 0.0
 
         # Fix 5: 中文文本复杂度加权（Issue #174）
-        zh_chars = sum(1 for c in content if '\u4e00' <= c <= '\u9fff')
+        zh_chars = sum(1 for c in content if "\u4e00" <= c <= "\u9fff")
         zh_ratio = zh_chars / len(content) if content else 0.0
 
         # 中文加权：汉字密度是英文的 2-3 倍
@@ -673,85 +840,90 @@ class LobsterDatabase:
 
         # 维度2：长度因子（中文加权）
         length_factor = min(len(content) / 500.0 * zh_weight, 1.0)
-        
+
         # 维度3：结构深度
         structure_score = 0.0
-        if '```' in content or '    ' in content:   # 代码块
+        if "```" in content or "    " in content:  # 代码块
             structure_score += 0.5
-        if any(content.count(marker) > 2 for marker in ['- ', '* ', '1. ']):  # 列表
+        if any(content.count(marker) > 2 for marker in ["- ", "* ", "1. "]):  # 列表
             structure_score += 0.3
-        if content.count('\n') > 5:  # 多段落
+        if content.count("\n") > 5:  # 多段落
             structure_score += 0.2
-        
+
         complexity = ttr + length_factor + min(structure_score, 1.0)
         return min(complexity, 3.0)  # 上限 3.0
-    
-    def remove_messages_from_context(self, conversation_id: str, message_ids: List[str]) -> int:
+
+    def remove_messages_from_context(
+        self, conversation_id: str, message_ids: List[str]
+    ) -> int:
         """从 context_items 中移除指定消息（light 去重策略使用）
-        
+
         注意：消息本体在 messages 表中永久保留（无损原则），只从上下文视图中移除。
-        
+
         Args:
             conversation_id: 对话 ID
             message_ids: 要移除的消息 ID 列表
-        
+
         Returns:
             实际移除的条数
         """
         if not message_ids:
             return 0
-        
-        placeholders = ','.join('?' * len(message_ids))
-        self.cursor.execute(f"""
+
+        placeholders = ",".join("?" * len(message_ids))
+        self.cursor.execute(
+            f"""
             DELETE FROM context_items
             WHERE conversation_id = ?
               AND item_type = 'message'
               AND item_id IN ({placeholders})
-        """, [conversation_id] + message_ids)
-        
+        """,
+            [conversation_id] + message_ids,
+        )
+
         removed_count = self.cursor.rowcount
         self.conn.commit()
         return removed_count
-    
+
     def get_exempt_message_ids(self, conversation_id: str) -> List[str]:
         """获取对话中所有 compression_exempt=1 的消息 ID
-        
+
         Args:
             conversation_id: 对话 ID
-        
+
         Returns:
             exempt 消息 ID 列表
         """
         self.cursor.execute(
             "SELECT message_id FROM messages WHERE conversation_id = ? AND compression_exempt = 1",
-            (conversation_id,)
+            (conversation_id,),
         )
         return [row[0] for row in self.cursor.fetchall()]
-    
+
     # ==================== 摘要操作 ====================
-    
+
     def save_summary(self, summary: Dict) -> str:
         """保存摘要（DAG 节点）
-        
+
         Args:
             summary: 摘要对象
-        
+
         Returns:
             summary_id
         """
-        summary_id = summary.get('summary_id') or self._generate_id('sum')
-        conversation_id = summary['conversation_id']
-        kind = summary['kind']  # 'leaf' or 'condensed'
-        depth = summary['depth']
-        content = summary['content']
+        summary_id = summary.get("summary_id") or self._generate_id("sum")
+        conversation_id = summary["conversation_id"]
+        kind = summary["kind"]  # 'leaf' or 'condensed'
+        depth = summary["depth"]
+        content = summary["content"]
         token_count = self._estimate_tokens(content)
-        earliest_at = summary.get('earliest_at')
-        latest_at = summary.get('latest_at')
-        descendant_count = summary.get('descendant_count', 0)
+        earliest_at = summary.get("earliest_at")
+        latest_at = summary.get("latest_at")
+        descendant_count = summary.get("descendant_count", 0)
         created_at = datetime.utcnow().isoformat()
-        r3_layer = summary.get('r3_layer', 1)  # v4.0.0: R³Mem 层级
-        memory_tier = summary.get('memory_tier', 'episodic')  # v3.6.0: 记忆层级
-        
+        r3_layer = summary.get("r3_layer", 1)  # v4.0.0: R³Mem 层级
+        memory_tier = summary.get("memory_tier", "episodic")  # v3.6.0: 记忆层级
+
         # v4.0.3: 使用事务保护，确保 FTS 与主表写入原子性（Issue #137 New Bug 2）
         with self.conn:
             # Bug 1 修复：查询是否已存在
@@ -760,20 +932,34 @@ class LobsterDatabase:
             )
             existing = self.cursor.fetchone()
             old_rowid = existing[0] if existing else None
-            
+
             # 执行 UPSERT（v4.0.2: 补充 r3_layer 和 memory_tier）
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 INSERT OR REPLACE INTO summaries 
                 (summary_id, conversation_id, kind, depth, content, token_count, 
                  earliest_at, latest_at, descendant_count, created_at,
                  r3_layer, memory_tier)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (summary_id, conversation_id, kind, depth, content, token_count,
-                  earliest_at, latest_at, descendant_count, created_at,
-                  r3_layer, memory_tier))
-            
+            """,
+                (
+                    summary_id,
+                    conversation_id,
+                    kind,
+                    depth,
+                    content,
+                    token_count,
+                    earliest_at,
+                    latest_at,
+                    descendant_count,
+                    created_at,
+                    r3_layer,
+                    memory_tier,
+                ),
+            )
+
             new_rowid = self.cursor.lastrowid
-            
+
             # 维护 FTS5 索引：先删旧，再插新
             if old_rowid is not None:
                 self.cursor.execute(
@@ -781,57 +967,113 @@ class LobsterDatabase:
                 )
             self.cursor.execute(
                 "INSERT INTO summaries_fts (rowid, summary_id, content) VALUES (?, ?, ?)",
-                (new_rowid, summary_id, content)
+                (new_rowid, summary_id, content),
             )
-            
+
             # 保存关系
-            if kind == 'leaf':
+            if kind == "leaf":
                 # 叶子摘要：关联消息
-                for msg_id in summary.get('source_messages', []):
-                    self.cursor.execute("""
+                for msg_id in summary.get("source_messages", []):
+                    self.cursor.execute(
+                        """
                         INSERT OR IGNORE INTO summary_messages (summary_id, message_id)
                         VALUES (?, ?)
-                    """, (summary_id, msg_id))
+                    """,
+                        (summary_id, msg_id),
+                    )
             else:
                 # 压缩摘要：关联父摘要
-                for parent_id in summary.get('parent_summaries', []):
-                    self.cursor.execute("""
+                for parent_id in summary.get("parent_summaries", []):
+                    self.cursor.execute(
+                        """
                         INSERT OR IGNORE INTO summary_parents (summary_id, parent_summary_id)
                         VALUES (?, ?)
-                    """, (summary_id, parent_id))
-        
+                    """,
+                        (summary_id, parent_id),
+                    )
+
         return summary_id
-    
+
     def get_summaries(self, conversation_id: str, depth: int = None) -> List[Dict]:
         """获取对话的摘要
-        
+
         Args:
             conversation_id: 对话 ID
             depth: 摘要深度（None = 所有深度）
-        
+
         Returns:
             摘要列表
         """
         if depth is not None:
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 SELECT * FROM summaries 
                 WHERE conversation_id = ? AND depth = ?
                 ORDER BY created_at ASC
-            """, (conversation_id, depth))
+            """,
+                (conversation_id, depth),
+            )
         else:
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 SELECT * FROM summaries 
                 WHERE conversation_id = ?
                 ORDER BY depth ASC, created_at ASC
-            """, (conversation_id,))
-        
+            """,
+                (conversation_id,),
+            )
+
         rows = self.cursor.fetchall()
-        return [self._row_to_dict(row, 'summaries') for row in rows]
-    
+        return [self._row_to_dict(row, "summaries") for row in rows]
+
     # ==================== 搜索操作 ====================
 
-    def search_messages(self, query: str, conversation_id: str = None, limit: int = 50,
-                       cross_namespace: bool = False) -> List[Dict]:
+    def set_owner(self, owner: str):
+        """设置当前数据库连接的 owner
+
+        Args:
+            owner: 所有者 ID (如 'agent:123' 或 'default')
+        """
+        self.owner = owner
+
+    def _owner_filter(self) -> tuple:
+        """返回 owner 过滤的 SQL 片段和参数
+
+        Returns:
+            (sql_fragment, params_tuple)
+            自动包含 public 记忆
+        """
+        return "(owner = ? OR owner = 'public')", (self.owner,)
+
+    def _apply_owner_filter(self, base_sql: str, params: list = None) -> tuple:
+        """为 SQL 查询应用 owner 过滤
+
+        Args:
+            base_sql: 基础 SQL（不含 WHERE 或已有 WHERE）
+            params: 现有参数列表
+
+        Returns:
+            (sql_with_filter, all_params)
+        """
+        if params is None:
+            params = []
+
+        filter_sql, filter_params = self._owner_filter()
+
+        if "WHERE" in base_sql.upper():
+            sql = f"{base_sql} AND {filter_sql}"
+        else:
+            sql = f"{base_sql} WHERE {filter_sql}"
+
+        return sql, params + list(filter_params)
+
+    def search_messages(
+        self,
+        query: str,
+        conversation_id: str = None,
+        limit: int = 50,
+        cross_namespace: bool = False,
+    ) -> List[Dict]:
         """搜索消息 - 借鉴 lcm_grep
 
         v3.6.0: 新增 cross_namespace 参数（Issue #127 模块四）
@@ -847,7 +1089,9 @@ class LobsterDatabase:
         """
         if conversation_id:
             # v3.6.0: 按 conversation_id 和 namespace 过滤
-            self.cursor.execute("""
+            # v5.0.0: 添加 owner 过滤
+            self.cursor.execute(
+                """
                 SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
                 FROM messages m
                 JOIN messages_fts fts ON m.id = fts.rowid
@@ -855,27 +1099,47 @@ class LobsterDatabase:
                 WHERE messages_fts MATCH ?
                   AND m.conversation_id = ?
                   AND (? OR c.namespace = ?)
+                  AND (m.owner = ? OR m.owner = 'public')
                 ORDER BY rank
                 LIMIT ?
-            """, (query, conversation_id, cross_namespace, self.namespace, limit))
+            """,
+                (
+                    query,
+                    conversation_id,
+                    cross_namespace,
+                    self.namespace,
+                    self.owner,
+                    limit,
+                ),
+            )
         else:
             # v3.6.0: 按 namespace 过滤
-            self.cursor.execute("""
+            # v5.0.0: 添加 owner 过滤
+            self.cursor.execute(
+                """
                 SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
                 FROM messages m
                 JOIN messages_fts fts ON m.id = fts.rowid
                 JOIN conversations c ON m.conversation_id = c.conversation_id
                 WHERE messages_fts MATCH ?
                   AND (? OR c.namespace = ?)
+                  AND (m.owner = ? OR m.owner = 'public')
                 ORDER BY rank
                 LIMIT ?
-            """, (query, cross_namespace, self.namespace, limit))
+            """,
+                (query, cross_namespace, self.namespace, self.owner, limit),
+            )
 
         rows = self.cursor.fetchall()
-        return [self._row_to_dict(row, 'messages') for row in rows]
+        return [self._row_to_dict(row, "messages") for row in rows]
 
-    def search_summaries(self, query: str, conversation_id: str = None, limit: int = 50,
-                        cross_namespace: bool = False) -> List[Dict]:
+    def search_summaries(
+        self,
+        query: str,
+        conversation_id: str = None,
+        limit: int = 50,
+        cross_namespace: bool = False,
+    ) -> List[Dict]:
         """搜索摘要 - 借鉴 lcm_grep
 
         v3.6.0: 新增 cross_namespace 参数（Issue #127 模块四）
@@ -891,7 +1155,9 @@ class LobsterDatabase:
         """
         if conversation_id:
             # v3.6.0: 按 conversation_id 和 namespace 过滤
-            self.cursor.execute("""
+            # v5.0.0: 添加 owner 过滤
+            self.cursor.execute(
+                """
                 SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
                 FROM summaries s
                 JOIN summaries_fts fts ON s.id = fts.rowid
@@ -899,30 +1165,187 @@ class LobsterDatabase:
                 WHERE summaries_fts MATCH ?
                   AND s.conversation_id = ?
                   AND (? OR c.namespace = ?)
+                  AND (s.owner = ? OR s.owner = 'public')
                 ORDER BY rank
                 LIMIT ?
-            """, (query, conversation_id, cross_namespace, self.namespace, limit))
+            """,
+                (
+                    query,
+                    conversation_id,
+                    cross_namespace,
+                    self.namespace,
+                    self.owner,
+                    limit,
+                ),
+            )
         else:
             # v3.6.0: 按 namespace 过滤
-            self.cursor.execute("""
+            # v5.0.0: 添加 owner 过滤
+            self.cursor.execute(
+                """
                 SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
                 FROM summaries s
                 JOIN summaries_fts fts ON s.id = fts.rowid
                 JOIN conversations c ON s.conversation_id = c.conversation_id
                 WHERE summaries_fts MATCH ?
                   AND (? OR c.namespace = ?)
+                  AND (s.owner = ? OR s.owner = 'public')
                 ORDER BY rank
                 LIMIT ?
-            """, (query, cross_namespace, self.namespace, limit))
+            """,
+                (query, cross_namespace, self.namespace, self.owner, limit),
+            )
 
         rows = self.cursor.fetchall()
-        return [self._row_to_dict(row, 'summaries') for row in rows]
+        return [self._row_to_dict(row, "summaries") for row in rows]
 
-    def get_context_by_tier(
-        self,
-        conversation_id: str,
-        tiers: list = None
-    ) -> dict:
+    # ==================== 技能操作 ====================
+
+    def save_skill(self, skill: "Skill") -> str:
+        """保存技能到数据库
+
+        Args:
+            skill: Skill 数据模型实例
+
+        Returns:
+            skill_id
+        """
+        now = datetime.utcnow().isoformat()
+
+        self.cursor.execute(
+            """
+            INSERT OR REPLACE INTO skills
+            (skill_id, name, description, owner, visibility, quality_score,
+             current_version, steps, warnings, script, source_task_ids,
+             created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+            (
+                skill.skill_id,
+                skill.name,
+                skill.description,
+                skill.owner,
+                skill.visibility,
+                skill.quality_score,
+                skill.version,
+                json.dumps(skill.steps, ensure_ascii=False),
+                json.dumps(skill.warnings, ensure_ascii=False),
+                skill.script,
+                json.dumps(skill.source_task_ids, ensure_ascii=False),
+                skill.created_at or now,
+                now,
+            ),
+        )
+        self.conn.commit()
+        return skill.skill_id
+
+    def get_skill(self, skill_id: str) -> Optional[Dict]:
+        """获取技能详情"""
+        self.cursor.execute("SELECT * FROM skills WHERE skill_id = ?", (skill_id,))
+        row = self.cursor.fetchone()
+        if not row:
+            return None
+        return self._row_to_dict(row, "skills")
+
+    def search_skills(
+        self, query: str, owner: str = None, visibility: str = None, limit: int = 20
+    ) -> List[Dict]:
+        """搜索技能 (FTS5)
+
+        Args:
+            query: 搜索关键词
+            owner: 过滤所有者 (可选)
+            visibility: 过滤可见性 (可选)
+            limit: 返回数量限制
+
+        Returns:
+            匹配的技能列表
+        """
+        if not query or query.strip() == "*":
+            sql = "SELECT s.* FROM skills s WHERE 1=1"
+            params = []
+        else:
+            sql = """
+                SELECT s.*, snippet(skills_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                FROM skills s
+                JOIN skills_fts fts ON s.id = fts.rowid
+                WHERE skills_fts MATCH ?
+            """
+            params = [query]
+
+        if owner:
+            sql += " AND s.owner = ?"
+            params.append(owner)
+
+        if visibility:
+            sql += " AND s.visibility = ?"
+            params.append(visibility)
+
+        sql += " ORDER BY s.quality_score DESC LIMIT ?"
+        params.append(limit)
+
+        self.cursor.execute(sql, params)
+        rows = self.cursor.fetchall()
+        return [self._row_to_dict(row, "skills") for row in rows]
+
+    def get_skills_by_owner(
+        self, owner: str, include_public: bool = True
+    ) -> List[Dict]:
+        """获取指定所有者的技能
+
+        Args:
+            owner: 所有者 ID
+            include_public: 是否包含公共技能
+
+        Returns:
+            技能列表
+        """
+        if include_public:
+            self.cursor.execute(
+                """
+                SELECT * FROM skills
+                WHERE owner = ? OR visibility = 'public'
+                ORDER BY quality_score DESC
+            """,
+                (owner,),
+            )
+        else:
+            self.cursor.execute(
+                """
+                SELECT * FROM skills WHERE owner = ?
+                ORDER BY quality_score DESC
+            """,
+                (owner,),
+            )
+
+        rows = self.cursor.fetchall()
+        return [self._row_to_dict(row, "skills") for row in rows]
+
+    def save_task_skill(self, task_id: str, skill_id: str) -> None:
+        """保存任务-技能关联"""
+        self.cursor.execute(
+            """
+            INSERT OR IGNORE INTO task_skills (task_id, skill_id) VALUES (?, ?)
+        """,
+            (task_id, skill_id),
+        )
+        self.conn.commit()
+
+    def save_skill_version(
+        self, skill_id: str, version: int, content: str, quality_score: float
+    ) -> None:
+        """保存技能版本"""
+        now = datetime.utcnow().isoformat()
+        self.cursor.execute(
+            """
+            INSERT INTO skill_versions (skill_id, version, content, quality_score, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+            (skill_id, version, content, quality_score, now),
+        )
+        self.conn.commit()
+
+    def get_context_by_tier(self, conversation_id: str, tiers: list = None) -> dict:
         """v3.6.0: 按记忆层级获取上下文内容（Issue #127 模块一）
 
         Args:
@@ -936,10 +1359,10 @@ class LobsterDatabase:
                 'semantic': [condensed 高层摘要]
             }
         """
-        tiers = tiers or ['working', 'episodic', 'semantic']
+        tiers = tiers or ["working", "episodic", "semantic"]
         result = {}
 
-        if 'working' in tiers:
+        if "working" in tiers:
             # 最近 20 条未被压缩的消息（working 层）
             # v4.0.85: 修复排序方式，从 seq DESC 改为 created_at DESC，确保用户输入不被截断
             working = self._execute_fetch_all(
@@ -947,31 +1370,31 @@ class LobsterDatabase:
                    WHERE conversation_id = ? AND memory_tier = 'working'
                    ORDER BY created_at DESC LIMIT 20""",
                 (conversation_id,),
-                table='messages'
+                table="messages",
             )
-            result['working'] = working
+            result["working"] = working
 
-        if 'episodic' in tiers:
+        if "episodic" in tiers:
             # DAG 叶节点摘要（episodic 层）
             episodic = self._execute_fetch_all(
                 """SELECT * FROM summaries
                    WHERE conversation_id = ? AND memory_tier = 'episodic'
                    ORDER BY created_at DESC LIMIT 10""",
                 (conversation_id,),
-                table='summaries'
+                table="summaries",
             )
-            result['episodic'] = episodic
+            result["episodic"] = episodic
 
-        if 'semantic' in tiers:
+        if "semantic" in tiers:
             # condensed 高层摘要（semantic 层）
             semantic = self._execute_fetch_all(
                 """SELECT * FROM summaries
                    WHERE conversation_id = ? AND memory_tier = 'semantic'
                    ORDER BY created_at DESC LIMIT 5""",
                 (conversation_id,),
-                table='summaries'
+                table="summaries",
             )
-            result['semantic'] = semantic
+            result["semantic"] = semantic
 
         return result
 
@@ -982,7 +1405,7 @@ class LobsterDatabase:
         correction_type: str,
         old_value: str,
         new_value: str,
-        reason: str = None
+        reason: str = None,
     ) -> dict:
         """v3.6.0: 应用记忆纠错（Issue #127 模块三）
 
@@ -1008,49 +1431,79 @@ class LobsterDatabase:
         # v4.0.3: 使用整体事务保护，纠错日志与修改原子提交（Issue #137 New Bug 3）
         with self.conn:
             # 记录纠错（直接带 applied_at，避免两次 UPDATE）
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 INSERT INTO corrections 
                 (correction_id, target_type, target_id, correction_type, old_value, new_value, reason, created_at, applied_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (correction_id, target_type, target_id, correction_type, old_value, new_value, reason, created_at, applied_at))
+            """,
+                (
+                    correction_id,
+                    target_type,
+                    target_id,
+                    correction_type,
+                    old_value,
+                    new_value,
+                    reason,
+                    created_at,
+                    applied_at,
+                ),
+            )
 
             # 应用纠错
-            table = 'messages' if target_type == 'message' else 'summaries'
-            id_field = 'message_id' if target_type == 'message' else 'summary_id'
-            fts_table = 'messages_fts' if target_type == 'message' else 'summaries_fts'
+            table = "messages" if target_type == "message" else "summaries"
+            id_field = "message_id" if target_type == "message" else "summary_id"
+            fts_table = "messages_fts" if target_type == "message" else "summaries_fts"
 
-            if correction_type == 'delete':
+            if correction_type == "delete":
                 # 先查 rowid（Issue #129 Bug 3 修复）
-                self.cursor.execute(f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,))
+                self.cursor.execute(
+                    f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,)
+                )
                 row = self.cursor.fetchone()
                 if row:
                     # 删除 FTS 索引
-                    self.cursor.execute(f"DELETE FROM {fts_table} WHERE rowid = ?", (row[0],))
+                    self.cursor.execute(
+                        f"DELETE FROM {fts_table} WHERE rowid = ?", (row[0],)
+                    )
                 # 删除主表记录
-                self.cursor.execute(f"DELETE FROM {table} WHERE {id_field} = ?", (target_id,))
-            elif correction_type == 'content':
+                self.cursor.execute(
+                    f"DELETE FROM {table} WHERE {id_field} = ?", (target_id,)
+                )
+            elif correction_type == "content":
                 # 先查 rowid（Issue #129 Bug 4 修复）
-                self.cursor.execute(f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,))
+                self.cursor.execute(
+                    f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,)
+                )
                 row = self.cursor.fetchone()
                 if row:
                     old_rowid = row[0]
                     # 更新主表内容
-                    self.cursor.execute(f"UPDATE {table} SET content = ? WHERE {id_field} = ?",
-                                        (new_value, target_id))
+                    self.cursor.execute(
+                        f"UPDATE {table} SET content = ? WHERE {id_field} = ?",
+                        (new_value, target_id),
+                    )
                     # 同步 FTS：删除旧记录
-                    self.cursor.execute(f"DELETE FROM {fts_table} WHERE rowid = ?", (old_rowid,))
+                    self.cursor.execute(
+                        f"DELETE FROM {fts_table} WHERE rowid = ?", (old_rowid,)
+                    )
                     # 插入新记录
                     self.cursor.execute(
                         f"INSERT INTO {fts_table} (rowid, {id_field}, content) VALUES (?, ?, ?)",
-                        (old_rowid, target_id, new_value)
+                        (old_rowid, target_id, new_value),
                     )
                 else:
                     # 如果记录不存在，只更新主表
-                    self.cursor.execute(f"UPDATE {table} SET content = ? WHERE {id_field} = ?",
-                                        (new_value, target_id))
-            elif correction_type == 'metadata':
+                    self.cursor.execute(
+                        f"UPDATE {table} SET content = ? WHERE {id_field} = ?",
+                        (new_value, target_id),
+                    )
+            elif correction_type == "metadata":
                 # 修改元数据
-                self.cursor.execute(f"UPDATE {table} SET metadata = ? WHERE {id_field} = ?", (new_value, target_id))
+                self.cursor.execute(
+                    f"UPDATE {table} SET metadata = ? WHERE {id_field} = ?",
+                    (new_value, target_id),
+                )
 
         return {
             "correction_id": correction_id,
@@ -1058,7 +1511,7 @@ class LobsterDatabase:
             "target_id": target_id,
             "correction_type": correction_type,
             "applied_at": applied_at,
-            "success": True
+            "success": True,
         }
 
     def upsert_entity(
@@ -1067,7 +1520,7 @@ class LobsterDatabase:
         entity_name: str,
         entity_type: str,
         message_ids: List[str],
-        namespace: str = 'default'
+        namespace: str = "default",
     ) -> str:
         """v4.0.0: 插入或更新实体记录，关联消息（R³Mem 模块四）
 
@@ -1089,9 +1542,10 @@ class LobsterDatabase:
         # v4.0.3: 改用 SHA-256[:24] 恢复幂等性（Issue #137 New Bug 1）
         # 兼顾无碰撞（96 bit）和幂等性（相同输入产生相同 ID）
         entity_id = f"ent_{hashlib.sha256((namespace + conversation_id + entity_name).encode()).hexdigest()[:24]}"
-        
+
         # 插入或更新实体
-        self.cursor.execute("""
+        self.cursor.execute(
+            """
             INSERT INTO entities
                 (entity_id, conversation_id, namespace, entity_type, entity_name,
                  first_seen_at, last_seen_at, mention_count)
@@ -1099,19 +1553,35 @@ class LobsterDatabase:
             ON CONFLICT(entity_id) DO UPDATE SET
                 last_seen_at = excluded.last_seen_at,
                 mention_count = mention_count + ?
-        """, (entity_id, conversation_id, namespace, entity_type, entity_name,
-              now, now, len(message_ids), len(message_ids)))
-        
+        """,
+            (
+                entity_id,
+                conversation_id,
+                namespace,
+                entity_type,
+                entity_name,
+                now,
+                now,
+                len(message_ids),
+                len(message_ids),
+            ),
+        )
+
         # 关联消息
         for msg_id in message_ids:
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 INSERT OR IGNORE INTO entity_mentions (entity_id, message_id) VALUES (?, ?)
-            """, (entity_id, msg_id))
-        
+            """,
+                (entity_id, msg_id),
+            )
+
         self.conn.commit()
         return entity_id
 
-    def sweep_decayed_messages(self, conversation_id: str, days_threshold: int = 30) -> dict:
+    def sweep_decayed_messages(
+        self, conversation_id: str, days_threshold: int = 30
+    ) -> dict:
         """v4.0.96: 基于 C-HLR+ 遗忘曲线的衰减清理
 
         使用 C-HLR+ 算法计算记忆保留率，将低保留率的消息标记为 decayed。
@@ -1133,7 +1603,8 @@ class LobsterDatabase:
         protect_cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
 
         # 查找候选消息（增加 conversation_id 过滤 + 近期保护）
-        self.cursor.execute("""
+        self.cursor.execute(
+            """
             SELECT message_id, token_count, tfidf_score, access_count, 
                    last_accessed_at, created_at, content, metadata, memory_tier
             FROM messages
@@ -1144,49 +1615,60 @@ class LobsterDatabase:
               AND memory_tier != 'decayed'
             ORDER BY tfidf_score ASC, last_accessed_at ASC
             LIMIT 100
-        """, (conversation_id, cutoff_date, protect_cutoff))
+        """,
+            (conversation_id, cutoff_date, protect_cutoff),
+        )
 
         rows = self.cursor.fetchall()
-        
+
         if not rows:
             return {
                 "swept_count": 0,
                 "candidates": 0,
                 "days_threshold": days_threshold,
                 "cutoff_date": cutoff_date,
-                "algorithm": "C-HLR+ v4.0.96"
+                "algorithm": "C-HLR+ v4.0.96",
             }
 
         # 使用 C-HLR+ 算法计算保留率
         scorer = CHLRScorer()
         candidates = []
-        
+
         for row in rows:
-            (message_id, token_count, tfidf_score, access_count, 
-             last_accessed_at, created_at, content, metadata, memory_tier) = row
-            
+            (
+                message_id,
+                token_count,
+                tfidf_score,
+                access_count,
+                last_accessed_at,
+                created_at,
+                content,
+                metadata,
+                memory_tier,
+            ) = row
+
             message = {
-                'message_id': message_id,
-                'token_count': token_count or 0,
-                'tfidf_score': tfidf_score or 0.0,
-                'access_count': access_count or 0,
-                'last_accessed_at': last_accessed_at or created_at,
-                'created_at': created_at,
-                'content': content,
-                'metadata': metadata,
-                'memory_tier': memory_tier,
+                "message_id": message_id,
+                "token_count": token_count or 0,
+                "tfidf_score": tfidf_score or 0.0,
+                "access_count": access_count or 0,
+                "last_accessed_at": last_accessed_at or created_at,
+                "created_at": created_at,
+                "content": content,
+                "metadata": metadata,
+                "memory_tier": memory_tier,
             }
-            
+
             # 计算半衰期和保留率
             half_life = scorer.calculate_half_life(message)
             retention = scorer.calculate_retention(message)
-            
+
             # 更新 half_life 字段
             self.cursor.execute(
                 "UPDATE messages SET half_life = ? WHERE message_id = ?",
-                (half_life, message_id)
+                (half_life, message_id),
             )
-            
+
             # 如果保留率 < 0.3，则标记为 decayed
             if scorer.should_decay(message, threshold=0.3):
                 candidates.append(message_id)
@@ -1198,17 +1680,17 @@ class LobsterDatabase:
                 "candidates": len(rows),
                 "days_threshold": days_threshold,
                 "cutoff_date": cutoff_date,
-                "algorithm": "C-HLR+ v4.0.96"
+                "algorithm": "C-HLR+ v4.0.96",
             }
 
         # 无损删除：只从 context_items 移除（参考 remove_messages_from_context）
         swept_count = self.remove_messages_from_context(conversation_id, candidates)
 
         # 标记 memory_tier 为 decayed（可查询，不物理删除）
-        placeholders = ','.join('?' * len(candidates))
+        placeholders = ",".join("?" * len(candidates))
         self.cursor.execute(
             f"UPDATE messages SET memory_tier = 'decayed' WHERE message_id IN ({placeholders})",
-            candidates
+            candidates,
         )
 
         self.conn.commit()
@@ -1219,7 +1701,7 @@ class LobsterDatabase:
             "decayed_count": len(candidates),
             "days_threshold": days_threshold,
             "cutoff_date": cutoff_date,
-            "algorithm": "C-HLR+ v4.0.96"
+            "algorithm": "C-HLR+ v4.0.96",
         }
 
     # ==================== 工具操作 ====================
@@ -1240,7 +1722,7 @@ class LobsterDatabase:
         summaries = self._execute_fetch_all(
             "SELECT * FROM summaries WHERE summary_id = ?",
             (summary_id,),
-            table='summaries'
+            table="summaries",
         )
 
         if not summaries:
@@ -1249,14 +1731,14 @@ class LobsterDatabase:
         summary = summaries[0]
 
         # 获取子节点（使用安全方法）
-        if summary['kind'] == 'leaf':
+        if summary["kind"] == "leaf":
             children = self._execute_fetch_all(
                 """SELECT m.* FROM messages m
                    JOIN summary_messages sm ON m.message_id = sm.message_id
                    WHERE sm.summary_id = ?
                    ORDER BY m.seq ASC""",
                 (summary_id,),
-                table='messages'
+                table="messages",
             )
         else:
             children = self._execute_fetch_all(
@@ -1265,19 +1747,16 @@ class LobsterDatabase:
                    WHERE sp.summary_id = ?
                    ORDER BY s.created_at ASC""",
                 (summary_id,),
-                table='summaries'
+                table="summaries",
             )
 
-        summary['children'] = children
-        summary['children_count'] = len(children)
+        summary["children"] = children
+        summary["children_count"] = len(children)
 
         return summary
-    
+
     def expand_summary(
-        self,
-        summary_id: str,
-        target_layer: int = 1,
-        entity_filter: str = None
+        self, summary_id: str, target_layer: int = 1, entity_filter: str = None
     ) -> List[Dict]:
         """v4.0.0: R³Mem 可逆三层展开
 
@@ -1304,18 +1783,18 @@ class LobsterDatabase:
 
         # Layer 1: document-level（返回子摘要列表，原有行为）
         if target_layer == 1:
-            if summary['kind'] == 'leaf':
-                return summary['children']  # 返回源消息
-            return summary['children']      # 返回子摘要（原逻辑）
+            if summary["kind"] == "leaf":
+                return summary["children"]  # 返回源消息
+            return summary["children"]  # 返回子摘要（原逻辑）
 
         # Layer 2: paragraph-level（递归展开到原始消息）
         if target_layer == 2:
-            if summary['kind'] == 'leaf':
-                return summary['children']
+            if summary["kind"] == "leaf":
+                return summary["children"]
             all_messages = []
-            for child in summary['children']:
-                child_id = child.get('summary_id') or child.get('message_id')
-                if child.get('summary_id'):
+            for child in summary["children"]:
+                child_id = child.get("summary_id") or child.get("message_id")
+                if child.get("summary_id"):
                     all_messages.extend(self.expand_summary(child_id, target_layer=2))
                 else:
                     all_messages.append(child)
@@ -1327,13 +1806,16 @@ class LobsterDatabase:
             if not entity_filter:
                 return all_messages
             # 过滤与实体相关的消息
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 SELECT em.message_id FROM entity_mentions em
                 JOIN entities e ON em.entity_id = e.entity_id
                 WHERE e.entity_name LIKE ?
-            """, (f'%{entity_filter}%',))
+            """,
+                (f"%{entity_filter}%",),
+            )
             relevant_ids = {row[0] for row in self.cursor.fetchall()}
-            return [m for m in all_messages if m.get('message_id') in relevant_ids]
+            return [m for m in all_messages if m.get("message_id") in relevant_ids]
 
         return []
 
@@ -1355,7 +1837,7 @@ class LobsterDatabase:
         # 没有缓存，从数据库加载
         self.cursor.execute(
             "SELECT COUNT(*) FROM messages WHERE conversation_id = ? AND role = 'user'",
-            (conversation_id,)
+            (conversation_id,),
         )
         result = self.cursor.fetchone()
         count = result[0] if result else 0
@@ -1365,241 +1847,370 @@ class LobsterDatabase:
         return count
 
     # ==================== 辅助方法 ====================
-    
+
     def _generate_id(self, prefix: str) -> str:
         """生成唯一 ID
-        
+
         Args:
             prefix: ID 前缀（'msg', 'sum' 等）
-        
+
         Returns:
             唯一 ID
         """
         # Bug 4 修复：使用 uuid4 避免批量调用时的碰撞
         return f"{prefix}_{uuid.uuid4().hex[:16]}"
-    
+
     def _extract_content(self, message: Dict) -> str:
         """提取消息内容
-        
+
         Args:
             message: 消息对象
-        
+
         Returns:
             文本内容
         """
-        content = message.get('content', [])
-        
+        content = message.get("content", [])
+
         if isinstance(content, str):
             return content
-        
+
         if isinstance(content, list):
             texts = []
             for block in content:
                 if isinstance(block, dict):
-                    if block.get('type') == 'text':
-                        texts.append(block.get('text', ''))
-                    elif block.get('type') == 'toolResult':
+                    if block.get("type") == "text":
+                        texts.append(block.get("text", ""))
+                    elif block.get("type") == "toolResult":
                         texts.append(f"[Tool Result: {block.get('name', 'unknown')}]")
-                    elif block.get('type') == 'toolCall':
+                    elif block.get("type") == "toolCall":
                         texts.append(f"[Tool Call: {block.get('name', 'unknown')}]")
-                    elif block.get('type') == 'thinking':
+                    elif block.get("type") == "thinking":
                         texts.append(f"[Thinking]")
-            return '\n'.join(texts)
-        
+            return "\n".join(texts)
+
         return str(content)
-    
+
     def _estimate_tokens(self, text: str) -> int:
         """估算 token 数量
-        
+
         Args:
             text: 文本内容
-        
+
         Returns:
             token 数量
         """
         # 简单估算：英文 4 字符 = 1 token，中文 1.5 字符 = 1 token
         char_count = len(text)
-        chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+        chinese_chars = sum(1 for c in text if "\u4e00" <= c <= "\u9fff")
         english_chars = char_count - chinese_chars
 
         tokens = (english_chars / 4) + (chinese_chars / 1.5)
         return int(tokens)
 
-    def _execute_fetch_all(self, sql: str, params: tuple = (), table: str = None) -> List[Dict]:
+    def _execute_fetch_all(
+        self, sql: str, params: tuple = (), table: str = None
+    ) -> List[Dict]:
         """v3.6.0: 安全的查询方法，修复 Issue #126 Bug 3
-        
+
         在 execute 后立即保存 description，避免递归调用时光标竞争。
-        
+
         Args:
             sql: SQL 查询语句
             params: 查询参数
             table: 表名（仅用于 fallback）
-        
+
         Returns:
             字典列表
         """
         self.cursor.execute(sql, params)
-        
+
         # 立即保存 description（关键修复！）
-        if hasattr(self.cursor, 'description') and self.cursor.description:
+        if hasattr(self.cursor, "description") and self.cursor.description:
             columns = [desc[0] for desc in self.cursor.description]
         else:
             # Fallback: 使用硬编码列表
-            if table == 'messages':
-                columns = ['id', 'message_id', 'conversation_id', 'seq', 'role',
-                          'content', 'token_count', 'created_at', 'metadata',
-                          'msg_type', 'tfidf_score', 'structural_bonus', 'compression_exempt',
-                          'last_accessed_at', 'access_count', 'stability',
-                          'memory_tier']  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
-            elif table == 'summaries':
-                columns = ['id', 'summary_id', 'conversation_id', 'kind', 'depth',
-                          'content', 'token_count', 'earliest_at', 'latest_at',
-                          'descendant_count', 'created_at',
-                          'memory_tier',  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
-                          'r3_layer']     # v4.0.2: 添加 r3_layer（Issue #136 Bug 2）
+            if table == "messages":
+                columns = [
+                    "id",
+                    "message_id",
+                    "conversation_id",
+                    "seq",
+                    "role",
+                    "content",
+                    "token_count",
+                    "created_at",
+                    "metadata",
+                    "msg_type",
+                    "tfidf_score",
+                    "structural_bonus",
+                    "compression_exempt",
+                    "last_accessed_at",
+                    "access_count",
+                    "stability",
+                    "memory_tier",
+                ]  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
+            elif table == "summaries":
+                columns = [
+                    "id",
+                    "summary_id",
+                    "conversation_id",
+                    "kind",
+                    "depth",
+                    "content",
+                    "token_count",
+                    "earliest_at",
+                    "latest_at",
+                    "descendant_count",
+                    "created_at",
+                    "memory_tier",  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
+                    "r3_layer",
+                ]  # v4.0.2: 添加 r3_layer（Issue #136 Bug 2）
             else:
                 columns = []
-        
+
         rows = self.cursor.fetchall()
-        
+
         if not columns:
             return [dict(row) for row in rows]
-        
+
         result = []
         for row in rows:
             item = dict(zip(columns, row))
             # 解析 JSON 字段
-            if 'metadata' in item and item['metadata']:
+            if "metadata" in item and item["metadata"]:
                 try:
-                    item['metadata'] = json.loads(item['metadata'])
+                    item["metadata"] = json.loads(item["metadata"])
                 except:
                     pass
             result.append(item)
-        
+
         return result
 
     def _row_to_dict(self, row: tuple, table: str) -> Dict:
         """将数据库行转换为字典
-        
+
         Args:
             row: 数据库行
             table: 表名（仅用于 fallback）
-        
+
         Returns:
             字典对象
         """
         # 优先使用 cursor.description 动态获取列名（健壮方案）
-        if hasattr(self.cursor, 'description') and self.cursor.description:
+        if hasattr(self.cursor, "description") and self.cursor.description:
             columns = [desc[0] for desc in self.cursor.description]
         else:
             # Fallback: 使用硬编码列表（仅在特殊情况下）
-            if table == 'messages':
-                columns = ['id', 'message_id', 'conversation_id', 'seq', 'role', 
-                          'content', 'token_count', 'created_at', 'metadata',
-                          'msg_type', 'tfidf_score', 'structural_bonus', 'compression_exempt',
-                          'last_accessed_at', 'access_count', 'stability',
-                          'memory_tier']  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
-            elif table == 'summaries':
-                columns = ['id', 'summary_id', 'conversation_id', 'kind', 'depth',
-                          'content', 'token_count', 'earliest_at', 'latest_at',
-                          'descendant_count', 'created_at',
-                          'memory_tier',  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
-                          'r3_layer']     # v4.0.2: 添加 r3_layer（Issue #136 Bug 2）
+            if table == "messages":
+                columns = [
+                    "id",
+                    "message_id",
+                    "conversation_id",
+                    "seq",
+                    "role",
+                    "content",
+                    "token_count",
+                    "created_at",
+                    "metadata",
+                    "msg_type",
+                    "tfidf_score",
+                    "structural_bonus",
+                    "compression_exempt",
+                    "last_accessed_at",
+                    "access_count",
+                    "stability",
+                    "memory_tier",
+                ]  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
+            elif table == "summaries":
+                columns = [
+                    "id",
+                    "summary_id",
+                    "conversation_id",
+                    "kind",
+                    "depth",
+                    "content",
+                    "token_count",
+                    "earliest_at",
+                    "latest_at",
+                    "descendant_count",
+                    "created_at",
+                    "memory_tier",  # v3.6.1: 添加 memory_tier（Issue #129 Bug 5）
+                    "r3_layer",
+                ]  # v4.0.2: 添加 r3_layer（Issue #136 Bug 2）
             else:
                 return dict(row)
-        
+
         result = dict(zip(columns, row))
-        
+
         # 解析 JSON 字段
-        if 'metadata' in result and result['metadata']:
+        if "metadata" in result and result["metadata"]:
             try:
-                result['metadata'] = json.loads(result['metadata'])
+                result["metadata"] = json.loads(result["metadata"])
             except:
                 pass
-        
+
         return result
-    
+
     # ==================== 辅助方法（用于测试） ====================
-    
+
     def create_conversation(self, metadata: Dict = None) -> str:
         """创建新对话
-        
+
         Args:
             metadata: 可选的对话元数据
-        
+
         Returns:
             conversation_id
         """
-        conversation_id = self._generate_id('conv')
+        conversation_id = self._generate_id("conv")
         created_at = datetime.utcnow().isoformat()
-        
+
         # v4.0.12: 添加事务保护（Issue #150 Bug #3）
         with self.conn:
             # 插入对话记录
-            self.cursor.execute("""
+            self.cursor.execute(
+                """
                 INSERT OR IGNORE INTO conversations (conversation_id, created_at, updated_at, metadata)
                 VALUES (?, ?, ?, ?)
-            """, (conversation_id, created_at, created_at, json.dumps(metadata or {})))
-        
+            """,
+                (conversation_id, created_at, created_at, json.dumps(metadata or {})),
+            )
+
         return conversation_id
-    
+
     def add_message(self, conversation_id: str, role: str, content: str) -> str:
         """添加消息到对话
-        
+
         Args:
             conversation_id: 对话 ID
             role: 角色 (user/assistant)
             content: 消息内容
-        
+
         Returns:
             message_id
         """
-        message_id = self._generate_id('msg')
-        
+        message_id = self._generate_id("msg")
+
         # 使用 save_message 方法
         message = {
-            'id': message_id,
-            'conversationId': conversation_id,
-            'role': role,
-            'content': content,
-            'seq': self._get_next_seq(conversation_id)
+            "id": message_id,
+            "conversationId": conversation_id,
+            "role": role,
+            "content": content,
+            "seq": self._get_next_seq(conversation_id),
         }
-        
+
         self.save_message(message)
         return message_id
-    
+
     def _get_next_seq(self, conversation_id: str) -> int:
         """获取对话的下一个序号"""
         self.cursor.execute(
             "SELECT COALESCE(MAX(seq), 0) + 1 FROM messages WHERE conversation_id = ?",
-            (conversation_id,)
+            (conversation_id,),
         )
         result = self.cursor.fetchone()
         return result[0] if result else 0
-    
+
     def get_conversation_stats(self, conversation_id: str) -> Optional[Dict]:
         """获取对话统计信息
-        
+
         Args:
             conversation_id: 对话 ID
-        
+
         Returns:
             包含 message_count, total_tokens 的字典
         """
         self.cursor.execute(
             "SELECT COUNT(*) as message_count, SUM(token_count) as total_tokens "
             "FROM messages WHERE conversation_id = ?",
-            (conversation_id,)
+            (conversation_id,),
         )
         result = self.cursor.fetchone()
-        
+
         if result:
-            return {
-                "message_count": result[0],
-                "total_tokens": result[1] or 0
-            }
+            return {"message_count": result[0], "total_tokens": result[1] or 0}
         return None
-    
+
+    def save_embedding(
+        self, target_type: str, target_id: str, vector: List[float]
+    ) -> str:
+        """保存向量嵌入为 BLOB"""
+        import struct
+
+        chunk_id = f"emb_{target_type}_{target_id}"
+        blob = struct.pack(f"{len(vector)}f", *vector)
+        now = datetime.utcnow().isoformat()
+
+        self.cursor.execute(
+            """
+            INSERT OR REPLACE INTO embeddings (chunk_id, target_type, target_id, vector, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """,
+            (chunk_id, target_type, target_id, blob, now),
+        )
+        self.conn.commit()
+        return chunk_id
+
+    def vector_search(
+        self,
+        query_vec: List[float],
+        top_k: int = 20,
+        target_type: str = None,
+        conversation_id: str = None,
+    ) -> List[Dict]:
+        """纯内存余弦相似度搜索"""
+        import struct
+        import numpy as np
+
+        query = "SELECT chunk_id, target_type, target_id, vector FROM embeddings"
+        conditions = []
+        params = []
+
+        if target_type:
+            conditions.append("target_type = ?")
+            params.append(target_type)
+        if conversation_id:
+            conditions.append("""
+                (target_type = 'message' AND target_id IN
+                    (SELECT message_id FROM messages WHERE conversation_id = ?))
+                OR (target_type = 'summary' AND target_id IN
+                    (SELECT summary_id FROM summaries WHERE conversation_id = ?))
+            """)
+            params.extend([conversation_id, conversation_id])
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        self.cursor.execute(query, params)
+        rows = self.cursor.fetchall()
+
+        query_np = np.array(query_vec, dtype=np.float32)
+        query_norm = np.linalg.norm(query_np)
+        if query_norm == 0:
+            return []
+
+        results = []
+        for chunk_id, t_type, t_id, blob in rows:
+            dim = len(blob) // 4
+            vec = np.array(struct.unpack(f"{dim}f", blob), dtype=np.float32)
+            vec_norm = np.linalg.norm(vec)
+            if vec_norm == 0 or query_norm == 0:
+                score = 0.0
+            else:
+                score = float(np.dot(query_np, vec) / (query_norm * vec_norm))
+            results.append(
+                {
+                    "chunk_id": chunk_id,
+                    "target_type": t_type,
+                    "target_id": t_id,
+                    "score": score,
+                }
+            )
+
+        results.sort(key=lambda x: x["score"], reverse=True)
+        return results[:top_k]
+
     def close(self):
         """关闭数据库连接"""
         if self.conn:
@@ -1611,55 +2222,56 @@ class LobsterDatabase:
 if __name__ == "__main__":
     # 测试数据库
     db = LobsterDatabase("test_lobster.db")
-    
+
     print("✅ 数据库初始化成功")
-    
+
     # 测试保存消息
     test_message = {
-        'id': 'msg_test123',
-        'conversationId': 'conv_test',
-        'seq': 1,
-        'role': 'user',
-        'content': [{'type': 'text', 'text': '这是一条测试消息'}],
-        'timestamp': datetime.utcnow().isoformat()
+        "id": "msg_test123",
+        "conversationId": "conv_test",
+        "seq": 1,
+        "role": "user",
+        "content": [{"type": "text", "text": "这是一条测试消息"}],
+        "timestamp": datetime.utcnow().isoformat(),
     }
-    
+
     msg_id = db.save_message(test_message)
     print(f"✅ 保存消息: {msg_id}")
-    
+
     # 测试搜索
     results = db.search_messages("测试")
     print(f"✅ 搜索结果: {len(results)} 条")
-    
+
     # 测试保存摘要
     test_summary = {
-        'summary_id': 'sum_test123',
-        'conversation_id': 'conv_test',
-        'kind': 'leaf',
-        'depth': 0,
-        'content': '这是测试摘要内容',
-        'source_messages': ['msg_test123'],
-        'earliest_at': datetime.utcnow().isoformat(),
-        'latest_at': datetime.utcnow().isoformat(),
-        'descendant_count': 1
+        "summary_id": "sum_test123",
+        "conversation_id": "conv_test",
+        "kind": "leaf",
+        "depth": 0,
+        "content": "这是测试摘要内容",
+        "source_messages": ["msg_test123"],
+        "earliest_at": datetime.utcnow().isoformat(),
+        "latest_at": datetime.utcnow().isoformat(),
+        "descendant_count": 1,
     }
-    
+
     sum_id = db.save_summary(test_summary)
     print(f"✅ 保存摘要: {sum_id}")
-    
+
     # 测试描述摘要
     summary = db.describe_summary(sum_id)
     print(f"✅ 摘要详情: {summary['summary_id']}, 子节点: {summary['children_count']}")
-    
+
     # 测试展开摘要
     messages = db.expand_summary(sum_id)
     print(f"✅ 展开摘要: {len(messages)} 条消息")
-    
+
     # 关闭数据库
     db.close()
     print("✅ 数据库关闭")
-    
+
     # 清理测试文件
     import os
+
     os.remove("test_lobster.db")
     print("✅ 清理测试文件")
