@@ -14,4 +14,4 @@ types-requests>=2.28.0
 
 # Documentation
 sphinx>=6.0.0
-sphinx-rtd-theme>=1.2.0
+sphinx-rtd-theme>=3.1.0
