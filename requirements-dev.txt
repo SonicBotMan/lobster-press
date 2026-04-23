@@ -10,7 +10,7 @@ flake8>=6.0.0
 mypy>=1.0.0
 
 # Type stubs
-types-requests>=2.28.0
+types-requests>=2.33.0.20260408
 
 # Documentation
 sphinx>=6.0.0
