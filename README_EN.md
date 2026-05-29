@@ -400,6 +400,7 @@ src/
 ## 📜 Version History
 | Version | Date | Notes |
 |---------|------|-------|
+| **v5.0.0+** 🔧 | 2026-05-30 | Engineering hardening: pyproject.toml + logging + provider dedup + security |
 | v1.0.0 ~ v1.5.5 | 2026-03-13~17 | Early iterations: DAG compression foundation |
 | v2.5.0 ~ v2.6.0 | 2026-03-17 | Cognitive science refactor: EM-LLM + Forgetting curve |
 | v3.0.0 ~ v3.2.1 | 2026-03-17 | LLM integration: Multi-provider + Prompt optimization |
