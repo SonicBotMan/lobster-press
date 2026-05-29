@@ -4,7 +4,7 @@
 # Python 3.8+ required
 
 # 可选依赖（用于精确 Token 计数）
-tiktoken>=0.5.0
+tiktoken>=0.12.0
 
 # 测试依赖
 pytest>=7.0.0
