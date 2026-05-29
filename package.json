@@ -51,7 +51,15 @@
   "openclaw": {
     "extensions": [
       "./dist/index.js"
-    ]
+    ],
+    "compat": {
+      "pluginApi": ">=2026.4.2",
+      "minGatewayVersion": "2026.4.2"
+    },
+    "build": {
+      "openclawVersion": "2026.5.27",
+      "pluginSdkVersion": "2026.5.27"
+    }
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.48"

@@ -1,5 +1,19 @@
 {
   "id": "lobster-press",
+  "kind": "context-engine",
+  "activation": {
+    "onStartup": true
+  },
+  "contracts": {
+    "tools": [
+      "lobster_grep",
+      "lobster_describe",
+      "lobster_expand",
+      "lobster_check_context",
+      "lobster_configure"
+    ],
+    "contextEngines": ["lobster-press"]
+  },
   "uiHints": {
     "llmProvider": {
       "label": "LLM Provider",
@@ -32,7 +46,6 @@
   },
   "configSchema": {
     "type": "object",
-    "additionalProperties": false,
     "properties": {
       "enabled":          { "type": "boolean" },
       "llmProvider":      { "type": "string" },
@@ -43,7 +56,9 @@
       "freshTailCount":   { "type": "integer", "minimum": 1 },
       "leafChunkTokens":  { "type": "integer", "minimum": 1000 },
       "namespace":        { "type": "string", "default": "default" },
-      "maxContextTokens": { "type": "integer", "minimum": 10000, "default": 40000 }
+      "maxContextTokens": { "type": "integer", "minimum": 10000, "default": 40000 },
+      "registerAsDefault": { "type": "boolean" },
+      "lifecycleEnabled": { "type": "boolean" }
     }
   }
 }
