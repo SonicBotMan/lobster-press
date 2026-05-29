@@ -350,8 +350,8 @@ class ViewerHandler(BaseHTTPRequestHandler):
 </html>"""
 
     def log_message(self, format, *args):
-        """覆盖日志输出，避免污染 stderr"""
-        pass
+        """Log HTTP requests at DEBUG level"""
+        logger.debug(format, *args)
 
 
 def start_viewer(
