@@ -11,7 +11,7 @@
 [![Test](https://github.com/SonicBotMan/lobster-press/workflows/Test/badge.svg)](https://github.com/SonicBotMan/lobster-press/actions/workflows/test.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
 [中文](README.md) | **English**
-**Latest**: [v5.0.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v5.0.0) · [Changelog](CHANGELOG.md)
+**Latest**: [v5.0.3](https://github.com/SonicBotMan/lobster-press/releases/tag/v5.0.3) · [Changelog](CHANGELOG.md)
 </div>
 ---
 
