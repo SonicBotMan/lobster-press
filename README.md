@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v5.0.0](https://github.com/SonicBotMan/lobster-press/releases/tag/v5.0.0) · [更新日志](CHANGELOG.md)
+**最新版本**: [v5.0.3](https://github.com/SonicBotMan/lobster-press/releases/tag/v5.0.3) · [更新日志](CHANGELOG.md)
 
 </div>
 
