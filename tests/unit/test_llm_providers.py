@@ -26,8 +26,6 @@ def test_mock_client():
     assert client.is_available()
 
     print(f"✅ Mock 客户端测试通过")
-    return True
-
 
 def test_openai_client():
     """测试 OpenAI 客户端（不实际调用 API）"""
@@ -45,8 +43,6 @@ def test_openai_client():
     assert client.is_available()
 
     print(f"✅ OpenAI 客户端初始化成功")
-    return True
-
 
 def test_deepseek_client():
     """测试 DeepSeek 客户端（不实际调用 API）"""
@@ -64,8 +60,6 @@ def test_deepseek_client():
     assert client.is_available()
 
     print(f"✅ DeepSeek 客户端初始化成功")
-    return True
-
 
 def test_zhipu_client():
     """测试智谱 GLM 客户端（不实际调用 API）"""
@@ -83,8 +77,6 @@ def test_zhipu_client():
     assert client.is_available()
 
     print(f"✅ 智谱 GLM 客户端初始化成功")
-    return True
-
 
 def test_alibaba_client():
     """测试阿里通义千问客户端（不实际调用 API）"""
@@ -102,8 +94,6 @@ def test_alibaba_client():
     assert client.is_available()
 
     print(f"✅ 阿里通义千问客户端初始化成功")
-    return True
-
 
 def test_anthropic_client():
     """测试 Anthropic Claude 客户端（不实际调用 API）"""
@@ -121,8 +111,6 @@ def test_anthropic_client():
     assert client.is_available()
 
     print(f"✅ Anthropic Claude 客户端初始化成功")
-    return True
-
 
 def test_gemini_client():
     """测试 Google Gemini 客户端（不实际调用 API）"""
@@ -140,8 +128,6 @@ def test_gemini_client():
     assert client.is_available()
 
     print(f"✅ Google Gemini 客户端初始化成功")
-    return True
-
 
 def test_mistral_client():
     """测试 Mistral 客户端（不实际调用 API）"""
@@ -159,8 +145,6 @@ def test_mistral_client():
     assert client.is_available()
 
     print(f"✅ Mistral 客户端初始化成功")
-    return True
-
 
 def test_baidu_client():
     """测试百度文心客户端（不实际调用 API）"""
@@ -182,8 +166,6 @@ def test_baidu_client():
     assert client.is_available()
 
     print(f"✅ 百度文心客户端初始化成功")
-    return True
-
 
 def test_factory_function():
     """测试工厂函数"""
@@ -197,8 +179,6 @@ def test_factory_function():
         assert "不支持的 LLM 提供商" in str(e)
 
     print(f"✅ 工厂函数测试通过")
-    return True
-
 
 def test_environment_variable():
     """测试环境变量配置"""
@@ -216,8 +196,6 @@ def test_environment_variable():
     assert isinstance(client, MockLLMClient)
 
     print(f"✅ 环境变量配置测试通过")
-    return True
-
 
 def test_graceful_fallback():
     """测试优雅降级"""
@@ -231,8 +209,6 @@ def test_graceful_fallback():
     assert isinstance(client, MockLLMClient)
 
     print(f"✅ 优雅降级测试通过")
-    return True
-
 
 def main():
     print("=" * 60)

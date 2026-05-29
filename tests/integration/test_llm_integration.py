@@ -78,9 +78,6 @@ def test_prompt_building():
     assert "稳定的语义知识" in note_prompt
     assert "JSON" in note_prompt
 
-    return True
-
-
 def test_token_estimation():
     """测试 token 估算"""
     print("\n" + "=" * 60)
@@ -101,9 +98,6 @@ def test_token_estimation():
     print(f"截断后消息数: {len(truncated)}")
     assert len(truncated) < len(long_messages)
 
-    return True
-
-
 def test_llm_integration_with_deepseek():
     """测试 DeepSeek LLM 集成"""
     print("\n" + "=" * 60)
@@ -113,7 +107,6 @@ def test_llm_integration_with_deepseek():
     api_key = os.environ.get("DEEPSEEK_API_KEY")
     if not api_key:
         print("⚠️ DEEPSEEK_API_KEY 未设置，跳过实际 API 测试")
-        return True
 
     try:
         # 创建客户端
@@ -129,16 +122,13 @@ def test_llm_integration_with_deepseek():
         print(f"   响应长度: {len(result)} 字符")
         print(f"   预览: {result[:100]}...")
 
-        return True
 
     except Exception as e:
         print(f"❌ 测试失败: {e}")
         import traceback
 
         traceback.print_exc()
-        return False
-
-
+    assert False, "Unexpected path"
 def test_llm_integration_with_zhipu():
     """测试智谱 GLM LLM 集成"""
     print("\n" + "=" * 60)
@@ -148,7 +138,6 @@ def test_llm_integration_with_zhipu():
     api_key = os.environ.get("ZHIPU_API_KEY")
     if not api_key:
         print("⚠️ ZHIPU_API_KEY 未设置，跳过实际 API 测试")
-        return True
 
     try:
         # 创建客户端
@@ -178,16 +167,13 @@ def test_llm_integration_with_zhipu():
         print(f"   提取的 notes 数量: {len(notes)}")
         print(f"   内容: {notes}")
 
-        return True
 
     except Exception as e:
         print(f"❌ 测试失败: {e}")
         import traceback
 
         traceback.print_exc()
-        return False
-
-
+    assert False, "Unexpected path"
 def main():
     print("=" * 60)
     print("LobsterPress v3.2.1 - LLM 集成测试")
