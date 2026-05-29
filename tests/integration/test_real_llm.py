@@ -58,16 +58,13 @@ def test_deepseek():
         print(f"\n📊 统计：")
         print(f"   响应长度: {len(result)} 字符")
 
-        return True
 
     except Exception as e:
         print(f"\n❌ 测试失败: {e}")
         import traceback
 
         traceback.print_exc()
-        return False
-
-
+    assert False, "Unexpected path"
 def test_zhipu():
     """测试智谱 GLM API"""
     print("\n" + "=" * 60)
@@ -97,16 +94,13 @@ def test_zhipu():
         print(f"\n📊 统计：")
         print(f"   响应长度: {len(result)} 字符")
 
-        return True
 
     except Exception as e:
         print(f"\n❌ 测试失败: {e}")
         import traceback
 
         traceback.print_exc()
-        return False
-
-
+    assert False, "Unexpected path"
 def main():
     print("=" * 60)
     print("LobsterPress v3.2.0 - 实际 LLM API 调用测试")
