@@ -8,18 +8,15 @@ Author: LobsterPress Team
 Version: v4.0.41
 """
 
-import sys
 import json
 import argparse
 import logging
 from typing import List, Dict, Optional
-from pathlib import Path
+
 
 logger = logging.getLogger(__name__)
-# 添加 database 模块
-sys.path.insert(0, str(Path(__file__).parent))
-from database import LobsterDatabase
-from pipeline.tfidf_scorer import TFIDFScorer
+from src.database import LobsterDatabase
+from src.pipeline.tfidf_scorer import TFIDFScorer
 
 
 # ==================== lobster_grep ====================

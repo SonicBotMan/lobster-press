@@ -21,16 +21,12 @@ import os
 import json
 import csv
 import logging
-from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional, Iterator
 
 logger = logging.getLogger(__name__)
-# 添加 src 模块
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from database import LobsterDatabase
-from pipeline.tfidf_scorer import TFIDFScorer, ScoredMessage
+from src.database import LobsterDatabase
+from src.pipeline.tfidf_scorer import TFIDFScorer, ScoredMessage
 
 
 class BatchImporter:

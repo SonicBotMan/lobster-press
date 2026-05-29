@@ -8,19 +8,16 @@ Author: LobsterPress Team
 Version: v4.0.41
 """
 
-import sys
 import json
 import logging
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
-from pathlib import Path
+
 
 logger = logging.getLogger(__name__)
-# 添加 database 模块
-sys.path.insert(0, str(Path(__file__).parent))
-from database import LobsterDatabase
-from pipeline.event_segmenter import EventSegmenter
-from prompts import build_leaf_summary_prompt, build_condensed_summary_prompt
+from src.database import LobsterDatabase
+from src.pipeline.event_segmenter import EventSegmenter
+from src.prompts import build_leaf_summary_prompt, build_condensed_summary_prompt
 
 
 class DAGCompressor:

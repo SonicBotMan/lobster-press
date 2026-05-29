@@ -8,24 +8,20 @@ Author: LobsterPress Team
 Version: v4.0.41
 """
 
-import sys
 import logging
-from pathlib import Path
 from typing import Dict, Optional
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
-# 添加 database 模块
-sys.path.insert(0, str(Path(__file__).parent))
-from database import LobsterDatabase
-from dag_compressor import DAGCompressor
-from pipeline.tfidf_scorer import TFIDFScorer, EXEMPT_TYPES
-from pipeline.semantic_dedup import SemanticDeduplicator
+from src.database import LobsterDatabase
+from src.dag_compressor import DAGCompressor
+from src.pipeline.tfidf_scorer import TFIDFScorer, EXEMPT_TYPES
+from src.pipeline.semantic_dedup import SemanticDeduplicator
 
 # v3.0.0: 语义记忆和矛盾检测
 try:
-    from semantic_memory import SemanticMemory
-    from pipeline.conflict_detector import ConflictDetector
+    from src.semantic_memory import SemanticMemory
+    from src.pipeline.conflict_detector import ConflictDetector
     SEMANTIC_MEMORY_AVAILABLE = True
 except ImportError:
     SEMANTIC_MEMORY_AVAILABLE = False
