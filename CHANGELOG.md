@@ -5,6 +5,32 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### Added
+- ✨ **pyproject.toml**: 标准 Python 包定义，支持 `pip install -e .`，定义 `[project]` 元数据、依赖、工具配置
+- ✨ **src/utils/math.py**: 统一 `cosine_similarity` 实现（消除 4 处重复代码）
+- ✨ **src/utils/tokens.py**: 统一 `estimate_tokens` 实现（消除 3 处重复代码）
+
+### Changed
+- 🔧 **LLM Providers**: 提取 `OpenAICompatibleClient` 基类，5 个 provider 共享（OpenAI/DeepSeek/Zhipu/Alibaba/Mistral），422→290 行（-31%）
+- 🔧 **logging 模块**: 17 个源文件全面替换 `print()` → `logging`（info/warning/error），去掉 emoji 前缀
+- 🔧 **CI lint**: 移除 `continue-on-error`，Black/isort/flake8 现在阻断 PR
+- 🔧 **Viewer 登录**: 支持 POST JSON body 传密码（保留 GET fallback）
+- 🔧 **Viewer CORS**: `Access-Control-Allow-Origin: *` → 仅 localhost
+- 🔧 **sys.path 清理**: 移除 4 处 `sys.path.insert` 污染，改用标准 `from src.xxx` 导入
+- 🔧 **.gitignore**: 添加 `*.tgz`、`.mypy_cache/`，去除重复项
+
+### Fixed
+- 🐛 **裸 `except:` × 6**: 全部改为具体异常类型（`json.JSONDecodeError`/`ValueError`/`TypeError`）
+- 🐛 **版本号不一致**: 统一到 `src/__init__.py` 单一来源（5.0.0），MCP Server 动态导入
+- 🐛 **TypeScript 类型检查**: 添加 `@types/node` + `tsconfig.json` 配置，修复 CI lint 失败
+
+### Removed
+- 🗑️ **5 个 .tgz 文件**: 从仓库中删除发布产物（4.0.93-97）
+- 🗑️ **临时文件**: `package.json.new`、`tmp.json`
+- 🗑️ **24 个测试 return-bool**: 移除测试函数中多余的 `return True/False`
+
 ## [5.0.2] - 2026-04-05
 
 ### Fixed (OpenClaw v2026.4.2 Compatibility)

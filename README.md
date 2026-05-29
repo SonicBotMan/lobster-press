@@ -682,6 +682,7 @@ export LOBSTER_LLM_SUMMARY_PROVIDER=openai   # 可选
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| **v5.0.0+** 🔧 | 2026-05-30 | 工程化加固: pyproject.toml + logging + provider去重 + 安全修复 |
 | **v5.0.0** ⭐ | 2026-04-05 | MemOS 4-Phase优化: 向量嵌入/技能进化/多智能体/工程化 |
 | **v4.0.89** ⭐ | 2026-03-24 | 记忆优先级排序：semantic > episodic > working，长期记忆优先注入 |
 | **v4.0.49** | 2026-03-23 | MCP 工具模式：禁用 lifecycle hooks，添加手动记忆管理指南 |
