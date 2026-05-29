@@ -12,9 +12,11 @@ Version: v4.0.41
 """
 
 import os
+import logging
 from abc import ABC, abstractmethod
 from typing import Optional, Dict, Any
 
+logger = logging.getLogger(__name__)
 
 class BaseLLMClient(ABC):
     """LLM 客户端基类"""
@@ -101,7 +103,7 @@ class FallbackLLMClient(BaseLLMClient):
                 if result:
                     return result
             except Exception as e:
-                print(f"⚠️ LLM [{name}] 失败: {e}，尝试下一级")
+                logger.warning(f"LLM [{name}] 失败: {e}，尝试下一级")
                 continue
         return ""
 
@@ -223,12 +225,12 @@ def create_llm_client(
 
         return get_provider_client(provider, api_key, model, **kwargs)
     except ImportError as e:
-        print(f"⚠️ 无法加载 LLM 提供商 {provider}: {e}")
-        print(f"   降级为 Mock 客户端")
+        logger.warning(f"无法加载 LLM 提供商 {provider}: {e}")
+        logger.warning("降级为 Mock 客户端")
         return MockLLMClient()
     except Exception as e:
-        print(f"⚠️ 创建 LLM 客户端失败: {e}")
-        print(f"   降级为 Mock 客户端")
+        logger.warning(f"创建 LLM 客户端失败: {e}")
+        logger.warning("降级为 Mock 客户端")
         return MockLLMClient()
 
 

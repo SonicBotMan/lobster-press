@@ -11,10 +11,12 @@ Version: v5.0.0
 import asyncio
 import threading
 import time
+import logging
 from typing import Callable, Dict, Any, Optional
 from collections import deque
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 
 class AsyncWorker:
     """异步任务队列处理器
@@ -82,7 +84,7 @@ class AsyncWorker:
             try:
                 self._process(task)
             except Exception as e:
-                print(f"⚠️ Async task [{task['type']}] failed: {e}")
+                logger.warning(f"Async task [{task['type']}] failed: {e}")
 
     def _dequeue(self) -> Optional[Dict]:
         """从队列取出任务"""
@@ -107,7 +109,7 @@ class AsyncWorker:
         elif task_type == "skill_eval":
             self._process_skill_eval(payload)
         else:
-            print(f"⚠️ Unknown task type: {task_type}")
+            logger.warning(f"Unknown task type: {task_type}")
 
     def _process_embed(self, payload: Dict):
         """异步嵌入：向量化消息/摘要
@@ -120,18 +122,18 @@ class AsyncWorker:
         content = payload.get("content", "")
 
         if not target_type or not target_id:
-            print("⚠️ embed: missing target_type or target_id")
+            logger.warning("embed: missing target_type or target_id")
             return
 
         if not self.embedder or not self.embedder.is_available():
-            print("⚠️ embed: embedder not available")
+            logger.warning("embed: embedder not available")
             return
 
         try:
             vec = self.embedder.embed(content)
             self.db.save_embedding(target_type, target_id, vec)
         except Exception as e:
-            print(f"⚠️ embed failed: {e}")
+            logger.warning(f"embed failed: {e}")
 
     def _process_task_detect(self, payload: Dict):
         """异步任务检测
@@ -142,11 +144,11 @@ class AsyncWorker:
         conversation_id = payload.get("conversation_id")
 
         if not conversation_id:
-            print("⚠️ task_detect: missing conversation_id")
+            logger.warning("task_detect: missing conversation_id")
             return
 
         if not self.llm_client:
-            print("⚠️ task_detect: llm_client not available")
+            logger.warning("task_detect: llm_client not available")
             return
 
         try:
@@ -156,7 +158,7 @@ class AsyncWorker:
             tasks = detector.detect_tasks(conversation_id)
             return tasks
         except Exception as e:
-            print(f"⚠️ task_detect failed: {e}")
+            logger.warning(f"task_detect failed: {e}")
             return None
 
     def _process_skill_eval(self, payload: Dict):
@@ -169,11 +171,11 @@ class AsyncWorker:
         task = payload.get("task")
 
         if not conversation_id or not task:
-            print("⚠️ skill_eval: missing conversation_id or task")
+            logger.warning("skill_eval: missing conversation_id or task")
             return
 
         if not self.llm_client:
-            print("⚠️ skill_eval: llm_client not available")
+            logger.warning("skill_eval: llm_client not available")
             return
 
         try:
@@ -183,7 +185,7 @@ class AsyncWorker:
             skill_id = evolver.evaluate_and_generate(task, conversation_id)
             return skill_id
         except Exception as e:
-            print(f"⚠️ skill_eval failed: {e}")
+            logger.warning(f"skill_eval failed: {e}")
             return None
 
     @property

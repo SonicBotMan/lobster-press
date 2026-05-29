@@ -1,11 +1,13 @@
 """Vector embedding module for lobster-press."""
 
 import os
+import logging
 import numpy as np
 import requests
 from abc import ABC, abstractmethod
 from typing import List
 
+logger = logging.getLogger(__name__)
 EMBEDDING_DIM = 1024
 
 
@@ -85,5 +87,5 @@ def create_embedder(**kwargs) -> BaseEmbedder:
     embedder = OpenAICompatibleEmbedder(**kwargs)
     if embedder.is_available():
         return embedder
-    print("⚠️ Embedding API 不可用，降级为 numpy 离线向量")
+    logger.warning("Embedding API 不可用，降级为 numpy 离线向量")
     return NumpyOfflineEmbedder()

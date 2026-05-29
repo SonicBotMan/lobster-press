@@ -16,8 +16,11 @@ Version: v2.5.0
 import re
 import math
 import time
+import logging
 from datetime import datetime
 from collections import Counter
+
+logger = logging.getLogger(__name__)
 from typing import List, Dict, Union
 from dataclasses import dataclass
 
@@ -368,7 +371,7 @@ class TFIDFScorer:
 # ==================== 测试代码 ====================
 
 if __name__ == "__main__":
-    print("🧪 测试 TFIDFScorer v2.5.0\n")
+    logger.info("测试 TFIDFScorer v2.5.0")
     
     scorer = TFIDFScorer()
     
@@ -383,10 +386,10 @@ if __name__ == "__main__":
     
     scored = scorer.score_and_tag(test_messages)
     
-    print(f"{'ID':<5} {'类型':<10} {'豁免':<6} {'分数':<8} 内容（前40字）")
-    print("-" * 80)
+    logger.info(f"{'ID':<5} {'类型':<10} {'豁免':<6} {'分数':<8} 内容（前40字）")
+    logger.info("-" * 80)
     for msg in scored:
         exempt = "✅" if msg.compression_exempt else "❌"
-        print(f"{msg.id:<5} {msg.msg_type:<10} {exempt:<6} {msg.final_score:<8.1f} {msg.content[:40]}")
+        logger.info(f"{msg.id:<5} {msg.msg_type:<10} {exempt:<6} {msg.final_score:<8.1f} {msg.content[:40]}")
     
-    print("\n✅ 测试完成")
+    logger.info("测试完成")

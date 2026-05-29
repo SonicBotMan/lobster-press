@@ -13,11 +13,13 @@ Version: v5.0.0
 import hashlib
 import json
 import re
+import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from typing import Optional, Dict, Any
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 
 class ViewerHandler(BaseHTTPRequestHandler):
     """Viewer HTTP Handler
@@ -355,11 +357,11 @@ def start_viewer(
     ViewerHandler.setup(db, password, owner)
 
     server = HTTPServer(("127.0.0.1", port), ViewerHandler)
-    print(f"🦞 LobsterPress Viewer: http://127.0.0.1:{port}")
-    print(f"   Owner: {owner}")
+    logger.info(f"LobsterPress Viewer: http://127.0.0.1:{port}")
+    logger.info(f"Owner: {owner}")
     if password:
-        print(f"   Password: {'*' * len(password)}")
+        logger.info(f"Password: {'*' * len(password)}")
     else:
-        print(f"   Password: None (no auth)")
+        logger.info("Password: None (no auth)")
 
     return server

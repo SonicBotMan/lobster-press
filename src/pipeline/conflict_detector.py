@@ -14,10 +14,12 @@ Version: v3.0.0
 """
 
 import re
+import logging
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ConflictResult:
@@ -48,9 +50,9 @@ class ConflictDetector:
                     'cross-encoder/nli-deberta-v3-small',
                     max_length=256
                 )
-                print('✅ ConflictDetector: 使用 NLI 模型（高精度）')
+                logger.info('ConflictDetector: 使用 NLI 模型（高精度）')
             except ImportError:
-                print('⚠️ ConflictDetector: sentence-transformers 未安装，降级为规则检测')
+                logger.warning('ConflictDetector: sentence-transformers 未安装，降级为规则检测')
     
     def detect(
         self,
@@ -111,7 +113,7 @@ class ConflictDetector:
                     conflict_score=contradiction_score
                 )
         except Exception as e:
-            print(f'⚠️ NLI 检测失败: {e}')
+            logger.warning(f'NLI 检测失败: {e}')
         return None
     
     def _check_with_rules(
@@ -200,5 +202,5 @@ class ConflictDetector:
                        conflict.old_note_id))
                 semantic_memory.db.conn.commit()
                 
-                print(f'🔄 记忆重巩固: [{conflict.old_content[:40]}...] '
-                      f'→ [{conflict.new_claim[:40]}...]')
+                logger.info(f'记忆重巩固: [{conflict.old_content[:40]}...] '
+                            f'→ [{conflict.new_claim[:40]}...]')

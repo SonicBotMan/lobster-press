@@ -9,10 +9,12 @@ Version: v4.0.41
 """
 
 import sys
+import logging
 from pathlib import Path
 from typing import Dict, Optional
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 # 添加 database 模块
 sys.path.insert(0, str(Path(__file__).parent))
 from database import LobsterDatabase
@@ -74,7 +76,7 @@ class IncrementalCompressor:
         if SEMANTIC_MEMORY_AVAILABLE:
             self.semantic_memory = SemanticMemory(db)
             self.conflict_detector = ConflictDetector(use_nli=True)
-            print('✅ 语义记忆层已启用（v3.0.0）')
+            logger.info('语义记忆层已启用（v3.0.0）')
         else:
             self.semantic_memory = None
             self.conflict_detector = None
@@ -155,9 +157,9 @@ class IncrementalCompressor:
         Returns:
             压缩统计
         """
-        print(f"\n{'=' * 60}")
-        print(f"  🦞 增量压缩: {conversation_id}")
-        print(f"{'=' * 60}\n")
+        logger.info(f"{'=' * 60}")
+        logger.info(f"增量压缩: {conversation_id}")
+        logger.info(f"{'=' * 60}")
         
         # 获取上下文使用率
         usage_ratio = self._get_context_usage(conversation_id)
@@ -165,8 +167,8 @@ class IncrementalCompressor:
         # v2.5.0: 选择压缩策略
         strategy = self._select_compression_strategy(usage_ratio)
         
-        print(f"📊 上下文使用率: {usage_ratio:.1%}")
-        print(f"🎯 压缩策略: {strategy}\n")
+        logger.info(f"上下文使用率: {usage_ratio:.1%}")
+        logger.info(f"压缩策略: {strategy}")
         
         stats = {
             'strategy': strategy,
@@ -177,7 +179,7 @@ class IncrementalCompressor:
         
         if strategy == 'none':
             # <60% 不压缩
-            print("✅ 上下文使用率低，无需压缩")
+            logger.info("上下文使用率低，无需压缩")
             return stats
         
         elif strategy == 'light':
@@ -195,11 +197,11 @@ class IncrementalCompressor:
                 actual_removed = self.db.remove_messages_from_context(
                     conversation_id, removed_ids
                 )
-                print(f"🔄 light 去重: 从上下文移除 {actual_removed} 条重复消息（原文永久保留）")
+                logger.info(f"light 去重: 从上下文移除 {actual_removed} 条重复消息（原文永久保留）")
                 stats['messages_compressed'] = actual_removed
                 stats['removed_ids'] = removed_ids
             else:
-                print("✅ 无重复消息，上下文已是最优")
+                logger.info("无重复消息，上下文已是最优")
             
             return stats
         
@@ -231,7 +233,7 @@ class IncrementalCompressor:
                 
                 if note_ids:
                     dag_stats['notes_extracted'] = len(note_ids)
-                    print(f"📝 语义知识提取: {len(note_ids)} 条 notes")
+                    logger.info(f"语义知识提取: {len(note_ids)} 条 notes")
             
             return dag_stats
     
@@ -269,7 +271,7 @@ class IncrementalCompressor:
         usage_ratio = self._get_context_usage(conversation_id)
         
         if usage_ratio >= self.context_threshold:
-            print(f"\n⚡ 触发压缩: 上下文使用率 {usage_ratio:.1%} >= {self.context_threshold:.0%}")
+            logger.info(f"触发压缩: 上下文使用率 {usage_ratio:.1%} >= {self.context_threshold:.0%}")
             return True
         
         return False
@@ -381,7 +383,7 @@ if __name__ == "__main__":
     import os
     if os.path.exists("test_incremental.db"):
         os.remove("test_incremental.db")
-        print("🗑️ 删除旧的测试数据库\n")
+        logger.info("删除旧的测试数据库")
     
     # 初始化
     db = LobsterDatabase("test_incremental.db")
@@ -392,15 +394,15 @@ if __name__ == "__main__":
         leaf_chunk_tokens=500
     )
     
-    print("=" * 60)
-    print("  🧪 增量压缩测试")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("增量压缩测试")
+    logger.info("=" * 60)
     
     # 创建测试对话
     conversation_id = "conv_incremental"
     
     # 测试 1: 逐步添加消息，观察自动压缩
-    print("\n📝 测试 1: 逐步添加消息（自动压缩）\n")
+    logger.info("测试 1: 逐步添加消息（自动压缩）")
     
     for i in range(1, 31):
         content = f'这是第 {i} 条消息，讨论了技术话题 {i % 10}。'
@@ -417,41 +419,41 @@ if __name__ == "__main__":
         result = manager.on_new_message(conversation_id, msg, auto_compress=True)
         
         if result:
-            print(f"\n✅ 消息 {i}: 触发压缩")
-            print(f"   - 叶子摘要: {result['leaf_summaries']} 个")
-            print(f"   - 压缩消息: {result['messages_compressed']} 条")
+            logger.info(f"消息 {i}: 触发压缩")
+            logger.info(f"   - 叶子摘要: {result['leaf_summaries']} 个")
+            logger.info(f"   - 压缩消息: {result['messages_compressed']} 条")
         else:
             if i % 10 == 0:
-                print(f"   消息 {i}: 上下文正常")
+                logger.info(f"消息 {i}: 上下文正常")
     
     # 测试 2: 查看监控状态
-    print("\n" + "=" * 60)
-    print("  📊 监控状态")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("监控状态")
+    logger.info("=" * 60)
     
     status = manager.monitor(conversation_id)
-    print(f"\n对话 ID: {status['conversation_id']}")
-    print(f"总消息数: {status['total_messages']}")
-    print(f"总摘要数: {status['total_summaries']}")
-    print(f"上下文使用率: {status['context_usage']:.2%}")
-    print(f"上下文阈值: {status['context_threshold']:.0%}")
-    print(f"需要压缩: {'是' if status['needs_compression'] else '否'}")
-    print(f"\n摘要分布:")
+    logger.info(f"对话 ID: {status['conversation_id']}")
+    logger.info(f"总消息数: {status['total_messages']}")
+    logger.info(f"总摘要数: {status['total_summaries']}")
+    logger.info(f"上下文使用率: {status['context_usage']:.2%}")
+    logger.info(f"上下文阈值: {status['context_threshold']:.0%}")
+    logger.info(f"需要压缩: {'是' if status['needs_compression'] else '否'}")
+    logger.info("摘要分布:")
     for depth, count in sorted(status['summaries_by_depth'].items()):
-        print(f"  Depth {depth}: {count} 个")
+        logger.info(f"  Depth {depth}: {count} 个")
     
     # 测试 3: 查看压缩统计
-    print("\n" + "=" * 60)
-    print("  📈 压缩统计")
-    print("=" * 60)
+    logger.info("=" * 60)
+    logger.info("压缩统计")
+    logger.info("=" * 60)
     
     stats = manager.get_stats()
-    print(f"\n总压缩次数: {stats['total_compressions']}")
-    print(f"总压缩消息: {stats['total_messages_compressed']} 条")
-    print(f"最后压缩时间: {stats['last_compression']}")
+    logger.info(f"总压缩次数: {stats['total_compressions']}")
+    logger.info(f"总压缩消息: {stats['total_messages_compressed']} 条")
+    logger.info(f"最后压缩时间: {stats['last_compression']}")
     
     # 清理
     db.close()
     os.remove("test_incremental.db")
-    print(f"\n🗑️ 清理测试数据库")
-    print(f"\n✅ 测试完成")
+    logger.info("清理测试数据库")
+    logger.info("测试完成")

@@ -14,10 +14,12 @@ import hashlib
 import uuid
 import math
 import sys
+import logging
 from typing import List, Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 # v4.0.0: 导入 ThreePassTrimmer（兼容多种导入场景）
 try:
     from .three_pass_trimmer import ThreePassTrimmer
@@ -588,7 +590,7 @@ class LobsterDatabase:
                         else 0.0
                     )
             except Exception as e:
-                print(f"⚠️ TF-IDF 计算失败: {e}")
+                logger.warning(f"TF-IDF 计算失败: {e}")
 
         # Phase 3: 使用事务确保原子性
         with self.conn:
@@ -1980,7 +1982,7 @@ class LobsterDatabase:
             if "metadata" in item and item["metadata"]:
                 try:
                     item["metadata"] = json.loads(item["metadata"])
-                except:
+                except (json.JSONDecodeError, ValueError):
                     pass
             result.append(item)
 
@@ -2046,7 +2048,7 @@ class LobsterDatabase:
         if "metadata" in result and result["metadata"]:
             try:
                 result["metadata"] = json.loads(result["metadata"])
-            except:
+            except (json.JSONDecodeError, ValueError):
                 pass
 
         return result
@@ -2223,7 +2225,7 @@ if __name__ == "__main__":
     # 测试数据库
     db = LobsterDatabase("test_lobster.db")
 
-    print("✅ 数据库初始化成功")
+    logger.info("数据库初始化成功")
 
     # 测试保存消息
     test_message = {
@@ -2236,11 +2238,11 @@ if __name__ == "__main__":
     }
 
     msg_id = db.save_message(test_message)
-    print(f"✅ 保存消息: {msg_id}")
+    logger.info(f"保存消息: {msg_id}")
 
     # 测试搜索
     results = db.search_messages("测试")
-    print(f"✅ 搜索结果: {len(results)} 条")
+    logger.info(f"搜索结果: {len(results)} 条")
 
     # 测试保存摘要
     test_summary = {
@@ -2256,22 +2258,22 @@ if __name__ == "__main__":
     }
 
     sum_id = db.save_summary(test_summary)
-    print(f"✅ 保存摘要: {sum_id}")
+    logger.info(f"保存摘要: {sum_id}")
 
     # 测试描述摘要
     summary = db.describe_summary(sum_id)
-    print(f"✅ 摘要详情: {summary['summary_id']}, 子节点: {summary['children_count']}")
+    logger.info(f"摘要详情: {summary['summary_id']}, 子节点: {summary['children_count']}")
 
     # 测试展开摘要
     messages = db.expand_summary(sum_id)
-    print(f"✅ 展开摘要: {len(messages)} 条消息")
+    logger.info(f"展开摘要: {len(messages)} 条消息")
 
     # 关闭数据库
     db.close()
-    print("✅ 数据库关闭")
+    logger.info("数据库关闭")
 
     # 清理测试文件
     import os
 
     os.remove("test_lobster.db")
-    print("✅ 清理测试文件")
+    logger.info("清理测试文件")

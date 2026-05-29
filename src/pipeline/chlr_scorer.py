@@ -63,7 +63,7 @@ class CHLRScorer:
                 import json
 
                 metadata = json.loads(metadata)
-            except:
+            except (json.JSONDecodeError, ValueError):
                 metadata = {}
 
         entity_count = len(metadata.get("entities", []))
@@ -143,7 +143,7 @@ class CHLRScorer:
                 last_accessed = last_accessed.replace(tzinfo=None)
 
             hours_since_access = (current_time - last_accessed).total_seconds() / 3600
-        except:
+        except (ValueError, TypeError):
             return 1.0
 
         # 计算半衰期

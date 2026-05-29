@@ -20,10 +20,12 @@ import sys
 import os
 import json
 import csv
+import logging
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Optional, Iterator
 
+logger = logging.getLogger(__name__)
 # 添加 src 模块
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -72,7 +74,7 @@ class BatchImporter:
         Returns:
             导入统计信息
         """
-        print(f"\n📦 开始导入 JSON: {json_path}")
+        logger.info(f"开始导入 JSON: {json_path}")
         
         # 读取 JSON 文件
         with open(json_path, 'r', encoding='utf-8') as f:
@@ -125,7 +127,7 @@ class BatchImporter:
         Returns:
             导入统计信息
         """
-        print(f"\n📦 开始导入 CSV: {csv_path}")
+        logger.info(f"开始导入 CSV: {csv_path}")
         
         # 读取 CSV 文件
         messages = []
@@ -185,7 +187,7 @@ class BatchImporter:
         """
         self.stats['total_conversations'] = len(conversations)
         
-        print(f"  发现 {len(conversations)} 个对话")
+        logger.info(f"发现 {len(conversations)} 个对话")
         
         for i, conv in enumerate(conversations):
             try:
@@ -196,18 +198,18 @@ class BatchImporter:
                 messages = conv.get(messages_field, [])
                 
                 if not messages:
-                    print(f"  ⚠️  对话 {conversation_id} 没有消息，跳过")
+                    logger.warning(f"对话 {conversation_id} 没有消息，跳过")
                     continue
                 
                 # 导入消息
                 self._import_messages(conversation_id, messages, batch_size)
                 
-                print(f"  ✅ 对话 {conversation_id}: {len(messages)} 条消息")
+                logger.info(f"对话 {conversation_id}: {len(messages)} 条消息")
                 
             except Exception as e:
                 error_msg = f"对话 {i} 导入失败: {str(e)}"
                 self.stats['errors'].append(error_msg)
-                print(f"  ❌ {error_msg}")
+                logger.error(error_msg)
         
         # 打印统计信息
         self._print_stats()
@@ -264,22 +266,22 @@ class BatchImporter:
     
     def _print_stats(self):
         """打印统计信息"""
-        print("\n" + "=" * 60)
-        print("  📊 导入统计")
-        print("=" * 60)
-        print(f"  对话总数: {self.stats['total_conversations']}")
-        print(f"  消息总数: {self.stats['total_messages']}")
-        print(f"  导入成功: {self.stats['imported_messages']}")
-        print(f"  跳过消息: {self.stats['skipped_messages']}")
+        logger.info("=" * 60)
+        logger.info("导入统计")
+        logger.info("=" * 60)
+        logger.info(f"对话总数: {self.stats['total_conversations']}")
+        logger.info(f"消息总数: {self.stats['total_messages']}")
+        logger.info(f"导入成功: {self.stats['imported_messages']}")
+        logger.info(f"跳过消息: {self.stats['skipped_messages']}")
         
         if self.stats['errors']:
-            print(f"\n  ❌ 错误 ({len(self.stats['errors'])}):")
+            logger.error(f"错误 ({len(self.stats['errors'])}):")
             for error in self.stats['errors'][:5]:  # 只显示前5个错误
-                print(f"    - {error}")
+                logger.error(f"  - {error}")
             if len(self.stats['errors']) > 5:
-                print(f"    ... 还有 {len(self.stats['errors']) - 5} 个错误")
+                logger.error(f"  ... 还有 {len(self.stats['errors']) - 5} 个错误")
         
-        print("=" * 60)
+        logger.info("=" * 60)
     
     def close(self):
         """关闭数据库连接"""
