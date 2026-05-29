@@ -19,6 +19,8 @@ from typing import List, Dict, Optional, Any
 from pathlib import Path
 from datetime import datetime
 
+from src.utils.tokens import estimate_tokens as _estimate_tokens_shared
+
 logger = logging.getLogger(__name__)
 # v4.0.0: 导入 ThreePassTrimmer（兼容多种导入场景）
 try:
@@ -1893,21 +1895,8 @@ class LobsterDatabase:
         return str(content)
 
     def _estimate_tokens(self, text: str) -> int:
-        """估算 token 数量
-
-        Args:
-            text: 文本内容
-
-        Returns:
-            token 数量
-        """
-        # 简单估算：英文 4 字符 = 1 token，中文 1.5 字符 = 1 token
-        char_count = len(text)
-        chinese_chars = sum(1 for c in text if "\u4e00" <= c <= "\u9fff")
-        english_chars = char_count - chinese_chars
-
-        tokens = (english_chars / 4) + (chinese_chars / 1.5)
-        return int(tokens)
+        """估算 token 数量。委托给 utils.tokens.estimate_tokens。"""
+        return _estimate_tokens_shared(text)
 
     def _execute_fetch_all(
         self, sql: str, params: tuple = (), table: str = None
