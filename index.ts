@@ -17,6 +17,12 @@ import { Type } from "@sinclair/typebox";
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 
+// Minimal AgentMessage type matching OpenClaw SDK contract
+type LobsterMessage = {
+  role: string;
+  content?: unknown;
+};
+
 // v4.0.19: 修复 __dirname 作用域问题（Issue #155 Bug #1）
 // __dirname 必须在模块顶层定义，ensureMcpServer 需要使用它
 const __filename = fileURLToPath(import.meta.url);
@@ -410,9 +416,14 @@ const lobsterPlugin = {
         validated.registerAsDefault = raw.registerAsDefault;
       }
       
-      // 其他字段直接透传
+      // Only pass through keys that were NOT processed above
+      // (excludes keys that failed validation, like out-of-range numbers)
+      const processedKeys = new Set([
+        'dbPath', 'contextThreshold', 'llmProvider', 'llmModel',
+        'llmApiKey', 'namespace', 'freshTailCount', 'maxContextTokens', 'registerAsDefault',
+      ]);
       for (const key of Object.keys(raw)) {
-        if (!(key in validated)) {
+        if (!processedKeys.has(key)) {
           validated[key] = raw[key];
         }
       }
@@ -1169,7 +1180,7 @@ ${JSON.stringify(fullConfig, null, 2)}
         }
       },
       
-      async ingest(params: { sessionId: string; sessionKey?: string; message: any; isHeartbeat?: boolean }) {
+      async ingest(params: { sessionId: string; sessionKey?: string; message: { id?: string; role?: string; content?: unknown; timestamp?: string | number }; isHeartbeat?: boolean }) {
         // v4.0.20: 调用 lobster_ingest MCP 工具存储消息（Issue #156 Bug #2）
         // v4.0.28: 与 prepareContext 保持一致，优先 sessionId，fallback 到 sessionKey（Issue #172）
         const conversationId = params.sessionId || params.sessionKey;
@@ -1216,14 +1227,14 @@ ${JSON.stringify(fullConfig, null, 2)}
           };
         }
       },
-      async assemble(p: { messages: any[]; sessionId?: string; tokenBudget?: number }) {
+      async assemble(p: { messages: LobsterMessage[]; sessionId?: string; tokenBudget?: number }) {
         // v4.0.73: 添加 debug 日志
         debugLog(`assemble called: sessionId=${p.sessionId}, messages=${p.messages?.length}`);
         
         // v3.6.0: 调用 lobster_assemble 按三层记忆模型拼装上下文（Issue #127 模块一）
         if (!p.sessionId) {
           debugLog('assemble: no sessionId, returning original messages');
-          return { messages: p.messages as any[], estimatedTokens: 0 };
+          return { messages: p.messages as LobsterMessage[], estimatedTokens: 0 };
         }
 
         try {
@@ -1242,23 +1253,73 @@ ${JSON.stringify(fullConfig, null, 2)}
           // 将三层记忆转为 messages 格式
           // v4.0.73: 修复 content 格式（Issue #183 Bug #5）
           // OpenClaw 期望 content 是数组格式：[{ type: "text", text: "..." }]
-          const messages = assembled.map((item: any) => ({
+          const messages = assembled.map((item: Record<string, unknown>) => ({
             role: item.role ?? "assistant",
             content: [{ type: "text", text: item.content ?? "" }],  // 数组格式
-            _tier: item.tier, // 保留层级信息
           }));
 
           return { messages, estimatedTokens: totalTokens };
         } catch (error) {
           // v4.0.29: 添加错误日志（Issue #170）
           api.logger.error(`[lobster-press] assemble failed for session ${p.sessionId}: ${error}`);
-          return { messages: p.messages as any[], estimatedTokens: 0 };
+          return { messages: p.messages as LobsterMessage[], estimatedTokens: 0 };
         }
       },
 
       // Clean up Python subprocess on engine disposal
       async dispose() {
         cleanupMcpProcess("dispose");
+      },
+
+      // Transcript maintenance - recompute forgetting curve scores
+      async maintain(params: {
+        sessionId: string;
+        sessionKey?: string;
+        sessionFile: string;
+        runtimeContext?: Record<string, unknown>;
+      }) {
+        try {
+          await callMcp(pluginConfig, "lobster_sweep", {
+            conversation_id: params.sessionId,
+          });
+          return { changed: false, bytesFreed: 0, rewrittenEntries: 0 };
+        } catch (err) {
+          api.logger.warn(`[lobster-press] maintain failed: ${err}`);
+          return { changed: false, bytesFreed: 0, rewrittenEntries: 0, reason: String(err) };
+        }
+      },
+
+      // Batch message ingestion for bulk loading
+      async ingestBatch(params: {
+        sessionId: string;
+        sessionKey?: string;
+        messages: Array<{ role?: string; content?: unknown; id?: string; timestamp?: string | number }>;
+        isHeartbeat?: boolean;
+      }) {
+        const conversationId = params.sessionId || params.sessionKey;
+        if (!conversationId || !params.messages?.length) {
+          return { ingestedCount: 0 };
+        }
+        try {
+          const formattedMessages = params.messages.map((msg, index) => ({
+            id: msg.id ?? `batch-${Date.now()}-${index}`,
+            role: msg.role || "user",
+            content: typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content ?? {}),
+            timestamp: msg.timestamp || new Date().toISOString(),
+          }));
+          const result = await callMcp(pluginConfig, "lobster_ingest", {
+            conversation_id: conversationId,
+            messages: formattedMessages,
+          });
+          const text = result?.content?.[0]?.text;
+          const data = text ? JSON.parse(text) : {};
+          return {
+            ingestedCount: data.ingested || 0,
+          };
+        } catch (err) {
+          api.logger.warn(`[lobster-press] ingestBatch failed: ${err}`);
+          return { ingestedCount: 0 };
+        }
       },
 
       // NOTE: prepareContext removed — it is NOT part of the ContextEngine interface

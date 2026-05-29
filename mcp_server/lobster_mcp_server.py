@@ -633,7 +633,7 @@ class LobsterPressMCPServer:
 
         # v3.2.2: OpenClaw 插件工具
         elif tool_name == "lobster_grep":
-            from agent_tools import lobster_grep
+            from src.agent_tools import lobster_grep
 
             db = self._get_db()
             results = lobster_grep(
@@ -645,7 +645,7 @@ class LobsterPressMCPServer:
             return {"results": results}
 
         elif tool_name == "lobster_describe":
-            from agent_tools import lobster_describe
+            from src.agent_tools import lobster_describe
 
             db = self._get_db()
             # v4.0.13: 添加 summary_id 和 depth 参数支持（Issue #151 Bug #1）
@@ -658,7 +658,7 @@ class LobsterPressMCPServer:
 
         # v4.0.11: 修复 max_depth 参数未传递（Issue #146）
         elif tool_name == "lobster_expand":
-            from agent_tools import lobster_expand
+            from src.agent_tools import lobster_expand
 
             db = self._get_db()
             summary_id = arguments["summary_id"]
@@ -667,7 +667,7 @@ class LobsterPressMCPServer:
 
         # v3.3.0: 自动压缩工具（调用真实 DAGCompressor）
         elif tool_name == "lobster_compress":
-            from dag_compressor import DAGCompressor
+            from src.dag_compressor import DAGCompressor
 
             db = self._get_db()
             llm = self._get_llm() if self.llm_provider else None
@@ -1206,7 +1206,7 @@ class LobsterPressMCPServer:
             }
 
         # v3.3.0: 调用真实 DAGCompressor（不再使用假 DAG）
-        from dag_compressor import DAGCompressor
+        from src.dag_compressor import DAGCompressor
 
         db = self._get_db()
         llm = self._get_llm() if self.llm_provider else None
