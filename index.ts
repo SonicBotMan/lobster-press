@@ -83,11 +83,11 @@ function cleanupMcpProcess(signal: string): void {
   }
 }
 
-// Register cleanup handlers (remove existing ones first to avoid duplicates)
-process.removeAllListeners("SIGINT");
-process.removeAllListeners("SIGTERM");
-process.on("SIGINT", () => { cleanupMcpProcess("SIGINT"); process.exit(130); });
-process.on("SIGTERM", () => { cleanupMcpProcess("SIGTERM"); process.exit(143); });
+// Register cleanup handlers (v5.0.1: OpenClaw v2026.5.28 compat)
+// DO NOT use removeAllListeners — that breaks other plugins and the host process.
+// DO NOT call process.exit() — the host owns shutdown.
+process.on("SIGINT", () => { cleanupMcpProcess("SIGINT"); });
+process.on("SIGTERM", () => { cleanupMcpProcess("SIGTERM"); });
 
 // ─── IPC Helpers ─────────────────────────────────────────────────────────────
 
@@ -954,7 +954,6 @@ ${JSON.stringify(fullConfig, null, 2)}
         name: "LobsterPress Memory Engine",
         version: LOBSTERPRESS_VERSION,  // v4.0.17: 从 package.json 读取（Issue #153 Bug #3）
         ownsCompaction: true,
-        kind: "context-engine",
       },
 
       // 关键：每次 turn 后自动检查上下文使用率
@@ -965,7 +964,16 @@ ${JSON.stringify(fullConfig, null, 2)}
       // ── 异常处理设计决策 ──
       // 三种策略均捕获异常并记录日志，不向上冒泡：
       // 压缩失败不应中断用户对话，由日志监控告警。
-      async afterTurn(params: any) {
+      async afterTurn(params: {
+        sessionId: string;
+        sessionKey?: string;
+        sessionFile?: string;
+        messages?: any[];
+        prePromptMessageCount?: number;
+        tokenBudget?: number;
+        runtimeContext?: Record<string, unknown>;
+        isHeartbeat?: boolean;
+      }) {
         // v4.0.6: 调试日志 - 确认 afterTurn 被调用（Issue #141 诊断）
         api.logger.info(`[lobster-press] afterTurn called (sessionId=${params?.sessionId ?? "unknown"})`);
 
@@ -1248,79 +1256,13 @@ ${JSON.stringify(fullConfig, null, 2)}
         }
       },
 
-      // v4.0.7: prepareContext 防御线（Issue #141 评论）
-      // v4.0.9: 修复 P0-2 - latest_summary 字段不存在，改用两步调用（Issue #142）
-      // v4.0.14: 修复 P1-4 - MCP 返回结构解析错误（Issue #152 Bug #4）
-      // 每轮对话开始前，OpenClaw 自动调用，将最新摘要注入 system prompt
-      async prepareContext(params: { sessionId?: string; sessionKey?: string }) {
-        // v4.0.73: 添加 debug 日志
-        debugLog(`prepareContext called: sessionId=${params.sessionId}, sessionKey=${params.sessionKey}`);
-        
-        const sessionId = params.sessionId || params.sessionKey;
-        if (!sessionId) {
-          debugLog('prepareContext: no sessionId, returning null');
-          return null;
-        }
-
-        try {
-          // 第一步：调用 lobster_describe 获取摘要结构
-          const describe = await callMcp(pluginConfig, "lobster_describe", {
-            conversation_id: sessionId,
-          });
-          
-          // v4.0.14: 正确解析 MCP 返回值（从 content[0].text 解析 JSON）
-          const describeText = describe.content?.[0]?.text;
-          if (!describeText) {
-            return null;
-          }
-          const describeResult = JSON.parse(describeText);
-          
-          const byDepth = describeResult?.by_depth ?? {};
-          const depths = Object.keys(byDepth).map(Number).sort((a, b) => b - a);
-          
-          // 如果没有摘要，返回 null
-          if (depths.length === 0) {
-            return null;
-          }
-          
-          // 获取最高深度的第一个摘要的 summary_id
-          const topSummaryId = byDepth[depths[0]]?.[0]?.summary_id;
-          if (!topSummaryId) {
-            return null;
-          }
-          
-          // 第二步：调用 lobster_expand 获取摘要内容（v4.0.17: Issue #153 Bug #1）
-          // lobster_describe 不接受 summary_id 参数，应该用 lobster_expand
-          const detail = await callMcp(pluginConfig, "lobster_expand", {
-            summary_id: topSummaryId,
-            max_depth: 1,  // 只展开一层，获取直接子节点
-          });
-          
-          // v4.0.20: 统一使用 content[0].text 解析路径（Issue #156 Bug #1）
-          const expandText = detail.content?.[0]?.text;
-          const expandResult = expandText ? JSON.parse(expandText) : {};
-          const messages = expandResult?.messages ?? [];
-          
-          if (messages.length === 0) {
-            return null;
-          }
-          
-          // v4.0.26: 修复截断逻辑（Issue #167 Bug #3）
-          // prepareContext 用于注入摘要到 system prompt，不是全量上下文
-          // 使用固定 4000 字符上限，避免逻辑混淆
-          const maxContextChars = 4000;
-          const content = messages
-            .slice(-5)  // 最新 5 条（而非前 5 条）
-            .map((m: any) => `[${m.role}]: ${m.content ?? ''}`)
-            .join('\n')
-            .slice(0, maxContextChars);
-          
-          return content ? `[Memory Context]\n${content}` : null;
-        } catch (error) {
-          api.logger.error(`[lobster-press] prepareContext failed: ${error}`);
-          return null;
-        }
+      // Clean up Python subprocess on engine disposal
+      async dispose() {
+        cleanupMcpProcess("dispose");
       },
+
+      // NOTE: prepareContext removed — it is NOT part of the ContextEngine interface
+      // and will never be called by OpenClaw v2026.5.28.
     };
 
     // 注册为 ContextEngine
@@ -1347,20 +1289,13 @@ ${JSON.stringify(fullConfig, null, 2)}
       `your OpenClaw Gateway may not support ContextEngine.afterTurn hook`
     );
     
-    // ── Lifecycle Hooks (v4.0.38: Issue #183 双模式插件) ───────────────────────
-    // 参考 MemOS OpenClaw Plugin：使用 lifecycle hooks 作为 ContextEngine 的降级方案
-    // 当 OpenClaw Gateway 不支持 ContextEngine.afterTurn 时，通过 lifecycle hooks 实现记忆管理
-    
-    // TODO(OpenClaw Issue #52810): 正在验证 hooks 是否触发
-    // v4.0.50: 恢复 lifecycle hooks 进行实际 agent 交互测试
-    
-    // v4.0.46: Debug logging - lifecycle hooks
-    debugLog('About to register lifecycle hooks...');
-    debugLog(`api.on type: ${typeof api.on}`);
+    // ── Lifecycle Hooks (v5.0.1: OpenClaw v2026.5.28 compat) ─────────────────
+    // Guard against missing api.on (older SDK builds or alternative plugin runners)
+    if (typeof api.on !== 'function') {
+      api.logger.info('[lobster-press] api.on not available, skipping lifecycle hooks');
+    } else {
 
-    // 1. before_agent_start: 召回记忆 (v4.0.75: 重新启用完整逻辑)
-    // 注意：使用 before_agent_start 而不是 before_prompt_build，因为后者返回值会导致错误
-    debugLog('Registering before_agent_start hook...');
+    // 1. before_agent_start: 召回记忆
     api.on("before_agent_start", async (event: any, ctx: any) => {
       debugLog(`HOOK FIRED: before_agent_start, ctx.sessionId=${ctx?.sessionId}`);
       
@@ -1482,9 +1417,7 @@ ${JSON.stringify(fullConfig, null, 2)}
       }
     });
     debugLog('before_agent_start hook registered');
-
     // 2. agent_end: 写入记忆 (v4.0.75: 重新启用完整逻辑)
-    debugLog('Registering agent_end hook...');
     api.on("agent_end", async (event: any, ctx: any) => {
       debugLog(`HOOK FIRED: agent_end, event.success=${event?.success}, ctx.sessionId=${ctx?.sessionId}`);
       
@@ -1635,9 +1568,8 @@ ${JSON.stringify(fullConfig, null, 2)}
       }
     });
     debugLog('agent_end hook registered');
-
     api.logger.info(`[lobster-press] Lifecycle hooks registered (before_agent_start + agent_end)`);
-    // END: lifecycle hooks (v4.0.50: re-enabled for testing)
+    } // end if (typeof api.on === 'function')
   },
 };
 
@@ -1645,7 +1577,6 @@ export default definePluginEntry({
   id: "lobster-press",
   name: "LobsterPress Memory Engine",
   description: "Cognitive memory system for AI Agents: DAG compression, Ebbinghaus forgetting curve, semantic notes, contradiction detection",
-  kind: "memory",
   configSchema: lobsterPlugin.configSchema,
   register: (api) => lobsterPlugin.register(api),
 });
