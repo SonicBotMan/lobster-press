@@ -10,10 +10,12 @@ Version: v4.0.41
 
 import sys
 import json
+import logging
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
 # 添加 database 模块
 sys.path.insert(0, str(Path(__file__).parent))
 from database import LobsterDatabase
@@ -102,7 +104,7 @@ class DAGCompressor:
             messages = self.db.get_messages(conversation_id)
         
         if len(messages) <= self.fresh_tail_count:
-            print(f"⚠️ 消息数 ({len(messages)}) ≤ fresh tail ({self.fresh_tail_count})，无需压缩")
+            logger.warning(f"消息数 ({len(messages)}) ≤ fresh tail ({self.fresh_tail_count})，无需压缩")
             return None
         
         # 2. 分离 fresh tail 和 older messages
@@ -120,7 +122,7 @@ class DAGCompressor:
         ]
         
         if not uncompressed_messages:
-            print(f"✅ 所有旧消息都已被压缩，无需继续")
+            logger.info("所有旧消息都已被压缩，无需继续")
             return None
         
         # v4.0.34: 按遗忘曲线保留率升序排列，优先压缩"最应该被遗忘"的消息（Issue #173 修复二）
@@ -142,7 +144,7 @@ class DAGCompressor:
         uncompressed_tokens = sum(m.get('token_count', 0) for m in uncompressed_messages)
         
         if uncompressed_tokens < max_tokens:
-            print(f"⚠️ 未压缩消息 tokens ({uncompressed_tokens}) < {max_tokens}，无需压缩")
+            logger.warning(f"未压缩消息 tokens ({uncompressed_tokens}) < {max_tokens}，无需压缩")
             return None
         
         # 6. v2.6.0: 使用 EventSegmenter 分割为情节
@@ -174,7 +176,7 @@ class DAGCompressor:
                 merged_episodes.append(pending)
         
         if not merged_episodes:
-            print(f"⚠️ 所有 episode 都太小，无需压缩")
+            logger.warning("所有 episode 都太小，无需压缩")
             return None
         
         last_summary = None
@@ -212,9 +214,9 @@ class DAGCompressor:
             else:
                 self._extract_entities_rule(conversation_id, episode, summary_id)
             
-            print(f"✅ 创建叶子摘要: {summary_id}")
-            print(f"   - 消息数: {len(episode)}")
-            print(f"   - Tokens: {sum(m.get('token_count', 0) for m in episode)} → {self.db._estimate_tokens(summary_content)}")
+            logger.info(f"创建叶子摘要: {summary_id}")
+            logger.info(f"   - 消息数: {len(episode)}")
+            logger.info(f"   - Tokens: {sum(m.get('token_count', 0) for m in episode)} → {self.db._estimate_tokens(summary_content)}")
             
             last_summary = summary
         
@@ -269,7 +271,7 @@ class DAGCompressor:
             
             return '\n'.join(summary_parts)
         except Exception as e:
-            print(f"⚠️ LLM 摘要生成失败: {e}，降级为提取式摘要")
+            logger.warning(f"LLM 摘要生成失败: {e}，降级为提取式摘要")
             return self._generate_extractive_leaf_summary(messages)
     
     def _generate_extractive_leaf_summary(self, messages: List[Dict]) -> str:
@@ -333,7 +335,7 @@ class DAGCompressor:
         summaries = self.db.get_summaries(conversation_id, depth)
         
         if len(summaries) < min_fanout:
-            print(f"⚠️ 摘要数 ({len(summaries)}) < {min_fanout}，无需压缩")
+            logger.warning(f"摘要数 ({len(summaries)}) < {min_fanout}，无需压缩")
             return None
         
         # Phase 2: 固定窗口批处理，处理所有可压缩的摘要
@@ -359,10 +361,10 @@ class DAGCompressor:
             summary['summary_id'] = summary_id
             last_summary = summary
             
-            print(f"✅ 创建压缩摘要: {summary_id}")
-            print(f"   - 深度: {depth + 1}")
-            print(f"   - 父摘要: {len(chunk)} 个")
-            print(f"   - 总消息数: {summary['descendant_count']}")
+            logger.info(f"创建压缩摘要: {summary_id}")
+            logger.info(f"   - 深度: {depth + 1}")
+            logger.info(f"   - 父摘要: {len(chunk)} 个")
+            logger.info(f"   - 总消息数: {summary['descendant_count']}")
             
             i += min_fanout
         
@@ -438,7 +440,7 @@ class DAGCompressor:
             
             return '\n'.join(summary_parts)
         except Exception as e:
-            print(f"⚠️ LLM 压缩摘要生成失败: {e}，降级为截断式摘要")
+            logger.warning(f"LLM 压缩摘要生成失败: {e}，降级为截断式摘要")
             return self._generate_extractive_condensed_summary(combined_content, depth)
     
     def _generate_extractive_condensed_summary(self, combined_content: str, depth: int) -> str:
@@ -483,7 +485,7 @@ class DAGCompressor:
             是否执行了压缩
         """
         import sys
-        print(f"\n🔄 增量压缩检查: {conversation_id}")
+        logger.info(f"增量压缩检查: {conversation_id}")
         
         # 1. 获取当前上下文大小
         messages = self.db.get_messages(conversation_id)
@@ -493,10 +495,10 @@ class DAGCompressor:
         max_tokens = token_budget or 128000
         usage_ratio = total_tokens / max_tokens
         
-        print(f"📊 上下文使用率: {usage_ratio:.1%} ({total_tokens:,} / {max_tokens:,} tokens)")
+        logger.info(f"上下文使用率: {usage_ratio:.1%} ({total_tokens:,} / {max_tokens:,} tokens)")
         
         if usage_ratio < context_threshold:
-            print(f"✅ 使用率 < {context_threshold:.0%}，无需压缩")
+            logger.info(f"使用率 < {context_threshold:.0%}，无需压缩")
             return False
         
         # v4.0.0: 压缩前先执行 CMV 三遍无损压缩
@@ -505,11 +507,11 @@ class DAGCompressor:
         messages_for_compress = None  # 预处理后的消息
         
         if stats['reduction_pct'] > 0:
-            print(f"[ThreePassTrimmer] reduction: {stats['reduction_pct']}%", file=sys.stderr)
+            logger.info(f"[ThreePassTrimmer] reduction: {stats['reduction_pct']}%")
             messages_for_compress = trimmed  # 用压缩后的版本做摘要
         
         # 2. 执行叶子压缩（传递预处理消息）
-        print(f"\n🚀 开始叶子压缩...")
+        logger.info("开始叶子压缩...")
         leaf_summary = self.leaf_compact(
             conversation_id,
             preprocessed_messages=messages_for_compress
@@ -519,7 +521,7 @@ class DAGCompressor:
             return False
         
         # 3. 检查是否需要压缩摘要
-        print(f"\n🔍 检查是否需要压缩摘要...")
+        logger.info("检查是否需要压缩摘要...")
         self._check_and_condense(conversation_id)
         
         return True
@@ -538,11 +540,11 @@ class DAGCompressor:
             summaries = self.db.get_summaries(conversation_id, current_depth)
             
             if len(summaries) < self.condensed_min_fanout:
-                print(f"✅ Depth {current_depth}: 摘要数 {len(summaries)} < {self.condensed_min_fanout}，停止")
+                logger.info(f"Depth {current_depth}: 摘要数 {len(summaries)} < {self.condensed_min_fanout}，停止")
                 break
             
             # 执行压缩摘要
-            print(f"\n🚀 Depth {current_depth} → {current_depth + 1}: 压缩摘要...")
+            logger.info(f"Depth {current_depth} → {current_depth + 1}: 压缩摘要...")
             condensed = self.condensed_compact(conversation_id, current_depth)
             
             if not condensed:
@@ -568,11 +570,11 @@ class DAGCompressor:
         """
         skip_message_ids = skip_message_ids or []
         
-        print(f"\n{'=' * 60}")
-        print(f"  🦞 完整压缩: {conversation_id}")
+        logger.info(f"{'=' * 60}")
+        logger.info(f"完整压缩: {conversation_id}")
         if skip_message_ids:
-            print(f"  🚫 跳过 {len(skip_message_ids)} 条 exempt 消息")
-        print(f"{'=' * 60}\n")
+            logger.info(f"跳过 {len(skip_message_ids)} 条 exempt 消息")
+        logger.info(f"{'=' * 60}")
         
         stats = {
             'leaf_summaries': 0,
@@ -582,8 +584,8 @@ class DAGCompressor:
         }
         
         # Phase 1: 叶子压缩
-        print("Phase 1: 叶子压缩")
-        print("-" * 60)
+        logger.info("Phase 1: 叶子压缩")
+        logger.info("-" * 60)
         
         while True:
             leaf = self.leaf_compact(conversation_id, skip_message_ids=skip_message_ids)
@@ -595,8 +597,8 @@ class DAGCompressor:
             stats['messages_compressed'] += leaf.get('descendant_count', 0)
         
         # Phase 2: 压缩摘要
-        print(f"\nPhase 2: 压缩摘要")
-        print("-" * 60)
+        logger.info("Phase 2: 压缩摘要")
+        logger.info("-" * 60)
         
         self._check_and_condense(conversation_id, max_depth=-1)
         
@@ -604,12 +606,12 @@ class DAGCompressor:
         all_summaries = self.db.get_summaries(conversation_id)
         stats['condensed_summaries'] = len([s for s in all_summaries if s['kind'] == 'condensed'])
         
-        print(f"\n{'=' * 60}")
-        print(f"  ✅ 压缩完成")
-        print(f"{'=' * 60}")
-        print(f"  叶子摘要: {stats['leaf_summaries']} 个")
-        print(f"  压缩摘要: {stats['condensed_summaries']} 个")
-        print(f"  压缩消息: {stats['messages_compressed']} 条")
+        logger.info(f"{'=' * 60}")
+        logger.info("压缩完成")
+        logger.info(f"{'=' * 60}")
+        logger.info(f"叶子摘要: {stats['leaf_summaries']} 个")
+        logger.info(f"压缩摘要: {stats['condensed_summaries']} 个")
+        logger.info(f"压缩消息: {stats['messages_compressed']} 条")
         
         return stats
     
@@ -829,7 +831,7 @@ class DAGCompressor:
                 raise ValueError("No JSON array found")
             entities = _json.loads(raw[start:end])
         except Exception as e:
-            print(f"⚠️ LLM 实体提取失败: {e}，降级为规则提取")
+            logger.warning(f"LLM 实体提取失败: {e}，降级为规则提取")
             self._extract_entities_rule(conversation_id, messages, summary_id)
             return
         
@@ -854,19 +856,19 @@ if __name__ == "__main__":
     import os
     if os.path.exists("test_dag.db"):
         os.remove("test_dag.db")
-        print("🗑️ 删除旧的测试数据库")
+        logger.info("删除旧的测试数据库")
     
     # 测试 DAG 压缩器
     db = LobsterDatabase("test_dag.db")
     compressor = DAGCompressor(db, fresh_tail_count=5)  # 测试用较小的 fresh tail
     
-    print("✅ DAG 压缩器初始化成功")
+    logger.info("DAG 压缩器初始化成功")
     
     # 创建测试对话
     conversation_id = "conv_test"
     
     # 创建 50 条测试消息（每条 100 tokens）
-    print(f"\n📝 创建 50 条测试消息（每条约 100 tokens）...")
+    logger.info("创建 50 条测试消息（每条约 100 tokens）...")
     for i in range(1, 51):
         # 创建较长的内容以增加 token 数
         content = f'这是第 {i} 条消息，讨论了技术话题 {i % 10}。' * 20
@@ -880,10 +882,10 @@ if __name__ == "__main__":
         }
         db.save_message(msg)
     
-    print(f"✅ 创建完成")
+    logger.info("创建完成")
     
     # 初始化上下文（添加所有消息到 context_items）
-    print(f"\n📋 初始化上下文...")
+    logger.info("初始化上下文...")
     for i in range(1, 51):
         msg_id = f'msg_{i:03d}'
         db.cursor.execute("""
@@ -891,57 +893,57 @@ if __name__ == "__main__":
             VALUES (?, ?, ?, ?)
         """, (conversation_id, i, 'message', msg_id))
     db.conn.commit()
-    print(f"✅ 上下文初始化完成")
+    logger.info("上下文初始化完成")
     
     # 测试完整压缩（降低阈值以便触发）
-    print(f"\n{'=' * 60}")
-    print("测试: 完整压缩（降低阈值）")
-    print(f"{'=' * 60}")
+    logger.info(f"{'=' * 60}")
+    logger.info("测试: 完整压缩（降低阈值）")
+    logger.info(f"{'=' * 60}")
     
     # 临时降低 leaf_chunk_tokens 以便触发压缩
     compressor.leaf_chunk_tokens = 500  # 降低到 500 tokens
     stats = compressor.full_compact(conversation_id)
     
     # 查看摘要
-    print(f"\n{'=' * 60}")
-    print("查看摘要结构")
-    print(f"{'=' * 60}")
+    logger.info(f"{'=' * 60}")
+    logger.info("查看摘要结构")
+    logger.info(f"{'=' * 60}")
     
     summaries = db.get_summaries(conversation_id)
-    print(f"\n总摘要数: {len(summaries)}")
+    logger.info(f"总摘要数: {len(summaries)}")
     
     for s in summaries[:5]:  # 只显示前 5 个
-        print(f"  - {s['summary_id']}: {s['kind']} (depth={s['depth']}, messages={s['descendant_count']})")
+        logger.info(f"  - {s['summary_id']}: {s['kind']} (depth={s['depth']}, messages={s['descendant_count']})")
     
     if len(summaries) > 5:
-        print(f"  ... 还有 {len(summaries) - 5} 个摘要")
+        logger.info(f"  ... 还有 {len(summaries) - 5} 个摘要")
     
     # 测试展开
     if summaries:
-        print(f"\n{'=' * 60}")
-        print("测试展开摘要")
-        print(f"{'=' * 60}")
+        logger.info(f"{'=' * 60}")
+        logger.info("测试展开摘要")
+        logger.info(f"{'=' * 60}")
         
         test_summary_id = summaries[0]['summary_id']
         messages = db.expand_summary(test_summary_id)
-        print(f"✅ 展开摘要 {test_summary_id}: {len(messages)} 条消息")
+        logger.info(f"展开摘要 {test_summary_id}: {len(messages)} 条消息")
     
     # 测试上下文
-    print(f"\n{'=' * 60}")
-    print("测试上下文项")
-    print(f"{'=' * 60}")
+    logger.info(f"{'=' * 60}")
+    logger.info("测试上下文项")
+    logger.info(f"{'=' * 60}")
     
     context_items = compressor.get_context_items(conversation_id)
-    print(f"总上下文项: {len(context_items)}")
+    logger.info(f"总上下文项: {len(context_items)}")
     
     # 统计类型
     message_count = sum(1 for item in context_items if item['type'] == 'message')
     summary_count = sum(1 for item in context_items if item['type'] == 'summary')
-    print(f"  - 消息: {message_count} 条")
-    print(f"  - 摘要: {summary_count} 个")
+    logger.info(f"  - 消息: {message_count} 条")
+    logger.info(f"  - 摘要: {summary_count} 个")
     
     # 清理
     db.close()
     import os
     os.remove("test_dag.db")
-    print(f"\n✅ 测试完成，清理数据库")
+    logger.info("测试完成，清理数据库")

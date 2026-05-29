@@ -11,9 +11,11 @@ Version: v4.0.41
 import sys
 import json
 import argparse
+import logging
 from typing import List, Dict, Optional
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
 # 添加 database 模块
 sys.path.insert(0, str(Path(__file__).parent))
 from database import LobsterDatabase
@@ -385,17 +387,17 @@ def main():
             )
             
             if args.json:
-                print(json.dumps(results, indent=2, ensure_ascii=False))
+                logger.info(json.dumps(results, indent=2, ensure_ascii=False))
             else:
-                print(f"\n🔍 搜索结果: {len(results)} 项\n")
+                logger.info(f"搜索结果: {len(results)} 项")
                 for i, result in enumerate(results, 1):
-                    print(f"{i}. [{result['type']}] {result['id']}")
+                    logger.info(f"{i}. [{result['type']}] {result['id']}")
                     if result['type'] == 'message':
-                        print(f"   Role: {result['role']}")
+                        logger.info(f"   Role: {result['role']}")
                     else:
-                        print(f"   Kind: {result['kind']} (depth={result['depth']})")
-                    print(f"   {result['content']}")
-                    print()
+                        logger.info(f"   Kind: {result['kind']} (depth={result['depth']})")
+                    logger.info(f"   {result['content']}")
+                    logger.info("")
         
         elif args.command == 'describe':
             result = lobster_describe(
@@ -406,44 +408,44 @@ def main():
             )
             
             if not result:
-                print("❌ 未找到摘要")
+                logger.error("未找到摘要")
                 return
             
             if args.json:
-                print(json.dumps(result, indent=2, ensure_ascii=False))
+                logger.info(json.dumps(result, indent=2, ensure_ascii=False))
             else:
                 if args.summary:
                     # 单个摘要详情
-                    print(f"\n📄 摘要: {result['summary_id']}\n")
-                    print(f"  Kind: {result['kind']}")
-                    print(f"  Depth: {result['depth']}")
-                    print(f"  Messages: {result.get('descendant_count', 0)}")
-                    print(f"  Content:\n{result['content']}\n")
+                    logger.info(f"摘要: {result['summary_id']}")
+                    logger.info(f"  Kind: {result['kind']}")
+                    logger.info(f"  Depth: {result['depth']}")
+                    logger.info(f"  Messages: {result.get('descendant_count', 0)}")
+                    logger.info(f"  Content:\n{result['content']}")
                     
                     if result['kind'] == 'leaf':
-                        print(f"  包含消息 ({len(result['messages'])} 条):")
+                        logger.info(f"  包含消息 ({len(result['messages'])} 条):")
                         for msg in result['messages'][:5]:
-                            print(f"    - [{msg['role']}] {msg['content']}")
+                            logger.info(f"    - [{msg['role']}] {msg['content']}")
                         if len(result['messages']) > 5:
-                            print(f"    ... 还有 {len(result['messages']) - 5} 条")
+                            logger.info(f"    ... 还有 {len(result['messages']) - 5} 条")
                     else:
-                        print(f"  父摘要 ({len(result['parent_summaries'])} 个):")
+                        logger.info(f"  父摘要 ({len(result['parent_summaries'])} 个):")
                         for parent in result['parent_summaries']:
-                            print(f"    - {parent['summary_id']}: {parent['kind']} (depth={parent['depth']})")
+                            logger.info(f"    - {parent['summary_id']}: {parent['kind']} (depth={parent['depth']})")
                 else:
                     # 对话的摘要结构
-                    print(f"\n📊 对话: {result['conversation_id']}\n")
-                    print(f"  总摘要数: {result['total_summaries']}")
-                    print(f"  最大深度: {result['max_depth']}\n")
+                    logger.info(f"对话: {result['conversation_id']}")
+                    logger.info(f"  总摘要数: {result['total_summaries']}")
+                    logger.info(f"  最大深度: {result['max_depth']}")
                     
                     for depth in sorted(result['by_depth'].keys()):
                         summaries = result['by_depth'][depth]
-                        print(f"  Depth {depth}: {len(summaries)} 个摘要")
+                        logger.info(f"  Depth {depth}: {len(summaries)} 个摘要")
                         for summary in summaries[:3]:
-                            print(f"    - {summary['summary_id']}: {summary['kind']} ({summary['descendant_count']} msgs)")
+                            logger.info(f"    - {summary['summary_id']}: {summary['kind']} ({summary['descendant_count']} msgs)")
                         if len(summaries) > 3:
-                            print(f"    ... 还有 {len(summaries) - 3} 个")
-                        print()
+                            logger.info(f"    ... 还有 {len(summaries) - 3} 个")
+                        logger.info("")
         
         elif args.command == 'expand':
             result = lobster_expand(
@@ -453,22 +455,22 @@ def main():
             )
             
             if args.json:
-                print(json.dumps(result, indent=2, ensure_ascii=False))
+                logger.info(json.dumps(result, indent=2, ensure_ascii=False))
             elif args.brief:
-                print(f"\n✅ 展开摘要: {result['summary_id']}")
-                print(f"  总消息数: {result['total_messages']}")
-                print(f"  访问摘要: {result['visited_summaries']}\n")
+                logger.info(f"展开摘要: {result['summary_id']}")
+                logger.info(f"  总消息数: {result['total_messages']}")
+                logger.info(f"  访问摘要: {result['visited_summaries']}")
             else:
-                print(f"\n📤 展开摘要: {result['summary_id']}\n")
-                print(f"  总消息数: {result['total_messages']}")
-                print(f"  访问摘要: {result['visited_summaries']}\n")
-                print("  消息:")
+                logger.info(f"展开摘要: {result['summary_id']}")
+                logger.info(f"  总消息数: {result['total_messages']}")
+                logger.info(f"  访问摘要: {result['visited_summaries']}")
+                logger.info("  消息:")
                 for i, msg in enumerate(result['messages'][:10], 1):
                     content = msg['content'][:80] + ('...' if len(msg['content']) > 80 else '')
-                    print(f"    {i}. [{msg['role']}] {content}")
+                    logger.info(f"    {i}. [{msg['role']}] {content}")
                 if len(result['messages']) > 10:
-                    print(f"    ... 还有 {len(result['messages']) - 10} 条消息")
-                print()
+                    logger.info(f"    ... 还有 {len(result['messages']) - 10} 条消息")
+                logger.info("")
     
     finally:
         db.close()

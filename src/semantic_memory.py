@@ -12,9 +12,11 @@ Version: v4.0.41
 
 import json
 import hashlib
+import logging
 from typing import List, Dict, Optional
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 # v3.2.1: 使用集中的 prompt 模块
 from prompts import build_note_extraction_prompt
 
@@ -79,7 +81,7 @@ class SemanticMemory:
             response = llm_client.generate(prompt, temperature=0.5, max_tokens=800)
             notes_data = json.loads(response.strip())
         except Exception as e:
-            print(f'⚠️ Note 提取失败: {e}')
+            logger.warning(f'Note 提取失败: {e}')
             return []
         
         created_ids = []

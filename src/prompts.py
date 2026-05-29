@@ -9,8 +9,10 @@ Author: LobsterPress Team
 Version: v4.0.41
 """
 
+import logging
 from typing import List, Dict
 
+logger = logging.getLogger(__name__)
 
 # ==================== 叶子摘要 Prompt ====================
 
@@ -261,12 +263,12 @@ if __name__ == '__main__':
         {'role': 'assistant', 'content': '已记录，PostgreSQL 15.2'},
     ]
     
-    print("=" * 60)
-    print("叶子摘要 Prompt:")
-    print("=" * 60)
-    print(build_leaf_summary_prompt(test_messages))
+    logger.info("=" * 60)
+    logger.info("叶子摘要 Prompt:")
+    logger.info("=" * 60)
+    logger.info(build_leaf_summary_prompt(test_messages))
     
-    print("\n" + "=" * 60)
-    print("Note 提取 Prompt:")
-    print("=" * 60)
-    print(build_note_extraction_prompt(test_messages))
+    logger.info("=" * 60)
+    logger.info("Note 提取 Prompt:")
+    logger.info("=" * 60)
+    logger.info(build_note_extraction_prompt(test_messages))

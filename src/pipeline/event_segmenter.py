@@ -14,10 +14,12 @@ Version: v2.6.0
 
 import re
 import math
+import logging
 from typing import List, Dict, Optional
 from datetime import datetime
 from collections import Counter
 
+logger = logging.getLogger(__name__)
 
 class EventSegmenter:
     """
@@ -233,7 +235,7 @@ if __name__ == "__main__":
     ]
 
     episodes = segmenter.segment(msgs_topic_a + msgs_topic_b)
-    print(f"✅ 情节数: {len(episodes)}")
+    logger.info(f"情节数: {len(episodes)}")
     for i, ep in enumerate(episodes):
-        print(f"  情节 {i + 1}: {len(ep)} 条消息")
-        print(f"    第一条: {ep[0]['content'][:40]}...")
+        logger.info(f"  情节 {i + 1}: {len(ep)} 条消息")
+        logger.info(f"    第一条: {ep[0]['content'][:40]}...")

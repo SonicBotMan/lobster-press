@@ -14,6 +14,8 @@ Thumbs.db
 *.log
 *.bak
 *.backup
+tmp.json
+package.json.new
 
 # 配置文件（可能包含敏感信息）
 config.json
@@ -35,7 +37,6 @@ adaptive-learning/
 
 # 测试文件
 test/
-# tests/  # Allow integration tests
 *.test.sh
 
 # 文档生成
@@ -49,6 +50,7 @@ __pycache__/
 .Python
 venv/
 env/
+.venv/
 
 # Node
 node_modules/
@@ -56,15 +58,16 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# 其他
+# 环境
 .env
 .env.local
 .env.*.local
 
-# 压缩包
+# 压缩包和发布产物
 *.zip
 *.tar.gz
 *.tar.bz2
+*.tgz
 
 # 测试覆盖率
 .coverage
@@ -78,9 +81,9 @@ build/
 *.egg-info/
 *.egg
 .eggs/
-.venv/
--e 
-# Node.js
-node_modules/
 
+# mypy
+.mypy_cache/
+
+# npmrc
 .npmrc.github

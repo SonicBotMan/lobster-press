@@ -10,10 +10,12 @@ Version: v5.0.0
 import sqlite3
 import json
 import hashlib
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Callable
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 
 class MemoryImporter:
     """OpenClaw 原生记忆导入器
@@ -109,7 +111,7 @@ class MemoryImporter:
                 self._import_session_db(db_path, processed_hashes)
             except Exception as e:
                 self._progress["errors"] += 1
-                print(f"⚠️ Failed to import {db_path.name}: {e}")
+                logger.warning(f"Failed to import {db_path.name}: {e}")
 
             if on_progress:
                 on_progress(self._progress.copy())
@@ -259,4 +261,4 @@ class MemoryImporter:
                     f,
                 )
         except Exception as e:
-            print(f"⚠️ Failed to save checkpoint: {e}")
+            logger.warning(f"Failed to save checkpoint: {e}")

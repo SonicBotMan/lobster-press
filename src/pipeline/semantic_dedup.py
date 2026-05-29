@@ -13,9 +13,11 @@ Version: v2.5.0
 """
 
 import math
+import logging
 from typing import List, Tuple, Set
 from collections import Counter
 
+logger = logging.getLogger(__name__)
 try:
     from .tfidf_scorer import ScoredMessage
 except ImportError:
@@ -158,7 +160,7 @@ if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from pipeline.tfidf_scorer import TFIDFScorer
     
-    print("🧪 测试 SemanticDeduplicator v2.5.0\n")
+    logger.info("测试 SemanticDeduplicator v2.5.0")
     
     scorer = TFIDFScorer()
     deduper = SemanticDeduplicator(threshold=0.82)
@@ -174,18 +176,18 @@ if __name__ == "__main__":
     # 评分
     scored = scorer.score_and_tag(test_messages)
     
-    print("评分结果:")
+    logger.info("评分结果:")
     for msg in scored:
         exempt = "✅" if msg.compression_exempt else "❌"
-        print(f"  {msg.id}: [{msg.msg_type}] {exempt} 分数={msg.final_score:.1f}")
+        logger.info(f"  {msg.id}: [{msg.msg_type}] {exempt} 分数={msg.final_score:.1f}")
     
-    print("\n去重:")
+    logger.info("去重:")
     kept, removed = deduper.deduplicate(scored)
     
-    print(f"  保留: {len(kept)} 条")
-    print(f"  删除: {len(removed)} 条")
+    logger.info(f"  保留: {len(kept)} 条")
+    logger.info(f"  删除: {len(removed)} 条")
     
     if removed:
-        print(f"  被删除的 ID: {removed}")
+        logger.info(f"  被删除的 ID: {removed}")
     
-    print("\n✅ 测试完成")
+    logger.info("测试完成")

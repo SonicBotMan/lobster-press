@@ -130,10 +130,10 @@ class TestProcessDispatch:
 
         worker = AsyncWorker(db=MagicMock())
 
-        with patch("builtins.print") as mock_print:
+        with patch("src.async_queue.worker.logger") as mock_logger:
             worker._process({"type": "unknown_type", "payload": {}})
-            mock_print.assert_called_once()
-            assert "Unknown task type" in mock_print.call_args[0][0]
+            mock_logger.warning.assert_called_once()
+            assert "Unknown task type" in mock_logger.warning.call_args[0][0]
 
 
 class TestProcessEmbed:
@@ -145,11 +145,11 @@ class TestProcessEmbed:
 
         worker = AsyncWorker(db=MagicMock(), embedder=None)
 
-        with patch("builtins.print") as mock_print:
+        with patch("src.async_queue.worker.logger") as mock_logger:
             worker._process_embed(
                 {"target_type": "msg", "target_id": "123", "content": "test"}
             )
-            mock_print.assert_called_once_with("⚠️ embed: embedder not available")
+            mock_logger.warning.assert_called_once_with("embed: embedder not available")
 
     def test_skips_when_missing_target_type_or_id(self):
         """Should skip when target_type or target_id is missing."""
@@ -159,13 +159,13 @@ class TestProcessEmbed:
         mock_embedder.is_available.return_value = True
         worker = AsyncWorker(db=MagicMock(), embedder=mock_embedder)
 
-        with patch("builtins.print") as mock_print:
+        with patch("src.async_queue.worker.logger") as mock_logger:
             worker._process_embed(
                 {"target_type": "", "target_id": "123", "content": "test"}
             )
             assert any(
                 "missing target_type or target_id" in str(arg)
-                for arg in mock_print.call_args_list
+                for arg in mock_logger.warning.call_args_list
             )
 
     def test_calls_embedder_and_save_embedding(self):
@@ -198,10 +198,10 @@ class TestProcessTaskDetect:
 
         worker = AsyncWorker(db=MagicMock(), llm_client=None)
 
-        with patch("builtins.print") as mock_print:
+        with patch("src.async_queue.worker.logger") as mock_logger:
             worker._process_task_detect({"conversation_id": "conv1"})
-            mock_print.assert_called_once_with(
-                "⚠️ task_detect: llm_client not available"
+            mock_logger.warning.assert_called_once_with(
+                "task_detect: llm_client not available"
             )
 
     def test_skips_when_missing_conversation_id(self):
@@ -210,10 +210,10 @@ class TestProcessTaskDetect:
 
         worker = AsyncWorker(db=MagicMock(), llm_client=MagicMock())
 
-        with patch("builtins.print") as mock_print:
+        with patch("src.async_queue.worker.logger") as mock_logger:
             worker._process_task_detect({})
-            mock_print.assert_called_once()
-            assert "missing conversation_id" in mock_print.call_args[0][0]
+            mock_logger.warning.assert_called_once()
+            assert "missing conversation_id" in mock_logger.warning.call_args[0][0]
 
     @patch("src.skills.task_detector.TaskDetector")
     def test_uses_task_detector_and_returns_tasks(self, mock_detector_class):
@@ -244,11 +244,11 @@ class TestProcessSkillEval:
 
         worker = AsyncWorker(db=MagicMock(), llm_client=None)
 
-        with patch("builtins.print") as mock_print:
+        with patch("src.async_queue.worker.logger") as mock_logger:
             worker._process_skill_eval(
                 {"conversation_id": "conv1", "task": {"type": "test"}}
             )
-            mock_print.assert_called_once_with("⚠️ skill_eval: llm_client not available")
+            mock_logger.warning.assert_called_once_with("skill_eval: llm_client not available")
 
     def test_skips_when_missing_conversation_id_or_task(self):
         """Should skip when conversation_id or task is missing."""
@@ -256,18 +256,18 @@ class TestProcessSkillEval:
 
         worker = AsyncWorker(db=MagicMock(), llm_client=MagicMock())
 
-        with patch("builtins.print") as mock_print:
+        with patch("src.async_queue.worker.logger") as mock_logger:
             worker._process_skill_eval({"conversation_id": "conv1"})
             assert any(
                 "missing conversation_id or task" in str(arg)
-                for arg in mock_print.call_args_list
+                for arg in mock_logger.warning.call_args_list
             )
 
-        with patch("builtins.print") as mock_print:
+        with patch("src.async_queue.worker.logger") as mock_logger:
             worker._process_skill_eval({"task": {}})
             assert any(
                 "missing conversation_id or task" in str(arg)
-                for arg in mock_print.call_args_list
+                for arg in mock_logger.warning.call_args_list
             )
 
     @patch("src.skills.evolver.SkillEvolver")
@@ -312,18 +312,18 @@ class TestErrorHandling:
         )
         worker._running = True
 
-        with patch("builtins.print") as mock_print:
+        with patch("src.async_queue.worker.logger") as mock_logger:
             t = threading.Thread(target=worker._run_loop)
             t.start()
             t.join(timeout=2.0)
             worker._running = False
 
-            assert mock_print.call_count > 0, (
-                f"print was never called. calls={mock_print.call_args_list}"
+            assert mock_logger.warning.call_count > 0, (
+                f"logger.warning was never called. calls={mock_logger.warning.call_args_list}"
             )
-            print_args = [str(c) for c in mock_print.call_args_list]
-            assert any("embed failed" in p for p in print_args), (
-                f"Expected error message not found in {print_args}"
+            warning_args = [str(c) for c in mock_logger.warning.call_args_list]
+            assert any("embed failed" in p for p in warning_args), (
+                f"Expected error message not found in {warning_args}"
             )
 
     def test_worker_continues_after_error(self):

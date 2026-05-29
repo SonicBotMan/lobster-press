@@ -527,7 +527,7 @@ class ThreePassTrimmer:
                             extracted = extract_text(nested)
                             if extracted:
                                 return extracted
-                        except:
+                        except (json.JSONDecodeError, ValueError):
                             pass
                     return text
                 # 如果没有 text，尝试提取 preview 字段
@@ -546,7 +546,7 @@ class ThreePassTrimmer:
         try:
             data = json.loads(s)
             return extract_text(data)
-        except:
+        except (json.JSONDecodeError, ValueError):
             # 如果不是 JSON，直接返回原文
             return s
 

@@ -30,16 +30,19 @@ import json
 import asyncio
 import os
 import re
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 from datetime import datetime
 
+logger = logging.getLogger(__name__)
 # 添加 src/ 目录到 Python 模块搜索路径
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # v4.0.13: 统一版本号常量（Issue #151 Bug #8）
-LOBSTERPRESS_VERSION = "4.0.97"
+# 从 src/__init__.py 导入，确保单一来源
+from src import __version__ as LOBSTERPRESS_VERSION
 
 
 @dataclass
@@ -864,18 +867,18 @@ class LobsterPressMCPServer:
                         for s in compression_stats
                     )
 
-                    print(
+                    logger.info(
                         f"[lobster_assemble] 压缩完成: {len(context['working'])} 条消息, "
                         f"tokens {total_original} → {total_trimmed} (节省 {total_saved})"
                     )
-                    print(
+                    logger.info(
                         f"[lobster_assemble] 意图提取: {len(intents_data['user_intents'])} 个用户意图, "
                         f"{len(intents_data['assistant_conclusions'])} 个 assistant 结论"
                     )
 
                 except Exception as e:
                     # 降级：使用原始内容
-                    print(f"[lobster_assemble] 压缩失败，降级使用原始内容: {e}")
+                    logger.error(f"压缩失败，降级使用原始内容: {e}")
 
             assembled = []
             used_tokens = 0
@@ -1691,18 +1694,18 @@ async def main():
 
     if args.test:
         # 测试模式
-        print("=== LobsterPress MCP Server 测试 ===")
-        print("\n可用工具:")
+        logger.info("=== LobsterPress MCP Server 测试 ===")
+        logger.info("可用工具:")
         for tool in server.tools:
-            print(f"  - {tool.name}: {tool.description}")
+            logger.info(f"  - {tool.name}: {tool.description}")
 
         # 测试 list_sessions
         result = await server._call_tool("list_sessions", {"min_tokens": 1000})
-        print(f"\n找到 {result['total']} 个可压缩会话")
+        logger.info(f"找到 {result['total']} 个可压缩会话")
         for session in result["sessions"][:3]:
-            print(f"  - {session['session_id']}: {session['estimated_tokens']} tokens")
+            logger.info(f"  - {session['session_id']}: {session['estimated_tokens']} tokens")
 
-        print("\n✅ MCP Server 正常工作")
+        logger.info("MCP Server 正常工作")
     else:
         # Phase 1 (Issue #115): 发送 ready handshake
         emit({"type": "lobster-press/ready", "ts": time.time()})
