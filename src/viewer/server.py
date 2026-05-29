@@ -101,7 +101,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
         """发送 JSON 响应"""
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1:* http://localhost:*")
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode())
 
@@ -241,9 +241,23 @@ class ViewerHandler(BaseHTTPRequestHandler):
         )
 
     def _api_login(self):
-        """登录 API"""
-        params = parse_qs(urlparse(self.path).query)
-        password = params.get("password", [""])[0]
+        """登录 API — accepts POST with JSON body for password."""
+        try:
+            content_length = int(self.headers.get("Content-Length", 0))
+        except (ValueError, TypeError):
+            content_length = 0
+        body = self.rfile.read(content_length).decode("utf-8") if content_length else ""
+        password = ""
+        if body:
+            try:
+                data = json.loads(body)
+                password = data.get("password", "")
+            except (json.JSONDecodeError, ValueError):
+                pass
+        # Fallback: try query string (backward compatibility with GET login)
+        if not password:
+            params = parse_qs(urlparse(self.path).query)
+            password = params.get("password", [""])[0]
 
         if (
             self._password_hash

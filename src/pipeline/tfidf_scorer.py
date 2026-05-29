@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 from typing import List, Dict, Union
 from dataclasses import dataclass
 
+from src.utils.math import cosine_similarity
+
 
 # 压缩豁免的消息类型（这些类型的消息不应被 DAG 折叠）
 EXEMPT_TYPES = {"decision", "config", "code", "error"}
@@ -178,35 +180,9 @@ class TFIDFScorer:
         return idf
     
     def _cosine_similarity(self, tokens1: List[str], tokens2: List[str]) -> float:
-        """计算两组 token 的余弦相似度（缺陷 2 修复）
-        
-        Args:
-            tokens1: 第一组 token
-            tokens2: 第二组 token
-        
-        Returns:
-            余弦相似度（0.0 - 1.0）
-        """
-        if not tokens1 or not tokens2:
-            return 0.0
-        
-        # 构建 TF 向量
-        tf1 = Counter(tokens1)
-        tf2 = Counter(tokens2)
-        
-        # 找到所有词
-        all_terms = set(tf1.keys()) | set(tf2.keys())
-        
-        # 计算点积和模长
-        dot_product = sum(tf1.get(term, 0) * tf2.get(term, 0) for term in all_terms)
-        norm1 = math.sqrt(sum(v ** 2 for v in tf1.values()))
-        norm2 = math.sqrt(sum(v ** 2 for v in tf2.values()))
-        
-        if norm1 == 0 or norm2 == 0:
-            return 0.0
-        
-        return dot_product / (norm1 * norm2)
-    
+        """计算两组 token 的余弦相似度。委托给 utils.math.cosine_similarity。"""
+        return cosine_similarity(tokens1, tokens2)
+
     def score_and_tag(self, messages: List[Dict]) -> List[ScoredMessage]:
         """批量评分并打标签（v2.5.0 核心接口）
 

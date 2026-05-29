@@ -19,6 +19,9 @@ from typing import List, Dict, Optional
 from datetime import datetime
 from collections import Counter
 
+from src.utils.math import cosine_similarity
+from src.utils.tokens import estimate_tokens
+
 logger = logging.getLogger(__name__)
 
 class EventSegmenter:
@@ -179,23 +182,12 @@ class EventSegmenter:
         return Counter(words)
 
     def _cosine_similarity(self, a: Counter, b: Counter) -> float:
-        """计算两个词频向量的余弦相似度"""
-        if not a or not b:
-            return 0.0
-
-        common = set(a.keys()) & set(b.keys())
-        dot = sum(a[w] * b[w] for w in common)
-        norm_a = math.sqrt(sum(v**2 for v in a.values()))
-        norm_b = math.sqrt(sum(v**2 for v in b.values()))
-
-        if norm_a == 0 or norm_b == 0:
-            return 0.0
-        return dot / (norm_a * norm_b)
+        """计算两个词频向量的余弦相似度。委托给 utils.math。"""
+        return cosine_similarity(a, b)
 
     def _estimate_tokens(self, text: str) -> int:
-        """粗估 token 数（与 database.py 保持一致）"""
-        chinese = sum(1 for c in text if "\u4e00" <= c <= "\u9fff")
-        return int((len(text) - chinese) / 4 + chinese / 1.5)
+        """粗估 token 数。委托给 utils.tokens。"""
+        return estimate_tokens(text)
 
 
 # ==================== 单元测试 ====================

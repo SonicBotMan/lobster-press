@@ -12,6 +12,8 @@ Version: v4.0.41
 import logging
 from typing import List, Dict
 
+from src.utils.tokens import estimate_tokens
+
 logger = logging.getLogger(__name__)
 
 # ==================== 叶子摘要 Prompt ====================
@@ -213,18 +215,6 @@ def build_conflict_detection_prompt(statement1: str, statement2: str) -> str:
 
 
 # ==================== Prompt 优化工具 ====================
-
-def estimate_tokens(text: str) -> int:
-    """估算文本的 token 数（粗略估计：1 token ≈ 4 字符）
-    
-    Args:
-        text: 文本
-    
-    Returns:
-        估算的 token 数
-    """
-    return len(text) // 4
-
 
 def truncate_messages(messages: List[Dict], max_tokens: int = 20000) -> List[Dict]:
     """截断消息列表以适应 token 限制

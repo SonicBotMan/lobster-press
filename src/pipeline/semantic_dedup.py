@@ -17,6 +17,8 @@ import logging
 from typing import List, Tuple, Set
 from collections import Counter
 
+from src.utils.math import cosine_similarity
+
 logger = logging.getLogger(__name__)
 try:
     from .tfidf_scorer import ScoredMessage
@@ -123,32 +125,8 @@ class SemanticDeduplicator:
         return tokens
     
     def _cosine(self, a: List[str], b: List[str]) -> float:
-        """计算余弦相似度（基于 TF 向量）
-        
-        Args:
-            a: 消息 A 的 token 列表
-            b: 消息 B 的 token 列表
-        
-        Returns:
-            相似度（0-1）
-        """
-        if not a or not b:
-            return 0.0
-        
-        tf_a = Counter(a)
-        tf_b = Counter(b)
-        
-        all_terms = set(tf_a) | set(tf_b)
-        
-        dot_product = sum(tf_a.get(t, 0) * tf_b.get(t, 0) for t in all_terms)
-        
-        norm_a = math.sqrt(sum(v ** 2 for v in tf_a.values()))
-        norm_b = math.sqrt(sum(v ** 2 for v in tf_b.values()))
-        
-        if norm_a == 0 or norm_b == 0:
-            return 0.0
-        
-        return dot_product / (norm_a * norm_b)
+        """计算余弦相似度。委托给 utils.math.cosine_similarity。"""
+        return cosine_similarity(a, b)
 
 
 # ==================== 测试代码 ====================
