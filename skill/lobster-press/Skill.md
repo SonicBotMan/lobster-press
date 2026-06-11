@@ -31,5 +31,5 @@ LobsterPress 是一个为 OpenClaw 设计的**认知记忆系统**，通过 DAG�
 - [路线图](../../docs/ROADMAP.md)
 
 ## 脚本
-
-工具脚本位于仓库根目录 `scripts/`。
+## 脚本
+工具脚本已移除（v5.0+ 全部功能已迁入 `src/`、`mcp_server/`、`tests/`，无遗留脚本）。
