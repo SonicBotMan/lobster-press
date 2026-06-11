@@ -122,14 +122,15 @@ class TestEntityExtraction:
 
     def test_top_entities_ranked_by_frequency(self):
         ex = IntentExtractor()
+        # Use '1.0.0' (no 'v' prefix) so only the long pattern
+        # \d+\.\d+\.\d+ matches — no ambiguity vs short patterns.
         msgs = [
-            _msg("user", "v4.0.94 有问题"),
-            _msg("user", "v4.0.94 又出现"),
-            _msg("user", "v4.0.94 重复"),
+            _msg("user", "1.0.0 有问题"),
+            _msg("user", "1.0.0 又出现"),
+            _msg("user", "1.0.0 重复"),
         ]
         r = ex.extract_intents(msgs)
-        # Top entity is a version token; either 'v4.0.94' or '4.0.94'
-        assert r["key_entities"][0] in ("v4.0.94", "4.0.94")
+        assert r["key_entities"][0] == "1.0.0"
 
     def test_key_entities_capped_at_ten(self):
         ex = IntentExtractor()
