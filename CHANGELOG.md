@@ -5,6 +5,40 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [5.1.0] - 2026-06-12
+
+### Fixed (end-to-end runtime)
+- 🐛 **save_message 端到端契约**: 修复 `conversations` 行从未创建导致 `search_messages` 的 INNER JOIN 返回 0 行的 bug——v3.6.0 命名空间隔离、v5.0.0 多智能体隔离功能因此从未生效
+- 🐛 **seq 字段自动分配**: 客户端不传 `seq` 时改用 `_get_next_seq(conversation_id)`，避免 `NOT NULL constraint failed: messages.seq`
+- ✅ **6 个端到端集成测试**: 新增 `tests/integration/test_mcp_e2e.py` 真实 spawn MCP server 子进程验证 round-trip——这 3 个 bug 之前任何单测/契约测试都抓不到
+
+### Changed (docs)
+- 📝 **README.md**: 移除 2 个未核实的 arXiv ID（C-HLR+ / Focus 撞了 R³Mem 的 ID），标为待作者核实
+- 📝 **README.md**: MCP 工具数 22 → 17（与 `@server.list_tools()` 注册一致）
+- 📝 **mcp_server/README.md**: 整段重写——移除 v2 时代的 5 个老工具，列出 v5.0 实际 17 个工具
+- 📝 **6 个 docs 加 v2-era 弃用 banner**：`EXAMPLES.md` / `CUSTOMIZATION.md` / `CONFIGURATION.md` / `BATCH-COMPRESSION.md` / `BENCHMARK.md` / `OPENCLAW-INTEGRATION.md`，诚实告知读者 v2 示例在 v5 跑不通
+
+### Removed (dead code)
+- 🗑️ **`scripts/`** (20 个文件, ~200 KB, 0 引用): v2.x 时代 shell + py 脚本，功能已全部迁入 `src/pipeline/`
+- 🗑️ **`systemd/`** (6 个文件): `ExecStart` 指向不存在的 `~/bin/*.sh`，整组 timer 在任何安装上都静默 no-op
+
+### Changed (tests)
+- 🗑️ **5 个 v2 假绿契约测试**: 删 `test_compress_session_contract.py` / `test_preview_compression_contract.py` / `test_get_compression_stats_contract.py` / `test_list_sessions_contract.py` / `test_update_weights_contract.py`——它们 mock 了不存在的工具，断言从不真正验证行为
+- 📝 **Rename `TestCompressSessionReal` → `TestDagCompressorReal`**: 类名反映 v5 现实（测试 `leaf_compact` / `condensed_compact` / `incremental_compact` 而非 v2 `compress_session`）
+- ✨ **75 个新单测**：
+  * `test_chlr_scorer.py`（30 cases）—— CHLRScorer 15% → 98% 覆盖
+  * `test_intent_extractor.py`（29 cases）—— IntentExtractor 0% → 90% 覆盖
+  * `test_batch_importer.py`（15 cases）—— BatchImporter 18% → 85% 覆盖
+
+### Changed (CI)
+- 🔧 **`continue-on-error` 全部移除**: 6 处 `continue-on-error: true` 删掉——tsc 编译失败、lint 失败、Node 测试失败现在都阻断 PR
+- 🔧 **覆盖门槛 20% → 60%**: `pytest.ini` 和 `.github/workflows/test.yml` 同步提升，实际覆盖 70.77% 安全通过
+
+### Stats
+- 测试：481 → 555（+74 净增）
+- 覆盖：62.20% → 70.77%（+8.57pp）
+- 推送：6 个 feature/fix 分支各 1–2 个 commit 已合并 master 可达
+
 ## [Unreleased]
 
 ### Added
@@ -376,4 +410,3 @@ result = lobster_ingest(conversation_id="conv_123", messages=[...])
 ### Notes
 - P0-1（turn_count 测试覆盖）是误报：`tests/unit/test_v400.py:175` 已有 `test_get_turn_count` 测试
 - P0-2（ingest 静默降级）是设计决策，调用方可根据 `ingested: false` 决定是否重试
-

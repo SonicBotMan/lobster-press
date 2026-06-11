@@ -41,7 +41,7 @@ jobs:
 
       - name: Run unit tests
         run: |
-          pytest tests/unit/ -v --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=20
+          pytest tests/unit/ -v --cov=src --cov-report=term-missing --cov-report=xml --cov-fail-under=60
 
       - name: Run integration tests
         run: |
