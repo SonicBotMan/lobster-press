@@ -581,9 +581,9 @@ server = start_viewer(db, port=18799, password="mypassword")
 | **Ebbinghaus Forgetting Curve** | 动态遗忘：R(t) = base × e^(-t/stability) |
 | **Memory Reconsolidation (Nader, 2000)** | 矛盾检测、知识重巩固 |
 | **CMV** | 三遍无损压缩 |
-| **C-HLR+ (arXiv:2004.11327)** | 复杂度驱动半衰期 |
-| **Focus (arXiv:2502.15957)** | 主动压缩触发 |
-| **R³Mem (arXiv:2502.15957)** | 可逆三层压缩 |
+| **C-HLR+** (Parisi et al.) | 复杂度驱动半衰期 — 详见 bibtex，arXiv ID 待作者核实 |
+| **Focus** (active compression) | 主动压缩触发 — 详见 bibtex，arXiv ID 待作者核实 |
+| **R³Mem** (arXiv:2502.15957) | 可逆三层压缩 |
 
 ---
 
@@ -646,7 +646,7 @@ export LOBSTER_LLM_SUMMARY_PROVIDER=openai   # 可选
 ├── index.ts                    # OpenClaw 插件入口（ContextEngine）
 ├── openclaw.plugin.json        # 插件配置
 ├── mcp_server/
-│   └── lobster_mcp_server.py   # MCP Server（22 个工具）
+│   └── lobster_mcp_server.py   # MCP Server（17 个工具）
 └── src/
     ├── database.py             # SQLite 存储层
     ├── dag_compressor.py       # DAG 压缩引擎

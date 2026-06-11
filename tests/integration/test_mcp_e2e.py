@@ -26,7 +26,6 @@ from pathlib import Path
 
 import pytest
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 MCP_MODULE = "mcp_server.lobster_mcp_server"
 
@@ -202,6 +201,7 @@ def test_mcp_namespace_isolation(mcp_server):
     assert json.loads(r)["status"] == "ok"
 
     import sqlite3
+
     conn = sqlite3.connect(db)
     row = conn.execute(
         "SELECT namespace FROM conversations WHERE conversation_id = ?",
@@ -258,9 +258,8 @@ def test_mcp_seq_overrides_auto(mcp_server):
     )
     assert json.loads(r)["status"] == "ok"
     import sqlite3
+
     conn = sqlite3.connect(db)
-    seq = conn.execute(
-        "SELECT seq FROM messages WHERE message_id = ?", ("m_exp_1",)
-    ).fetchone()[0]
+    seq = conn.execute("SELECT seq FROM messages WHERE message_id = ?", ("m_exp_1",)).fetchone()[0]
     conn.close()
     assert seq == 7, f"explicit seq=7 not honored, got {seq}"
