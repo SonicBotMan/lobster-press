@@ -1,5 +1,12 @@
 # 🔧 模型配置与 OpenClaw 集成
 
+> **v2-era examples (removed in v5.0)**: The `lobster-press/scripts/*.sh` and `~/bin/*.sh` referenced below were removed in v5.0 (see `fix/remove-dead-code`). **The deployment snippets that copy shell scripts will fail on a v5.0 install.**
+>
+> For v5.0 configuration see:
+> - [README 安装步骤](../../README.md#-安装步骤推荐方式) — uses npm pack of the v5.0 plugin
+> - [`openclaw.plugin.json`](../../openclaw.plugin.json) — plugin manifest
+> - [`src/database.py`](../../src/database.py) — runtime configuration
+
 本文档详细说明如何配置 AI 模型以及将 LobsterPress 集成到 OpenClaw 中。
 
 ---

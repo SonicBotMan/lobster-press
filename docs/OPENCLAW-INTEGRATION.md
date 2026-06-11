@@ -1,5 +1,9 @@
 # OpenClaw 集成指南
 
+> **v2-era example**: The "安装协调器" section below references `scripts/lobster-openclaw-coordinator.sh`, which was removed in v5.0 (see `fix/remove-dead-code`). **The `cp` command will fail on a v5.0 install.** Skip that step; v5.0 ships everything needed for OpenClaw integration via the npm plugin.
+>
+> For v5.0 OpenClaw setup, follow the main [README 安装步骤](../../README.md#-安装步骤推荐方式).
+
 本文档说明如何将 LobsterPress 与 OpenClaw 集成，包括：
 1. **ContextEngine 集成**（v3.3.0+）：自动上下文监测与压缩
 2. **Compaction 协调**：与 OpenClaw 内置 Compaction 功能协调工作

@@ -1,5 +1,12 @@
 # 📊 LobsterPress Benchmark 报告
 
+> **v2-era benchmark (v1.2.0, 2026-03-10)**: The benchmark below was run against the v1.x `scripts/lobster_press_v120.py` tool, which was removed in v5.0. **The commands and numbers in the sections below do not reflect v5.0.**
+>
+> For v5.0 performance characteristics, run:
+> ```bash
+> pytest tests/test_performance.py -v
+> ```
+
 > 版本: v1.2.0 | 测试日期: 2026-03-10 | 模型: GLM-4
 
 ---

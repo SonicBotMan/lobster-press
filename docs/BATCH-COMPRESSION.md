@@ -1,5 +1,9 @@
 # 批量压缩器使用指南
 
+> **v2-era examples (removed in v5.0)**: The `scripts/batch_compressor.py` and related legacy shell scripts were removed in v5.0 (see `fix/remove-dead-code`). **The commands below will not work on a v5.0 install.**
+>
+> For v5.0 batch import use [`src/pipeline/batch_importer.py`](../../src/pipeline/batch_importer.py) (Python API) or the `lobster_import` MCP tool (see [README MCP 工具列表](../../README.md#%EF%B8%8F-mcp-工具列表)).
+
 ## 概述
 
 批量压缩器（Batch Compressor）用于批量处理多个会话的压缩任务，支持并发处理、实时进度显示、超时控制等特性。

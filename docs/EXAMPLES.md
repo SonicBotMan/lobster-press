@@ -1,5 +1,12 @@
 # 🦞 龙虾饼 (LobsterPress) - 使用示例合集
 
+> **v2-era examples (removed in v5.0)**: The `~/bin/*.sh` and `scripts/*.sh` referenced below were removed in v5.0 (see `fix/remove-dead-code`). **The commands in the sections below will not work on a v5.0 install.**
+>
+> For v5.0 usage see:
+> - [README MCP 工具列表](../../README.md#%EF%B8%8F-mcp-工具列表) — 17 tools
+> - [`tests/integration/test_mcp_e2e.py`](../../tests/integration/test_mcp_e2e.py) — end-to-end examples
+> - Python API: `from src.database import LobsterDatabase` + `from src.incremental_compressor import IncrementalCompressor`
+
 本文档提供 LobsterPress 的详细使用示例，涵盖各种实际场景。
 
 ---
