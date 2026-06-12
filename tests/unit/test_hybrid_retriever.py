@@ -377,12 +377,8 @@ class TestFTSSearch:
         db = self._make_mock_db()
         retriever = HybridRetriever(db=db)
         retriever._fts_search("test", conversation_id="conv_123")
-        db.search_messages.assert_called_once_with(
-            "test", conversation_id="conv_123", limit=50
-        )
-        db.search_summaries.assert_called_once_with(
-            "test", conversation_id="conv_123", limit=50
-        )
+        db.search_messages.assert_called_once_with("test", conversation_id="conv_123", limit=50)
+        db.search_summaries.assert_called_once_with("test", conversation_id="conv_123", limit=50)
 
     def test_empty_results(self):
         """Should return empty list when no matches."""
@@ -458,17 +454,13 @@ class TestVectorSearch:
         embedder.embed.return_value = [0.1] * 1024
         retriever = HybridRetriever(db=db, embedder=embedder)
         retriever._vector_search("query", conversation_id="conv_1")
-        db.vector_search.assert_called_once_with(
-            [0.1] * 1024, top_k=50, conversation_id="conv_1"
-        )
+        db.vector_search.assert_called_once_with([0.1] * 1024, top_k=50, conversation_id="conv_1")
 
 
 class TestFullPipeline:
     """Tests for the full search() pipeline."""
 
-    def _make_retriever(
-        self, with_embedder=False, msgs=None, sums=None, vec_results=None
-    ):
+    def _make_retriever(self, with_embedder=False, msgs=None, sums=None, vec_results=None):
         db = MagicMock()
         db.search_messages.return_value = msgs or []
         db.search_summaries.return_value = sums or []

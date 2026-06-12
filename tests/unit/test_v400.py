@@ -28,48 +28,52 @@ class TestThreePassTrimmer:
         """测试 Pass 1: 剥离 base64 冗余"""
         trimmer = ThreePassTrimmer()
         # 使用足够长的 base64 字符串触发压缩（> 500 字符）
-        long_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==" * 10
-        messages = [
-            {"role": "assistant", "content": f"Image data: {long_base64}"}
-        ]
+        long_base64 = (
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+            * 10
+        )
+        messages = [{"role": "assistant", "content": f"Image data: {long_base64}"}]
         trimmed, stats = trimmer.trim(messages)
         # Pass 1 应该剥离 base64 数据（允许负数 reduction_pct，因为有 [compressed] 标记开销）
-        assert stats['pass1_saved'] > 0 or stats['reduction_pct'] >= -20
+        assert stats["pass1_saved"] > 0 or stats["reduction_pct"] >= -20
 
     def test_pass2_deduplicate_tools(self):
         """测试 Pass 2: 去重工具结果"""
         trimmer = ThreePassTrimmer()
         messages = [
             {"role": "tool", "content": '{"status": "ok"}', "tool_name": "test_tool"},
-            {"role": "tool", "content": '{"status": "ok"}', "tool_name": "test_tool"}
+            {"role": "tool", "content": '{"status": "ok"}', "tool_name": "test_tool"},
         ]
         trimmed, stats = trimmer.trim(messages)
         # Pass 2 应该去重
         assert len(trimmed) <= 2
-        assert stats['pass2_saved'] >= 0
+        assert stats["pass2_saved"] >= 0
 
     def test_pass3_fold_boilerplate(self):
         """测试 Pass 3: 折叠系统样板代码"""
         trimmer = ThreePassTrimmer()
         messages = [
             {"role": "system", "content": "[MEMORY REMINDER] Check your memory"},
-            {"role": "system", "content": "[MEMORY REMINDER] Check your memory"}
+            {"role": "system", "content": "[MEMORY REMINDER] Check your memory"},
         ]
         trimmed, stats = trimmer.trim(messages)
         # Pass 3 应该折叠样板代码
-        assert stats['pass3_saved'] >= 0
+        assert stats["pass3_saved"] >= 0
 
     def test_lossless_principle(self):
         """测试无损原则：user/assistant 消息不被修改"""
         trimmer = ThreePassTrimmer()
         messages = [
-            {"role": "user", "content": "This is important user content that should not be modified."}
+            {
+                "role": "user",
+                "content": "This is important user content that should not be modified.",
+            }
         ]
         trimmed, stats = trimmer.trim(messages)
         # user 消息应该保持不变
         assert len(trimmed) == 1
-        assert trimmed[0]['role'] == 'user'
-        assert trimmed[0]['content'] == messages[0]['content']
+        assert trimmed[0]["role"] == "user"
+        assert trimmed[0]["content"] == messages[0]["content"]
 
 
 class TestCHLRPlus:
@@ -91,12 +95,16 @@ class TestCHLRPlus:
 
         # 第一次访问
         db.touch_message(msg_id)
-        db.cursor.execute("SELECT stability, access_count FROM messages WHERE message_id = ?", (msg_id,))
+        db.cursor.execute(
+            "SELECT stability, access_count FROM messages WHERE message_id = ?", (msg_id,)
+        )
         stability1, count1 = db.cursor.fetchone()
 
         # 第二次访问
         db.touch_message(msg_id)
-        db.cursor.execute("SELECT stability, access_count FROM messages WHERE message_id = ?", (msg_id,))
+        db.cursor.execute(
+            "SELECT stability, access_count FROM messages WHERE message_id = ?", (msg_id,)
+        )
         stability2, count2 = db.cursor.fetchone()
 
         assert count2 == count1 + 1
@@ -119,7 +127,9 @@ class TestR3Mem:
         assert db.cursor.fetchone() is not None
 
         # 检查 entity_mentions 表
-        db.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='entity_mentions'")
+        db.cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='entity_mentions'"
+        )
         assert db.cursor.fetchone() is not None
 
     def test_upsert_entity(self):
@@ -131,16 +141,15 @@ class TestR3Mem:
         msg_id = db.add_message(conv_id, "user", "小明喜欢编程")
 
         entity_id = db.upsert_entity(
-            conversation_id=conv_id,
-            entity_name="小明",
-            entity_type="person",
-            message_ids=[msg_id]
+            conversation_id=conv_id, entity_name="小明", entity_type="person", message_ids=[msg_id]
         )
 
         assert entity_id.startswith("ent_")
 
         # 检查实体是否插入
-        db.cursor.execute("SELECT entity_name, mention_count FROM entities WHERE entity_id = ?", (entity_id,))
+        db.cursor.execute(
+            "SELECT entity_name, mention_count FROM entities WHERE entity_id = ?", (entity_id,)
+        )
         row = db.cursor.fetchone()
         assert row[0] == "小明"
         assert row[1] == 1
@@ -160,7 +169,7 @@ class TestR3Mem:
             "kind": "leaf",
             "depth": 0,
             "content": "Test summary",
-            "source_messages": [msg_id]  # 修复：使用 source_messages 字段
+            "source_messages": [msg_id],  # 修复：使用 source_messages 字段
         }
         summary_id = db.save_summary(summary)
 
@@ -172,7 +181,7 @@ class TestR3Mem:
         # 改为测试 target_layer=2（返回原始消息）
         result_layer2 = db.expand_summary(summary_id, target_layer=2)
         assert len(result_layer2) == 1
-        assert result_layer2[0]['message_id'] == msg_id
+        assert result_layer2[0]["message_id"] == msg_id
 
     def test_get_turn_count(self):
         """测试获取轮次数"""
@@ -204,12 +213,15 @@ class TestWMRTools:
         db.add_message(conv_id, "user", "Test message")
 
         # 检查消息层级分布
-        db.cursor.execute("""
+        db.cursor.execute(
+            """
             SELECT memory_tier, COUNT(*) as cnt
             FROM messages
             WHERE conversation_id = ?
             GROUP BY memory_tier
-        """, (conv_id,))
+        """,
+            (conv_id,),
+        )
         tier_dist = {row[0]: row[1] for row in db.cursor.fetchall()}
         assert "working" in tier_dist
         assert tier_dist["working"] == 1
@@ -223,14 +235,19 @@ class TestWMRTools:
         msg_id = db.add_message(conv_id, "user", "Test message")
 
         # 标记为 decayed
-        db.cursor.execute("UPDATE messages SET memory_tier = 'decayed' WHERE message_id = ?", (msg_id,))
+        db.cursor.execute(
+            "UPDATE messages SET memory_tier = 'decayed' WHERE message_id = ?", (msg_id,)
+        )
         db.conn.commit()
 
         # 检查 decayed 消息数量
-        db.cursor.execute("""
+        db.cursor.execute(
+            """
             SELECT COUNT(*) FROM messages
             WHERE conversation_id = ? AND memory_tier = 'decayed'
-        """, (conv_id,))
+        """,
+            (conv_id,),
+        )
         decayed_count = db.cursor.fetchone()[0]
         assert decayed_count == 1
 

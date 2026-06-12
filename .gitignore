@@ -87,3 +87,7 @@ build/
 
 # npmrc
 .npmrc.github
+
+# IDE/tooling
+.codegraph/
+.cursor/

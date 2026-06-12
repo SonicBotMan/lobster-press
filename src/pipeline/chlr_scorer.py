@@ -108,9 +108,7 @@ class CHLRScorer:
 
         return half_life
 
-    def calculate_retention(
-        self, message: Dict, current_time: datetime = None
-    ) -> float:
+    def calculate_retention(self, message: Dict, current_time: datetime = None) -> float:
         """
         计算记忆保留率（0-1）
 
@@ -136,9 +134,7 @@ class CHLRScorer:
             return 1.0  # 新消息，保留率 100%
 
         try:
-            last_accessed = datetime.fromisoformat(
-                last_accessed_str.replace("Z", "+00:00")
-            )
+            last_accessed = datetime.fromisoformat(last_accessed_str.replace("Z", "+00:00"))
             if last_accessed.tzinfo:
                 last_accessed = last_accessed.replace(tzinfo=None)
             if current_time.tzinfo:

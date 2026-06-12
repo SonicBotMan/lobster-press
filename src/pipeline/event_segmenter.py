@@ -24,6 +24,7 @@ from src.utils.tokens import estimate_tokens
 
 logger = logging.getLogger(__name__)
 
+
 class EventSegmenter:
     """
     将消息序列切分为语义连贯的「情节」（episode）。
@@ -125,9 +126,7 @@ class EventSegmenter:
 
         return False
 
-    def _split_by_boundaries(
-        self, messages: List[Dict], boundaries: List[int]
-    ) -> List[List[Dict]]:
+    def _split_by_boundaries(self, messages: List[Dict], boundaries: List[int]) -> List[List[Dict]]:
         """按边界索引切分消息列表，并合并过小的情节"""
         episodes = []
         boundaries_set = set(boundaries)
@@ -152,9 +151,7 @@ class EventSegmenter:
 
         merged = [episodes[0]]
         for episode in episodes[1:]:
-            episode_tokens = sum(
-                self._estimate_tokens(m.get("content", "")) for m in episode
-            )
+            episode_tokens = sum(self._estimate_tokens(m.get("content", "")) for m in episode)
             if episode_tokens < self.min_episode_tokens:
                 merged[-1] = merged[-1] + episode  # 合并到前一个
             else:
@@ -165,12 +162,8 @@ class EventSegmenter:
     def _get_time_gap(self, prev: Dict, curr: Dict) -> Optional[float]:
         """获取两条消息间的时间差（秒），解析失败返回 None"""
         try:
-            t1 = datetime.fromisoformat(
-                prev.get("created_at") or prev.get("timestamp", "")
-            )
-            t2 = datetime.fromisoformat(
-                curr.get("created_at") or curr.get("timestamp", "")
-            )
+            t1 = datetime.fromisoformat(prev.get("created_at") or prev.get("timestamp", ""))
+            t2 = datetime.fromisoformat(curr.get("created_at") or curr.get("timestamp", ""))
             return abs((t2 - t1).total_seconds())
         except Exception:
             return None

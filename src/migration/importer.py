@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+
 class MemoryImporter:
     """OpenClaw 原生记忆导入器
 
@@ -32,9 +33,7 @@ class MemoryImporter:
 
     def __init__(self, db, openclaw_path: str = None):
         self.db = db
-        self.openclaw_path = (
-            Path(openclaw_path) if openclaw_path else self.OPENCLAW_DEFAULT_PATH
-        )
+        self.openclaw_path = Path(openclaw_path) if openclaw_path else self.OPENCLAW_DEFAULT_PATH
         self._progress = {"stored": 0, "skipped": 0, "merged": 0, "errors": 0}
         self._checkpoint_file = None
 

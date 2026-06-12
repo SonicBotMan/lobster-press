@@ -47,9 +47,7 @@ class ThreePassTrimmer:
                 'pass4_saved': int,  # v4.0.95: 消息去重
             }
         """
-        original_tokens = sum(
-            self._estimate_tokens(self._msg_to_text(m)) for m in messages
-        )
+        original_tokens = sum(self._estimate_tokens(self._msg_to_text(m)) for m in messages)
 
         after_p1, p1_saved = self._pass1_strip_mechanical_bloat(messages)
         after_p2, p2_saved = self._pass2_dedup_tool_results(after_p1)
@@ -63,12 +61,8 @@ class ThreePassTrimmer:
             if msg.get("_pass1_compressed") or msg.get("_pass4_dedup"):
                 msg["content"] = f"[compressed] {msg.get('content', '')}"
 
-        trimmed_tokens = sum(
-            self._estimate_tokens(self._msg_to_text(m)) for m in after_p4
-        )
-        reduction_pct = (
-            (1 - trimmed_tokens / original_tokens) * 100 if original_tokens > 0 else 0.0
-        )
+        trimmed_tokens = sum(self._estimate_tokens(self._msg_to_text(m)) for m in after_p4)
+        reduction_pct = (1 - trimmed_tokens / original_tokens) * 100 if original_tokens > 0 else 0.0
 
         return after_p4, {
             "original_tokens": original_tokens,
@@ -83,9 +77,7 @@ class ThreePassTrimmer:
 
     # ── Pass 1: 剥离机械性 Bloat ──────────────────────────────────────────────
 
-    def _pass1_strip_mechanical_bloat(
-        self, messages: List[Dict]
-    ) -> Tuple[List[Dict], int]:
+    def _pass1_strip_mechanical_bloat(self, messages: List[Dict]) -> Tuple[List[Dict], int]:
         """
         Pass 1: 保留 user 全部内容，压缩 tool/assistant 输出中的机械性 bloat。
 
@@ -113,9 +105,7 @@ class ThreePassTrimmer:
             if role == "assistant":
                 content = msg.get("content", "")
                 original_len = (
-                    len(content)
-                    if isinstance(content, str)
-                    else len(json.dumps(content))
+                    len(content) if isinstance(content, str) else len(json.dumps(content))
                 )
 
                 compressed_content = self._compress_assistant_content(content)
@@ -126,16 +116,12 @@ class ThreePassTrimmer:
                 )
 
                 saved += max(0, original_len - compressed_len)
-                result.append(
-                    {**msg, "content": compressed_content, "_pass1_compressed": True}
-                )
+                result.append({**msg, "content": compressed_content, "_pass1_compressed": True})
                 continue
 
             # tool / system 消息：尝试压缩
             content = msg.get("content", "")
-            original_len = (
-                len(content) if isinstance(content, str) else len(json.dumps(content))
-            )
+            original_len = len(content) if isinstance(content, str) else len(json.dumps(content))
 
             compressed_content = self._compress_tool_content(content)
             compressed_len = (
@@ -145,9 +131,7 @@ class ThreePassTrimmer:
             )
 
             saved += max(0, original_len - compressed_len)
-            result.append(
-                {**msg, "content": compressed_content, "_pass1_compressed": True}
-            )
+            result.append({**msg, "content": compressed_content, "_pass1_compressed": True})
 
         return result, saved
 
@@ -386,13 +370,9 @@ class ThreePassTrimmer:
     def _is_base64_blob(self, s: str) -> bool:
         if len(s) < 100:
             return False
-        b64_chars = set(
-            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
-        )
+        b64_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=")
         sample = s[:200].replace("\n", "")
-        return (
-            len(sample) > 0 and sum(c in b64_chars for c in sample) / len(sample) > 0.95
-        )
+        return len(sample) > 0 and sum(c in b64_chars for c in sample) / len(sample) > 0.95
 
     def _looks_like_json(self, s: str) -> bool:
         stripped = s.strip()
@@ -402,9 +382,7 @@ class ThreePassTrimmer:
 
     # ── Pass 4: 消息去重（v4.0.95）──────────────────────────────────────────────
 
-    def _pass4_dedup_messages(
-        self, messages: List[Dict]
-    ) -> Tuple[List[Dict], int, int]:
+    def _pass4_dedup_messages(self, messages: List[Dict]) -> Tuple[List[Dict], int, int]:
         """
         Pass 4: 语义去重消息
 
@@ -519,9 +497,7 @@ class ThreePassTrimmer:
                 if "text" in obj:
                     text = obj["text"]
                     # 如果 text 还是 JSON 字符串，递归提取
-                    if isinstance(text, str) and (
-                        text.startswith("{") or text.startswith("[")
-                    ):
+                    if isinstance(text, str) and (text.startswith("{") or text.startswith("[")):
                         try:
                             nested = json.loads(text)
                             extracted = extract_text(nested)

@@ -409,9 +409,7 @@ class TestSaveSkill:
 
         skill_id = evolver._save_skill(task, skill_md, 0.7, "conv2", "owner1")
 
-        temp_db.cursor.execute(
-            "SELECT * FROM skill_versions WHERE skill_id = ?", (skill_id,)
-        )
+        temp_db.cursor.execute("SELECT * FROM skill_versions WHERE skill_id = ?", (skill_id,))
         version = temp_db.cursor.fetchone()
         assert version is not None
 
@@ -485,7 +483,9 @@ class TestEvaluateAndGenerate:
                 self.calls.append(prompt)
                 if "YES" in prompt or "NO" in prompt:
                     return "YES"
-                return "# Complete Pipeline\n## 目标\nTest\n## 步骤\n1. step1\n2. step2\n## 警告\n- ok"
+                return (
+                    "# Complete Pipeline\n## 目标\nTest\n## 步骤\n1. step1\n2. step2\n## 警告\n- ok"
+                )
 
         mock_llm = SmartMockLLM()
         evolver = SkillEvolver(db=temp_db, llm_client=mock_llm)
@@ -503,15 +503,11 @@ class TestEvaluateAndGenerate:
         assert saved is not None
         assert saved["name"] == "Complete pipeline execution"
 
-        temp_db.cursor.execute(
-            "SELECT * FROM skill_versions WHERE skill_id = ?", (skill_id,)
-        )
+        temp_db.cursor.execute("SELECT * FROM skill_versions WHERE skill_id = ?", (skill_id,))
         version = temp_db.cursor.fetchone()
         assert version is not None
 
-        temp_db.cursor.execute(
-            "SELECT * FROM task_skills WHERE task_id = ?", ("conv_pipeline",)
-        )
+        temp_db.cursor.execute("SELECT * FROM task_skills WHERE task_id = ?", ("conv_pipeline",))
         assoc = temp_db.cursor.fetchone()
         assert assoc is not None
 

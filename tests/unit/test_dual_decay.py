@@ -231,8 +231,6 @@ class TestFloorValue:
             "created_at": created.isoformat(),
         }
 
-        retention = self.db._compute_retention(
-            msg, at_very_old, half_life_override=336.0
-        )
+        retention = self.db._compute_retention(msg, at_very_old, half_life_override=336.0)
         assert retention > 0.0
         assert retention >= 0.3

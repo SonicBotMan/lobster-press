@@ -193,7 +193,9 @@ class TestDeduplication:
 
 class TestDataclasses:
     def test_intent_fields(self):
-        i = Intent(intent_type="question", content="x", confidence=0.9, source="user", entities=["a"])
+        i = Intent(
+            intent_type="question", content="x", confidence=0.9, source="user", entities=["a"]
+        )
         assert i.intent_type == "question"
         assert i.content == "x"
         assert i.confidence == 0.9

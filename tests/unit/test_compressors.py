@@ -37,7 +37,7 @@ class TestDAGCompressor:
         """测试叶子压缩：空对话"""
         db = LobsterDatabase(":memory:")
         compressor = DAGCompressor(db)
-        
+
         # 空对话应该返回 None
         result = compressor.leaf_compact("empty_conv")
         assert result is None
@@ -46,14 +46,14 @@ class TestDAGCompressor:
         """测试叶子压缩：有消息"""
         db = LobsterDatabase(":memory:")
         compressor = DAGCompressor(db)
-        
+
         # 添加一些消息
         conv_id = "test_conv"
         for i in range(5):
             db.add_message(conv_id, "user", f"Message {i}")
-        
+
         # Mock LLM 客户端
-        with patch.object(compressor, '_generate_llm_leaf_summary', return_value="Summary"):
+        with patch.object(compressor, "_generate_llm_leaf_summary", return_value="Summary"):
             result = compressor.leaf_compact(conv_id, max_tokens=100)
             # 应该创建摘要
             assert result is not None or result is None  # 允许 None（没有压缩）
@@ -62,12 +62,12 @@ class TestDAGCompressor:
         """测试增量压缩"""
         db = LobsterDatabase(":memory:")
         compressor = DAGCompressor(db)
-        
+
         # 添加一些消息
         conv_id = "test_conv"
         for i in range(10):
             db.add_message(conv_id, "user", f"Message {i}" * 10)
-        
+
         # 执行增量压缩
         result = compressor.incremental_compact(conv_id, context_threshold=0.5)
         # 应该返回布尔值
@@ -77,7 +77,7 @@ class TestDAGCompressor:
         """测试获取上下文项"""
         db = LobsterDatabase(":memory:")
         compressor = DAGCompressor(db)
-        
+
         conv_id = "test_conv"
         items = compressor.get_context_items(conv_id)
         assert isinstance(items, list)
@@ -96,15 +96,15 @@ class TestIncrementalCompressor:
         """测试压缩策略选择"""
         db = LobsterDatabase(":memory:")
         compressor = IncrementalCompressor(db)
-        
+
         # 低使用率 -> none
         strategy = compressor._select_compression_strategy(0.5)
         assert strategy == "none"
-        
+
         # 中等使用率 -> light
         strategy = compressor._select_compression_strategy(0.65)
         assert strategy == "light"
-        
+
         # 高使用率 -> aggressive
         strategy = compressor._select_compression_strategy(0.8)
         assert strategy == "aggressive"
@@ -113,30 +113,30 @@ class TestIncrementalCompressor:
         """测试获取统计信息"""
         db = LobsterDatabase(":memory:")
         compressor = IncrementalCompressor(db)
-        
+
         stats = compressor.get_stats()
         assert isinstance(stats, dict)
-        assert 'total_compressions' in stats
+        assert "total_compressions" in stats
 
     def test_monitor(self):
         """测试监控"""
         db = LobsterDatabase(":memory:")
         compressor = IncrementalCompressor(db)
-        
+
         conv_id = "test_conv"
         result = compressor.monitor(conv_id)
         assert isinstance(result, dict)
-        assert 'conversation_id' in result
+        assert "conversation_id" in result
 
     def test_compress_empty_conversation(self):
         """测试压缩空对话"""
         db = LobsterDatabase(":memory:")
         compressor = IncrementalCompressor(db)
-        
+
         result = compressor.compress("empty_conv")
         # 空对话应该返回包含统计信息的字典
         assert isinstance(result, dict)
-        assert 'strategy' in result
+        assert "strategy" in result
 
 
 class TestCompressorIntegration:
@@ -146,14 +146,14 @@ class TestCompressorIntegration:
         """测试数据库和压缩器工作流"""
         db = LobsterDatabase(":memory:")
         compressor = DAGCompressor(db)
-        
+
         # 添加消息
         conv_id = "test_conv"
         msg_ids = []
         for i in range(5):
             msg_id = db.add_message(conv_id, "user", f"Test message {i}")
             msg_ids.append(msg_id)
-        
+
         # 检查消息是否保存
         messages = db.get_messages(conv_id)
         assert len(messages) == 5
@@ -162,18 +162,14 @@ class TestCompressorIntegration:
         """测试 v4.0.0 新特性"""
         db = LobsterDatabase(":memory:")
         db.migrate_v40()  # 确保 v4.0.0 迁移完成
-        
+
         compressor = DAGCompressor(db)
-        
+
         # 测试 token_budget 参数
         conv_id = "test_conv"
         for i in range(10):
             db.add_message(conv_id, "user", f"Message {i}")
-        
+
         # incremental_compact 应该接受 token_budget 参数
-        result = compressor.incremental_compact(
-            conv_id, 
-            context_threshold=0.8, 
-            token_budget=4000
-        )
+        result = compressor.incremental_compact(conv_id, context_threshold=0.8, token_budget=4000)
         assert isinstance(result, bool)

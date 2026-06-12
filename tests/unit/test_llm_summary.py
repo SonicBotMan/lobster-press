@@ -81,6 +81,7 @@ def test_llm_leaf_summary():
     print(f"✅ LLM 叶子摘要生成成功 (长度: {len(summary)})")
     print(f"摘要内容:\n{summary[:200]}...")
 
+
 def test_extractive_leaf_summary():
     """测试提取式叶子摘要（降级方案）"""
     print("\n🧪 测试提取式叶子摘要...")
@@ -121,6 +122,7 @@ def test_extractive_leaf_summary():
 
     print(f"✅ 提取式叶子摘要生成成功 (长度: {len(summary)})")
 
+
 def test_llm_condensed_summary():
     """测试 LLM 压缩摘要生成"""
     print("\n🧪 测试 LLM 压缩摘要生成...")
@@ -144,6 +146,7 @@ def test_llm_condensed_summary():
 
     print(f"✅ LLM 压缩摘要生成成功 (长度: {len(summary)})")
 
+
 def test_llm_client_integration():
     """测试 LLM 客户端集成"""
     print("\n🧪 测试 LLM 客户端集成...")
@@ -161,6 +164,7 @@ def test_llm_client_integration():
     assert compressor.llm_client is llm_client
 
     print("✅ LLM 客户端集成成功")
+
 
 def main():
     print("=" * 60)

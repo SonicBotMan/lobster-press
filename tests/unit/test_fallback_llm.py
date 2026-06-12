@@ -46,9 +46,7 @@ def test_fallback_chain_order():
     summary = MockClient("summary", "summary_response")
     native = MockClient("native", "native_response")
 
-    client = FallbackLLMClient(
-        skill_client=skill, summary_client=summary, native_client=native
-    )
+    client = FallbackLLMClient(skill_client=skill, summary_client=summary, native_client=native)
 
     result = client.generate("test prompt")
     assert result == "skill:skill_response"
@@ -63,9 +61,7 @@ def test_fallback_skill_fails():
     summary = MockClient("summary", "summary_response")
     native = MockClient("native", "native_response")
 
-    client = FallbackLLMClient(
-        skill_client=skill, summary_client=summary, native_client=native
-    )
+    client = FallbackLLMClient(skill_client=skill, summary_client=summary, native_client=native)
 
     result = client.generate("SKILL_FAIL")
     assert result == "summary:summary_response"
@@ -80,9 +76,7 @@ def test_fallback_skill_summary_fail():
     summary = MockClient("summary", "summary_response", fail_on_prompt="SUMMARY_FAIL")
     native = MockClient("native", "native_response")
 
-    client = FallbackLLMClient(
-        skill_client=skill, summary_client=summary, native_client=native
-    )
+    client = FallbackLLMClient(skill_client=skill, summary_client=summary, native_client=native)
 
     result = client.generate("SKILL_FAIL_SUMMARY_FAIL")
     assert result == "native:native_response"
@@ -97,9 +91,7 @@ def test_fallback_all_fail():
     summary = MockClient("summary", "summary_response", available=False)
     native = MockClient("native", "native_response", available=False)
 
-    client = FallbackLLMClient(
-        skill_client=skill, summary_client=summary, native_client=native
-    )
+    client = FallbackLLMClient(skill_client=skill, summary_client=summary, native_client=native)
 
     result = client.generate("test")
     assert result != ""
@@ -114,9 +106,7 @@ def test_fallback_generate_returns_first_non_empty():
     summary = MockClient("summary", "summary_response")
     native = MockClient("native", "native_response")
 
-    client = FallbackLLMClient(
-        skill_client=skill, summary_client=summary, native_client=native
-    )
+    client = FallbackLLMClient(skill_client=skill, summary_client=summary, native_client=native)
 
     result = client.generate("test")
     assert result == "summary:summary_response"
@@ -130,9 +120,7 @@ def test_fallback_generate_catches_exceptions():
     summary = MockClient("summary", "summary_response", fail_on_prompt="SUMMARY_FAIL")
     native = MockClient("native", "native_response", fail_on_prompt="NATIVE_FAIL")
 
-    client = FallbackLLMClient(
-        skill_client=skill, summary_client=summary, native_client=native
-    )
+    client = FallbackLLMClient(skill_client=skill, summary_client=summary, native_client=native)
 
     result = client.generate("SKILL_FAIL_SUMMARY_FAIL_NATIVE_FAIL")
     assert result != ""
@@ -146,18 +134,14 @@ def test_fallback_is_available():
     skill = MockClient("skill", "skill_response")
     summary = MockClient("summary", "summary_response")
 
-    client = FallbackLLMClient(
-        skill_client=skill, summary_client=summary, native_client=None
-    )
+    client = FallbackLLMClient(skill_client=skill, summary_client=summary, native_client=None)
 
     assert client.is_available() is True
 
 
 def test_fallback_empty_chain():
     """测试空链时 is_available 仍返回 True（mock 兜底）"""
-    client = FallbackLLMClient(
-        skill_client=None, summary_client=None, native_client=None
-    )
+    client = FallbackLLMClient(skill_client=None, summary_client=None, native_client=None)
 
     assert client.is_available() is True
     assert len(client.chain) == 1

@@ -24,7 +24,7 @@ from prompts import (
     LEAF_SUMMARY_PROMPT,
     CONDENSED_SUMMARY_PROMPT,
     NOTE_EXTRACTION_PROMPT,
-    CONFLICT_DETECTION_PROMPT
+    CONFLICT_DETECTION_PROMPT,
 )
 
 
@@ -74,9 +74,7 @@ class TestBuildLeafSummaryPrompt:
 
     def test_build_with_single_message(self):
         """测试单条消息"""
-        messages = [
-            {"role": "user", "content": "Hello"}
-        ]
+        messages = [{"role": "user", "content": "Hello"}]
         result = build_leaf_summary_prompt(messages)
         assert isinstance(result, str)
         assert "Hello" in result
@@ -86,7 +84,7 @@ class TestBuildLeafSummaryPrompt:
         messages = [
             {"role": "user", "content": "Question 1"},
             {"role": "assistant", "content": "Answer 1"},
-            {"role": "user", "content": "Question 2"}
+            {"role": "user", "content": "Question 2"},
         ]
         result = build_leaf_summary_prompt(messages)
         assert isinstance(result, str)
@@ -96,10 +94,7 @@ class TestBuildLeafSummaryPrompt:
 
     def test_build_with_missing_content(self):
         """测试缺少 content 字段"""
-        messages = [
-            {"role": "user"},  # 缺少 content
-            {"role": "assistant", "content": "Answer"}
-        ]
+        messages = [{"role": "user"}, {"role": "assistant", "content": "Answer"}]  # 缺少 content
         # 应该能处理缺少 content 的情况
         result = build_leaf_summary_prompt(messages)
         assert isinstance(result, str)
@@ -112,9 +107,9 @@ class TestBuildCondensedSummaryPrompt:
         """测试构建压缩摘要 prompt"""
         content = "Summary 1\n\nSummary 2"
         depth = 2
-        
+
         result = build_condensed_summary_prompt(content, depth)
-        
+
         assert isinstance(result, str)
         assert "Summary 1" in result
         assert "Summary 2" in result
@@ -128,7 +123,7 @@ class TestBuildCondensedSummaryPrompt:
     def test_build_with_different_depths(self):
         """测试不同深度"""
         content = "Test summary"
-        
+
         for depth in [1, 2, 3]:
             result = build_condensed_summary_prompt(content, depth)
             assert str(depth) in result
@@ -141,11 +136,11 @@ class TestBuildNoteExtractionPrompt:
         """测试构建知识提取 prompt"""
         messages = [
             {"role": "user", "content": "What is Python?"},
-            {"role": "assistant", "content": "Python is a programming language."}
+            {"role": "assistant", "content": "Python is a programming language."},
         ]
-        
+
         result = build_note_extraction_prompt(messages)
-        
+
         assert isinstance(result, str)
         assert "What is Python?" in result
         assert "Python is a programming language." in result
@@ -163,9 +158,9 @@ class TestBuildConflictDetectionPrompt:
         """测试构建矛盾检测 prompt"""
         statement1 = "Python is slow"
         statement2 = "Python is fast"
-        
+
         result = build_conflict_detection_prompt(statement1, statement2)
-        
+
         assert isinstance(result, str)
         assert statement1 in result
         assert statement2 in result
@@ -217,9 +212,7 @@ class TestTruncateMessages:
 
     def test_truncate_within_limit(self):
         """测试在限制内"""
-        messages = [
-            {"role": "user", "content": "Short message"}
-        ]
+        messages = [{"role": "user", "content": "Short message"}]
         result = truncate_messages(messages, max_tokens=1000)
         assert len(result) == 1
         assert result[0] == messages[0]
@@ -228,12 +221,10 @@ class TestTruncateMessages:
         """测试超过限制"""
         # 创建超长消息
         long_content = "This is a long message. " * 1000
-        messages = [
-            {"role": "user", "content": long_content}
-        ]
-        
+        messages = [{"role": "user", "content": long_content}]
+
         result = truncate_messages(messages, max_tokens=100)
-        
+
         # 应该返回截断后的消息
         assert isinstance(result, list)
 
@@ -242,22 +233,20 @@ class TestTruncateMessages:
         messages = [
             {"role": "user", "content": "Message 1"},
             {"role": "assistant", "content": "Message 2"},
-            {"role": "user", "content": "Message 3"}
+            {"role": "user", "content": "Message 3"},
         ]
-        
+
         result = truncate_messages(messages, max_tokens=1000)
-        
+
         # 应该保留所有消息（总 token 数小于限制）
         assert len(result) == 3
 
     def test_truncate_preserves_message_structure(self):
         """测试保留消息结构"""
-        messages = [
-            {"role": "user", "content": "Test", "timestamp": "2026-03-19"}
-        ]
-        
+        messages = [{"role": "user", "content": "Test", "timestamp": "2026-03-19"}]
+
         result = truncate_messages(messages, max_tokens=1000)
-        
+
         # 应该保留所有字段
         assert result[0]["role"] == "user"
         assert result[0]["content"] == "Test"

@@ -65,28 +65,45 @@ def _msg(content, role="user", msg_id=None):
 # ---------- _select_compression_strategy ----------
 # Function uses hard-coded thresholds (0.60, 0.75) regardless of ctor args.
 
+
 class TestSelectStrategy:
     def test_under_60_percent_none(self):
-        c = IncrementalCompressor(db=__import__("src.database", fromlist=["LobsterDatabase"]).LobsterDatabase(tempfile.mktemp(suffix=".db")), max_context_tokens=1000)
+        c = IncrementalCompressor(
+            db=__import__("src.database", fromlist=["LobsterDatabase"]).LobsterDatabase(
+                tempfile.mktemp(suffix=".db")
+            ),
+            max_context_tokens=1000,
+        )
         # Any usage < 0.60 -> none
         assert c._select_compression_strategy(0.0) == "none"
         assert c._select_compression_strategy(0.30) == "none"
         assert c._select_compression_strategy(0.59) == "none"
 
     def test_60_to_75_percent_light(self):
-        c = IncrementalCompressor(db=__import__("src.database", fromlist=["LobsterDatabase"]).LobsterDatabase(tempfile.mktemp(suffix=".db")), max_context_tokens=1000)
+        c = IncrementalCompressor(
+            db=__import__("src.database", fromlist=["LobsterDatabase"]).LobsterDatabase(
+                tempfile.mktemp(suffix=".db")
+            ),
+            max_context_tokens=1000,
+        )
         assert c._select_compression_strategy(0.60) == "light"
         assert c._select_compression_strategy(0.70) == "light"
         assert c._select_compression_strategy(0.74) == "light"
 
     def test_above_75_percent_aggressive(self):
-        c = IncrementalCompressor(db=__import__("src.database", fromlist=["LobsterDatabase"]).LobsterDatabase(tempfile.mktemp(suffix=".db")), max_context_tokens=1000)
+        c = IncrementalCompressor(
+            db=__import__("src.database", fromlist=["LobsterDatabase"]).LobsterDatabase(
+                tempfile.mktemp(suffix=".db")
+            ),
+            max_context_tokens=1000,
+        )
         assert c._select_compression_strategy(0.75) == "aggressive"
         assert c._select_compression_strategy(0.90) == "aggressive"
         assert c._select_compression_strategy(1.0) == "aggressive"
 
 
 # ---------- on_new_message ----------
+
 
 class TestOnNewMessage:
     def test_below_threshold_returns_none(self, compressor):
@@ -147,6 +164,7 @@ class TestOnNewMessage:
 
 # ---------- _get_context_usage ----------
 
+
 class TestContextUsage:
     def test_no_messages_zero_usage(self, compressor):
         assert compressor._get_context_usage("empty_conv") == 0.0
@@ -168,6 +186,7 @@ class TestContextUsage:
 
 
 # ---------- get_stats ----------
+
 
 class TestGetStats:
     def test_initial_stats_shape(self, compressor):
@@ -191,6 +210,7 @@ class TestGetStats:
 
 # ---------- monitor ----------
 
+
 class TestMonitor:
     def test_monitor_returns_dict(self, compressor):
         compressor.on_new_message("c1", _msg("hi", msg_id="m1"))
@@ -201,7 +221,10 @@ class TestMonitor:
         compressor.on_new_message("c1", _msg("hi", msg_id="m1"))
         m = compressor.monitor("c1")
         # Some form of usage / tokens / ratio should be reported
-        assert any("usage" in k.lower() or "token" in k.lower() or "ratio" in k.lower() for k in m) or len(m) >= 1
+        assert (
+            any("usage" in k.lower() or "token" in k.lower() or "ratio" in k.lower() for k in m)
+            or len(m) >= 1
+        )
 
     def test_monitor_empty_conversation(self, compressor):
         m = compressor.monitor("never_used")
@@ -209,6 +232,7 @@ class TestMonitor:
 
 
 # ---------- _should_compress ----------
+
 
 class TestShouldCompress:
     def test_empty_no_compress(self, compressor):
@@ -227,6 +251,7 @@ class TestShouldCompress:
 
 
 # ---------- compress ----------
+
 
 class TestCompress:
     def test_compress_returns_dict(self, compressor):

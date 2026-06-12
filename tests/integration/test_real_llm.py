@@ -58,7 +58,6 @@ def test_deepseek():
         print(f"\n📊 统计：")
         print(f"   响应长度: {len(result)} 字符")
 
-
     except Exception as e:
         print(f"\n❌ 测试失败: {e}")
         import traceback
@@ -75,9 +74,7 @@ def test_zhipu():
 
     try:
         # 创建客户端
-        client = create_llm_client(
-            provider="zhipu", api_key=ZHIPU_API_KEY, model="glm-4-flash"
-        )
+        client = create_llm_client(provider="zhipu", api_key=ZHIPU_API_KEY, model="glm-4-flash")
 
         print(f"✅ 客户端创建成功")
         print(f"   Provider: 智谱 GLM")
@@ -95,7 +92,6 @@ def test_zhipu():
         print("-" * 60)
         print(f"\n📊 统计：")
         print(f"   响应长度: {len(result)} 字符")
-
 
     except Exception as e:
         print(f"\n❌ 测试失败: {e}")

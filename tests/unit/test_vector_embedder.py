@@ -60,9 +60,7 @@ class TestOpenAICompatibleEmbedder:
         """is_available should return True when endpoint and api_key are set."""
         from src.vector.embedder import OpenAICompatibleEmbedder
 
-        embedder = OpenAICompatibleEmbedder(
-            endpoint="http://localhost", api_key="test-key"
-        )
+        embedder = OpenAICompatibleEmbedder(endpoint="http://localhost", api_key="test-key")
         assert embedder.is_available() is True
 
 

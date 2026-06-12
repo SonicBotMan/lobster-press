@@ -33,9 +33,7 @@ class BaseEmbedder(ABC):
 class OpenAICompatibleEmbedder(BaseEmbedder):
     """OpenAI compatible API embedder."""
 
-    def __init__(
-        self, endpoint: str = None, api_key: str = None, model: str = "bge-m3"
-    ):
+    def __init__(self, endpoint: str = None, api_key: str = None, model: str = "bge-m3"):
         self.endpoint = endpoint or os.environ.get("LOBSTER_EMBED_ENDPOINT")
         self.api_key = api_key or os.environ.get("LOBSTER_EMBED_API_KEY")
         self.model = model

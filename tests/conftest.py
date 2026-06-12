@@ -1,6 +1,7 @@
 """
 Pytest configuration and shared fixtures for LobsterPress tests.
 """
+
 import sys
 from pathlib import Path
 
@@ -42,32 +43,32 @@ def sample_messages():
             "id": "msg_001",
             "role": "user",
             "content": "我们决定使用 PostgreSQL 作为主数据库",
-            "timestamp": "2026-03-17T10:00:00Z"
+            "timestamp": "2026-03-17T10:00:00Z",
         },
         {
             "id": "msg_002",
             "role": "assistant",
             "content": "好的，我会记住这个决定。PostgreSQL 是一个可靠的选择，特别是对于需要 ACID 事务的场景。",
-            "timestamp": "2026-03-17T10:01:00Z"
+            "timestamp": "2026-03-17T10:01:00Z",
         },
         {
             "id": "msg_003",
             "role": "user",
             "content": "另外，我们采用 React 18 作为前端框架",
-            "timestamp": "2026-03-17T10:02:00Z"
+            "timestamp": "2026-03-17T10:02:00Z",
         },
         {
             "id": "msg_004",
             "role": "assistant",
             "content": "明白了。React 18 带来了很多新特性，比如并发渲染和自动批处理。",
-            "timestamp": "2026-03-17T10:03:00Z"
+            "timestamp": "2026-03-17T10:03:00Z",
         },
         {
             "id": "msg_005",
             "role": "user",
             "content": "改用 MongoDB，因为需要文档灵活性",
-            "timestamp": "2026-03-17T10:05:00Z"
-        }
+            "timestamp": "2026-03-17T10:05:00Z",
+        },
     ]
 
 
@@ -80,13 +81,13 @@ def sample_notes():
             "conversation_id": "conv_123",
             "category": "decision",
             "content": "项目采用 PostgreSQL 作为主数据库",
-            "confidence": 0.95
+            "confidence": 0.95,
         },
         {
             "note_id": "note_002",
             "conversation_id": "conv_123",
             "category": "decision",
             "content": "前端使用 React 18",
-            "confidence": 0.90
-        }
+            "confidence": 0.90,
+        },
     ]

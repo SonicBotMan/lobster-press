@@ -128,9 +128,7 @@ class TestTCP05:
         # 这里我们主要测试接口是否正常工作
         try:
             did_compress = compressor.incremental_compact(
-                conv_id,
-                context_threshold=0.0,
-                token_budget=128000
+                conv_id, context_threshold=0.0, token_budget=128000
             )
 
             # 获取压缩后的消息数
@@ -140,10 +138,14 @@ class TestTCP05:
             # 验证：如果压缩成功，消息数应该减少或保持不变
             # （可能因为 token 不足而不压缩）
             if did_compress:
-                assert count_after <= count_before, "Message count should not increase after compression"
+                assert (
+                    count_after <= count_before
+                ), "Message count should not increase after compression"
             else:
                 # 如果没有压缩，消息数应该保持不变
-                assert count_after == count_before, "Message count should remain same if no compression"
+                assert (
+                    count_after == count_before
+                ), "Message count should remain same if no compression"
         except Exception as e:
             # 如果出现异常，记录但不失败（因为可能需要实际的 LLM）
             print(f"Compression test skipped due to: {e}")
@@ -157,10 +159,7 @@ class TestTCP06:
         from lobster_mcp_server import LobsterPressMCPServer
 
         # 创建 MCP 服务器实例（使用正确的参数）
-        server = LobsterPressMCPServer(
-            db_path=":memory:",
-            namespace="test"
-        )
+        server = LobsterPressMCPServer(db_path=":memory:", namespace="test")
 
         conversation_id = "test_conv_ingest"
         messages = [
@@ -169,23 +168,22 @@ class TestTCP06:
                 "role": "user",
                 "content": "Hello, this is a test message",
                 "timestamp": "2026-03-22T12:00:00Z",
-                "seq": 1  # 添加 seq 字段
+                "seq": 1,  # 添加 seq 字段
             },
             {
                 "id": "msg_2",
                 "role": "assistant",
                 "content": "I received your message",
                 "timestamp": "2026-03-22T12:00:01Z",
-                "seq": 2  # 添加 seq 字段
-            }
+                "seq": 2,  # 添加 seq 字段
+            },
         ]
 
         # 调用 lobster_ingest
         async def run_test():
-            result = await server._call_tool("lobster_ingest", {
-                "conversation_id": conversation_id,
-                "messages": messages
-            })
+            result = await server._call_tool(
+                "lobster_ingest", {"conversation_id": conversation_id, "messages": messages}
+            )
 
             # 验证返回结果
             assert result["ingested"] == 2, f"Should ingest 2 messages, got {result['ingested']}"
@@ -206,18 +204,14 @@ class TestTCP06:
         """验证 lobster_ingest 正确处理空消息列表"""
         from lobster_mcp_server import LobsterPressMCPServer
 
-        server = LobsterPressMCPServer(
-            db_path=":memory:",
-            namespace="test"
-        )
+        server = LobsterPressMCPServer(db_path=":memory:", namespace="test")
 
         conversation_id = "test_conv_empty"
 
         async def run_test():
-            result = await server._call_tool("lobster_ingest", {
-                "conversation_id": conversation_id,
-                "messages": []
-            })
+            result = await server._call_tool(
+                "lobster_ingest", {"conversation_id": conversation_id, "messages": []}
+            )
 
             # 验证返回结果
             assert result["ingested"] == 0, "Should ingest 0 messages"
@@ -229,17 +223,14 @@ class TestTCP06:
         """验证 lobster_ingest 验证必需字段"""
         from lobster_mcp_server import LobsterPressMCPServer
 
-        server = LobsterPressMCPServer(
-            db_path=":memory:",
-            namespace="test"
-        )
+        server = LobsterPressMCPServer(db_path=":memory:", namespace="test")
 
         async def run_test():
             # 测试缺少 conversation_id
             try:
-                result = await server._call_tool("lobster_ingest", {
-                    "messages": [{"role": "user", "content": "test"}]
-                })
+                result = await server._call_tool(
+                    "lobster_ingest", {"messages": [{"role": "user", "content": "test"}]}
+                )
                 assert False, "Should raise ValueError for missing conversation_id"
             except ValueError as e:
                 assert "conversation_id is required" in str(e)

@@ -27,14 +27,13 @@ def test_mock_client():
 
     print(f"✅ Mock 客户端测试通过")
 
+
 def test_openai_client():
     """测试 OpenAI 客户端（不实际调用 API）"""
     print("\n🧪 测试 OpenAI 客户端初始化...")
 
     # 创建客户端（无 API key，仅测试初始化）
-    client = create_llm_client(
-        provider="openai", api_key="test-key", model="gpt-4o-mini"
-    )
+    client = create_llm_client(provider="openai", api_key="test-key", model="gpt-4o-mini")
 
     # 验证客户端创建成功
     assert client is not None
@@ -44,14 +43,13 @@ def test_openai_client():
 
     print(f"✅ OpenAI 客户端初始化成功")
 
+
 def test_deepseek_client():
     """测试 DeepSeek 客户端（不实际调用 API）"""
     print("\n🧪 测试 DeepSeek 客户端初始化...")
 
     # 创建客户端
-    client = create_llm_client(
-        provider="deepseek", api_key="test-key", model="deepseek-chat"
-    )
+    client = create_llm_client(provider="deepseek", api_key="test-key", model="deepseek-chat")
 
     # 验证客户端创建成功
     assert client is not None
@@ -61,14 +59,13 @@ def test_deepseek_client():
 
     print(f"✅ DeepSeek 客户端初始化成功")
 
+
 def test_zhipu_client():
     """测试智谱 GLM 客户端（不实际调用 API）"""
     print("\n🧪 测试智谱 GLM 客户端初始化...")
 
     # 创建客户端
-    client = create_llm_client(
-        provider="zhipu", api_key="test-key", model="glm-4-flash"
-    )
+    client = create_llm_client(provider="zhipu", api_key="test-key", model="glm-4-flash")
 
     # 验证客户端创建成功
     assert client is not None
@@ -78,14 +75,13 @@ def test_zhipu_client():
 
     print(f"✅ 智谱 GLM 客户端初始化成功")
 
+
 def test_alibaba_client():
     """测试阿里通义千问客户端（不实际调用 API）"""
     print("\n🧪 测试阿里通义千问客户端初始化...")
 
     # 创建客户端
-    client = create_llm_client(
-        provider="alibaba", api_key="test-key", model="qwen-turbo"
-    )
+    client = create_llm_client(provider="alibaba", api_key="test-key", model="qwen-turbo")
 
     # 验证客户端创建成功
     assert client is not None
@@ -94,6 +90,7 @@ def test_alibaba_client():
     assert client.is_available()
 
     print(f"✅ 阿里通义千问客户端初始化成功")
+
 
 def test_anthropic_client():
     """测试 Anthropic Claude 客户端（不实际调用 API）"""
@@ -112,14 +109,13 @@ def test_anthropic_client():
 
     print(f"✅ Anthropic Claude 客户端初始化成功")
 
+
 def test_gemini_client():
     """测试 Google Gemini 客户端（不实际调用 API）"""
     print("\n🧪 测试 Google Gemini 客户端初始化...")
 
     # 创建客户端
-    client = create_llm_client(
-        provider="gemini", api_key="test-key", model="gemini-pro"
-    )
+    client = create_llm_client(provider="gemini", api_key="test-key", model="gemini-pro")
 
     # 验证客户端创建成功
     assert client is not None
@@ -129,14 +125,13 @@ def test_gemini_client():
 
     print(f"✅ Google Gemini 客户端初始化成功")
 
+
 def test_mistral_client():
     """测试 Mistral 客户端（不实际调用 API）"""
     print("\n🧪 测试 Mistral 客户端初始化...")
 
     # 创建客户端
-    client = create_llm_client(
-        provider="mistral", api_key="test-key", model="mistral-small-latest"
-    )
+    client = create_llm_client(provider="mistral", api_key="test-key", model="mistral-small-latest")
 
     # 验证客户端创建成功
     assert client is not None
@@ -145,6 +140,7 @@ def test_mistral_client():
     assert client.is_available()
 
     print(f"✅ Mistral 客户端初始化成功")
+
 
 def test_baidu_client():
     """测试百度文心客户端（不实际调用 API）"""
@@ -167,6 +163,7 @@ def test_baidu_client():
 
     print(f"✅ 百度文心客户端初始化成功")
 
+
 def test_factory_function():
     """测试工厂函数"""
     print("\n🧪 测试工厂函数...")
@@ -179,6 +176,7 @@ def test_factory_function():
         assert "不支持的 LLM 提供商" in str(e)
 
     print(f"✅ 工厂函数测试通过")
+
 
 def test_environment_variable():
     """测试环境变量配置"""
@@ -197,6 +195,7 @@ def test_environment_variable():
 
     print(f"✅ 环境变量配置测试通过")
 
+
 def test_graceful_fallback():
     """测试优雅降级"""
     print("\n🧪 测试优雅降级...")
@@ -209,6 +208,7 @@ def test_graceful_fallback():
     assert isinstance(client, MockLLMClient)
 
     print(f"✅ 优雅降级测试通过")
+
 
 def main():
     print("=" * 60)

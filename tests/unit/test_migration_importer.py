@@ -81,9 +81,7 @@ class TestScan:
                 metadata TEXT
             )
         """)
-        cursor.execute(
-            "INSERT INTO messages VALUES ('msg1', 'user', 'Hello', '2024-01-01', '{}')"
-        )
+        cursor.execute("INSERT INTO messages VALUES ('msg1', 'user', 'Hello', '2024-01-01', '{}')")
         conn.commit()
         conn.close()
 
@@ -208,9 +206,7 @@ class TestImportMemories:
                 metadata TEXT
             )
         """)
-        cursor.execute(
-            "INSERT INTO messages VALUES ('msg1', 'user', 'Hello', '2024-01-01', '{}')"
-        )
+        cursor.execute("INSERT INTO messages VALUES ('msg1', 'user', 'Hello', '2024-01-01', '{}')")
         conn.commit()
         conn.close()
 
@@ -279,9 +275,7 @@ class TestImportMemories:
                 metadata TEXT
             )
         """)
-        cursor.execute(
-            "INSERT INTO messages VALUES ('msg1', 'user', 'Hello', '2024-01-01', '{}')"
-        )
+        cursor.execute("INSERT INTO messages VALUES ('msg1', 'user', 'Hello', '2024-01-01', '{}')")
         conn.commit()
         conn.close()
 

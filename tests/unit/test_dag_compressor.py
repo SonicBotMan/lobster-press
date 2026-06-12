@@ -41,6 +41,7 @@ def compressor(db):
 # Global counter to guarantee unique message IDs across repeated _seed calls
 _msg_counter = 0
 
+
 def _seed(db, conv_id, contents, role="user"):
     global _msg_counter
     ids = []
@@ -59,6 +60,7 @@ def _seed(db, conv_id, contents, role="user"):
 
 
 # ---------- leaf_compact ----------
+
 
 class TestLeafCompact:
     def test_empty_conversation_returns_no_summary(self, compressor, db):
@@ -100,6 +102,7 @@ class TestLeafCompact:
 
 # ---------- condensed_compact ----------
 
+
 class TestCondensedCompact:
     def test_empty_conversation_returns_none(self, compressor, db):
         assert compressor.condensed_compact("empty") is None
@@ -131,20 +134,22 @@ class TestCondensedCompact:
 
 # ---------- incremental_compact ----------
 
+
 class TestIncrementalCompact:
     def test_below_threshold_returns_false(self, compressor, db):
         # Small conversation, well below 75% of 20000 tokens
         _seed(db, "c1", ["tiny msg"])
-        assert compressor.incremental_compact("c1", context_threshold=0.75,
-                                            token_budget=20000) is False
+        assert (
+            compressor.incremental_compact("c1", context_threshold=0.75, token_budget=20000)
+            is False
+        )
 
     def test_above_threshold_triggers_compression(self, compressor, db):
         # Fill way past threshold — seed all messages in one call so IDs are unique
         contents = [f"msg {i}: " + "x" * 500 for i in range(20)]
         _seed(db, "c1", contents)
         # Token budget 1000, 20 msgs * ~125 tokens = ~2500 > 50%
-        result = compressor.incremental_compact("c1", context_threshold=0.5,
-                                              token_budget=1000)
+        result = compressor.incremental_compact("c1", context_threshold=0.5, token_budget=1000)
         assert result is True
 
     def test_token_budget_override(self, compressor, db):
@@ -152,12 +157,12 @@ class TestIncrementalCompact:
         contents = [f"msg {i}: " + "x" * 100 for i in range(5)]
         _seed(db, "c1", contents)
         # 5 msgs * ~25 tokens = ~125; budget 50 -> way over
-        result = compressor.incremental_compact("c1", context_threshold=0.99,
-                                              token_budget=50)
+        result = compressor.incremental_compact("c1", context_threshold=0.99, token_budget=50)
         assert result is True
 
 
 # ---------- full_compact ----------
+
 
 class TestFullCompact:
     def test_full_compress_returns_stats_dict(self, compressor, db):
@@ -165,10 +170,17 @@ class TestFullCompact:
         result = compressor.full_compact("c1")
         assert isinstance(result, dict)
         # Should have some stat keys
-        assert any(k in result for k in (
-            "leaf_summaries", "condensed_summaries", "messages_compressed",
-            "tokens_saved", "original_tokens", "compressed_tokens",
-        ))
+        assert any(
+            k in result
+            for k in (
+                "leaf_summaries",
+                "condensed_summaries",
+                "messages_compressed",
+                "tokens_saved",
+                "original_tokens",
+                "compressed_tokens",
+            )
+        )
 
     def test_full_compress_creates_at_least_one_summary(self, compressor, db):
         _seed(db, "c1", ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf"])
@@ -194,6 +206,7 @@ class TestFullCompact:
 
 # ---------- get_context_items ----------
 
+
 class TestGetContextItems:
     def test_empty_conversation_returns_empty(self, compressor, db):
         items = compressor.get_context_items("empty")
@@ -215,6 +228,7 @@ class TestGetContextItems:
 
 # ---------- end-to-end pipeline ----------
 
+
 class TestEndToEndPipeline:
     def test_leaf_then_condensed_pipeline(self, compressor, db):
         # Seed enough to create 4+ leaf summaries, then condense
@@ -235,8 +249,7 @@ class TestEndToEndPipeline:
         contents = [f"e2e msg {i}: " + "y" * 500 for i in range(20)]
         _seed(db, "c1", contents)
         # Incremental should trigger (budget 1000, ~2500 tokens total)
-        triggered = compressor.incremental_compact("c1", context_threshold=0.5,
-                                                 token_budget=1000)
+        triggered = compressor.incremental_compact("c1", context_threshold=0.5, token_budget=1000)
         assert triggered is True
         # After full compress, all summaries are in DB
         compressor.full_compact("c1")

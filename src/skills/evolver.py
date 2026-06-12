@@ -186,9 +186,7 @@ class SkillEvolver:
                 pass
 
         # 降级：模板生成
-        steps_md = "\n".join(
-            f"{i + 1}. {s}" for i, s in enumerate(task.get("steps", []))
-        )
+        steps_md = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(task.get("steps", [])))
         return f"""# {task.get("goal", "未命名技能")[:50]}
 
 ## 目标

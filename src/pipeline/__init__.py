@@ -13,9 +13,9 @@ from .semantic_dedup import SemanticDeduplicator
 from .batch_importer import BatchImporter
 
 __all__ = [
-    'TFIDFScorer',
-    'ScoredMessage',
-    'EXEMPT_TYPES',
-    'SemanticDeduplicator',
-    'BatchImporter',
+    "TFIDFScorer",
+    "ScoredMessage",
+    "EXEMPT_TYPES",
+    "SemanticDeduplicator",
+    "BatchImporter",
 ]

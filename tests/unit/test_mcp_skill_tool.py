@@ -82,9 +82,7 @@ class TestLobsterSkillGetAction:
         )
         temp_db.conn.commit()
 
-        result = run_async(
-            server._handle_lobster_skill({"action": "get", "skill_id": skill_id})
-        )
+        result = run_async(server._handle_lobster_skill({"action": "get", "skill_id": skill_id}))
 
         assert "skill" in result
         assert result["skill"]["skill_id"] == skill_id
@@ -115,9 +113,7 @@ class TestLobsterSkillGetAction:
         server = LobsterPressMCPServer()
 
         result = run_async(
-            server._handle_lobster_skill(
-                {"action": "get", "skill_id": "nonexistent_skill"}
-            )
+            server._handle_lobster_skill({"action": "get", "skill_id": "nonexistent_skill"})
         )
 
         assert "error" in result
@@ -172,9 +168,7 @@ class TestLobsterSkillListAction:
         """)
         temp_db.conn.commit()
 
-        result = run_async(
-            server._handle_lobster_skill({"action": "list", "visibility": "public"})
-        )
+        result = run_async(server._handle_lobster_skill({"action": "list", "visibility": "public"}))
 
         assert "skills" in result
         assert result["count"] == 1

@@ -21,6 +21,7 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
+
 class ViewerHandler(BaseHTTPRequestHandler):
     """Viewer HTTP Handler
 
@@ -354,9 +355,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
         logger.debug(format, *args)
 
 
-def start_viewer(
-    db, port: int = 18799, password: str = None, owner: str = "default"
-) -> HTTPServer:
+def start_viewer(db, port: int = 18799, password: str = None, owner: str = "default") -> HTTPServer:
     """启动 Viewer HTTP 服务
 
     Args:

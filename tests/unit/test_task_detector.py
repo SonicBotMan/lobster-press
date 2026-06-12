@@ -15,9 +15,7 @@ class MockLLMClient:
         self.call_count = 0
         self.last_prompt = None
 
-    def generate(
-        self, prompt: str, temperature: float = 0.0, max_tokens: int = 10
-    ) -> str:
+    def generate(self, prompt: str, temperature: float = 0.0, max_tokens: int = 10) -> str:
         self.call_count += 1
         self.last_prompt = prompt
         return self.response

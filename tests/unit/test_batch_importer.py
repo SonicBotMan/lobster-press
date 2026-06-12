@@ -9,8 +9,8 @@ import pytest
 
 from src.pipeline.batch_importer import BatchImporter
 
-
 # ---------- fixtures ----------
+
 
 @pytest.fixture
 def tmp_db_path():
@@ -30,13 +30,19 @@ def importer(tmp_db_path):
 
 # ---------- JSON import ----------
 
+
 class TestImportFromJson:
     def test_single_conversation_dict(self, importer, tmp_db_path):
         data = {
             "conversationId": "c_json_1",
             "messages": [
                 {"id": "m1", "role": "user", "content": "hi", "timestamp": "2026-06-12T10:00:00Z"},
-                {"id": "m2", "role": "assistant", "content": "hello", "timestamp": "2026-06-12T10:01:00Z"},
+                {
+                    "id": "m2",
+                    "role": "assistant",
+                    "content": "hello",
+                    "timestamp": "2026-06-12T10:01:00Z",
+                },
             ],
         }
         path = tmp_db_path + ".json"
@@ -54,14 +60,29 @@ class TestImportFromJson:
             {
                 "conversationId": "c_list_1",
                 "messages": [
-                    {"id": "m1", "role": "user", "content": "hello", "timestamp": "2026-06-12T10:00:00Z"},
+                    {
+                        "id": "m1",
+                        "role": "user",
+                        "content": "hello",
+                        "timestamp": "2026-06-12T10:00:00Z",
+                    },
                 ],
             },
             {
                 "conversationId": "c_list_2",
                 "messages": [
-                    {"id": "m2", "role": "user", "content": "world", "timestamp": "2026-06-12T10:00:00Z"},
-                    {"id": "m3", "role": "user", "content": "world 2", "timestamp": "2026-06-12T10:01:00Z"},
+                    {
+                        "id": "m2",
+                        "role": "user",
+                        "content": "world",
+                        "timestamp": "2026-06-12T10:00:00Z",
+                    },
+                    {
+                        "id": "m3",
+                        "role": "user",
+                        "content": "world 2",
+                        "timestamp": "2026-06-12T10:01:00Z",
+                    },
                 ],
             },
         ]
@@ -89,7 +110,12 @@ class TestImportFromJson:
         data = {
             "conv_id": "c_custom_1",
             "turns": [
-                {"id": "m1", "role": "user", "content": "test", "timestamp": "2026-06-12T10:00:00Z"},
+                {
+                    "id": "m1",
+                    "role": "user",
+                    "content": "test",
+                    "timestamp": "2026-06-12T10:00:00Z",
+                },
             ],
         }
         path = tempfile.mktemp(suffix=".json")
@@ -113,7 +139,12 @@ class TestImportFromJson:
         data = {
             "conversationId": "c_unicode",
             "messages": [
-                {"id": "m1", "role": "user", "content": "你好世界 🦞", "timestamp": "2026-06-12T10:00:00Z"},
+                {
+                    "id": "m1",
+                    "role": "user",
+                    "content": "你好世界 🦞",
+                    "timestamp": "2026-06-12T10:00:00Z",
+                },
             ],
         }
         path = tempfile.mktemp(suffix=".json")
@@ -126,15 +157,31 @@ class TestImportFromJson:
 
 # ---------- CSV import ----------
 
+
 class TestImportFromCsv:
     def test_basic_csv(self, importer):
         import csv as csvmod
+
         path = tempfile.mktemp(suffix=".csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
             w = csvmod.DictWriter(f, fieldnames=["conversation_id", "role", "content", "timestamp"])
             w.writeheader()
-            w.writerow({"conversation_id": "c_csv_1", "role": "user", "content": "hi", "timestamp": "2026-06-12T10:00:00Z"})
-            w.writerow({"conversation_id": "c_csv_1", "role": "assistant", "content": "hello", "timestamp": "2026-06-12T10:01:00Z"})
+            w.writerow(
+                {
+                    "conversation_id": "c_csv_1",
+                    "role": "user",
+                    "content": "hi",
+                    "timestamp": "2026-06-12T10:00:00Z",
+                }
+            )
+            w.writerow(
+                {
+                    "conversation_id": "c_csv_1",
+                    "role": "assistant",
+                    "content": "hello",
+                    "timestamp": "2026-06-12T10:01:00Z",
+                }
+            )
         result = importer.import_from_csv(path)
         os.unlink(path)
         assert isinstance(result, dict)
@@ -142,13 +189,35 @@ class TestImportFromCsv:
 
     def test_csv_groups_by_conversation(self, importer):
         import csv as csvmod
+
         path = tempfile.mktemp(suffix=".csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
             w = csvmod.DictWriter(f, fieldnames=["conversation_id", "role", "content", "timestamp"])
             w.writeheader()
-            w.writerow({"conversation_id": "cA", "role": "user", "content": "a1", "timestamp": "2026-06-12T10:00:00Z"})
-            w.writerow({"conversation_id": "cB", "role": "user", "content": "b1", "timestamp": "2026-06-12T10:00:00Z"})
-            w.writerow({"conversation_id": "cA", "role": "user", "content": "a2", "timestamp": "2026-06-12T10:01:00Z"})
+            w.writerow(
+                {
+                    "conversation_id": "cA",
+                    "role": "user",
+                    "content": "a1",
+                    "timestamp": "2026-06-12T10:00:00Z",
+                }
+            )
+            w.writerow(
+                {
+                    "conversation_id": "cB",
+                    "role": "user",
+                    "content": "b1",
+                    "timestamp": "2026-06-12T10:00:00Z",
+                }
+            )
+            w.writerow(
+                {
+                    "conversation_id": "cA",
+                    "role": "user",
+                    "content": "a2",
+                    "timestamp": "2026-06-12T10:01:00Z",
+                }
+            )
         result = importer.import_from_csv(path)
         os.unlink(path)
         # 3 rows total, grouped into 2 conversations
@@ -157,22 +226,33 @@ class TestImportFromCsv:
 
     def test_csv_with_unicode(self, importer):
         import csv as csvmod
+
         path = tempfile.mktemp(suffix=".csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
             w = csvmod.DictWriter(f, fieldnames=["conversation_id", "role", "content", "timestamp"])
             w.writeheader()
-            w.writerow({"conversation_id": "c_unicode", "role": "user", "content": "你好", "timestamp": "2026-06-12T10:00:00Z"})
+            w.writerow(
+                {
+                    "conversation_id": "c_unicode",
+                    "role": "user",
+                    "content": "你好",
+                    "timestamp": "2026-06-12T10:00:00Z",
+                }
+            )
         result = importer.import_from_csv(path)
         os.unlink(path)
         assert result.get("imported_messages", 0) >= 1
 
     def test_csv_with_custom_field_names(self, importer):
         import csv as csvmod
+
         path = tempfile.mktemp(suffix=".csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
             w = csvmod.DictWriter(f, fieldnames=["cid", "speaker", "text", "ts"])
             w.writeheader()
-            w.writerow({"cid": "c1", "speaker": "user", "text": "hello", "ts": "2026-06-12T10:00:00Z"})
+            w.writerow(
+                {"cid": "c1", "speaker": "user", "text": "hello", "ts": "2026-06-12T10:00:00Z"}
+            )
         result = importer.import_from_csv(
             path,
             conversation_id_field="cid",
@@ -186,6 +266,7 @@ class TestImportFromCsv:
     def test_csv_with_missing_optional_fields(self, importer):
         # No role -> defaults to 'user'; no timestamp -> now
         import csv as csvmod
+
         path = tempfile.mktemp(suffix=".csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
             w = csvmod.DictWriter(f, fieldnames=["conversation_id", "content"])
@@ -197,6 +278,7 @@ class TestImportFromCsv:
 
     def test_empty_csv(self, importer):
         import csv as csvmod
+
         path = tempfile.mktemp(suffix=".csv")
         with open(path, "w", encoding="utf-8", newline="") as f:
             w = csvmod.DictWriter(f, fieldnames=["conversation_id", "content"])
@@ -207,6 +289,7 @@ class TestImportFromCsv:
 
 
 # ---------- stats dict ----------
+
 
 class TestStats:
     def test_initial_stats(self, importer):
@@ -235,8 +318,8 @@ class TestStats:
         assert importer.stats["total_messages"] >= 2
 
 
-
 # ---------- close ----------
+
 
 class TestClose:
     def test_close_releases_db(self, importer, tmp_db_path):

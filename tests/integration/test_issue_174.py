@@ -22,6 +22,7 @@ from pathlib import Path
 
 # 添加项目根目录到路径
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from src.dag_compressor import DAGCompressor
@@ -37,11 +38,11 @@ class TestIssue174Fixes:
         compressor = DAGCompressor.__new__(DAGCompressor)
 
         # 验证 DECISION_KEYWORDS 存在
-        assert hasattr(DAGCompressor, 'DECISION_KEYWORDS')
+        assert hasattr(DAGCompressor, "DECISION_KEYWORDS")
 
         # 验证 DECISION_KEYWORDS 包含预期关键词
         keywords = DAGCompressor.DECISION_KEYWORDS
-        assert '决定' in keywords or '采用' in keywords or 'chosen' in keywords
+        assert "决定" in keywords or "采用" in keywords or "chosen" in keywords
 
     def test_fix2_database_transaction_protection(self):
         """Fix 2: 验证数据库事务保护"""
@@ -71,7 +72,7 @@ class TestIssue174Fixes:
 
         # 验证核心方法存在
         # Fix 3 主要修改了 leaf_compact 方法中的逻辑
-        assert hasattr(compressor, 'leaf_compact')
+        assert hasattr(compressor, "leaf_compact")
 
     def test_fix5_chinese_text_complexity_weighting(self):
         """Fix 5: 验证中文文本复杂度加权"""
@@ -88,7 +89,9 @@ class TestIssue174Fixes:
         english_tokens = scorer.tokenize(english_text)
 
         # 验证中文 bi-gram 提取
-        chinese_bigrams = [t for t in chinese_tokens if len(t) == 2 and all('\u4e00' <= c <= '\u9fff' for c in t)]
+        chinese_bigrams = [
+            t for t in chinese_tokens if len(t) == 2 and all("\u4e00" <= c <= "\u9fff" for c in t)
+        ]
         assert len(chinese_bigrams) > 0, "中文 bi-gram 提取失败"
 
     def test_fix6_tfidf_caching(self):
@@ -122,10 +125,10 @@ class TestIssue174Fixes:
             db = LobsterDatabase(db_path)
 
             # 验证 _turn_counts 缓存存在
-            assert hasattr(db, '_turn_counts')
+            assert hasattr(db, "_turn_counts")
 
             # 验证 get_turn_count 方法存在
-            assert hasattr(db, 'get_turn_count')
+            assert hasattr(db, "get_turn_count")
 
 
 if __name__ == "__main__":

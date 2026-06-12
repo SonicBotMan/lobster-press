@@ -179,9 +179,7 @@ class TestHandleMemoryWritePublic:
         content = "Memory for specific conversation"
         conv_id = "conv_specific_123"
         result = run_async(
-            server._handle_memory_write_public(
-                {"content": content, "conversation_id": conv_id}
-            )
+            server._handle_memory_write_public({"content": content, "conversation_id": conv_id})
         )
 
         assert result["status"] == "ok"
@@ -243,9 +241,7 @@ class TestHandleSkillSearch:
         """)
         temp_db.conn.commit()
 
-        result = run_async(
-            server._handle_skill_search({"query": "*", "scope": "public"})
-        )
+        result = run_async(server._handle_skill_search({"query": "*", "scope": "public"}))
 
         assert result["scope"] == "public"
         assert all(s["visibility"] == "public" for s in result["skills"])
@@ -266,9 +262,7 @@ class TestHandleSkillSearch:
         """)
         temp_db.conn.commit()
 
-        result = run_async(
-            server._handle_skill_search({"query": "Mix", "scope": "mix"})
-        )
+        result = run_async(server._handle_skill_search({"query": "Mix", "scope": "mix"}))
 
         assert result["scope"] == "mix"
         assert "skills" in result
@@ -320,9 +314,7 @@ class TestHandleSkillPublish:
         temp_db.conn.commit()
 
         result = run_async(
-            server._handle_skill_publish(
-                {"skill_id": "skill_pub_test"}, visibility="public"
-            )
+            server._handle_skill_publish({"skill_id": "skill_pub_test"}, visibility="public")
         )
 
         assert result["status"] == "ok"
@@ -351,9 +343,7 @@ class TestHandleSkillPublish:
         temp_db.conn.commit()
 
         result = run_async(
-            server._handle_skill_publish(
-                {"skill_id": "skill_priv_test"}, visibility="private"
-            )
+            server._handle_skill_publish({"skill_id": "skill_priv_test"}, visibility="private")
         )
 
         assert result["status"] == "ok"
@@ -385,9 +375,7 @@ class TestHandleSkillPublish:
         server._db = temp_db
 
         result = run_async(
-            server._handle_skill_publish(
-                {"skill_id": "nonexistent_skill"}, visibility="public"
-            )
+            server._handle_skill_publish({"skill_id": "nonexistent_skill"}, visibility="public")
         )
 
         assert "error" in result

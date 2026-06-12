@@ -588,28 +588,17 @@ class LobsterDatabase:
         # 若调用方已传入分数（>0），优先使用；否则用当前对话语料重新评分
         if tfidf_score == 0.0 and content:
             try:
-                corpus_msgs = (
-                    self.get_messages(conversation_id) if conversation_id else []
-                )
-                corpus_texts = [self._extract_content(m) for m in corpus_msgs] + [
-                    content
-                ]
+                corpus_msgs = self.get_messages(conversation_id) if conversation_id else []
+                corpus_texts = [self._extract_content(m) for m in corpus_msgs] + [content]
                 scored = self._get_tfidf_scorer().score_messages(
-                    [
-                        {"content": t, "role": "user", "msg_type": "unknown"}
-                        for t in corpus_texts
-                    ]
+                    [{"content": t, "role": "user", "msg_type": "unknown"} for t in corpus_texts]
                 )
                 if scored:
                     last = scored[-1]
                     # v4.0.41: ScoredMessage 是 dataclass，不是 dict（Issue #181）
-                    tfidf_score = (
-                        last.tfidf_score if hasattr(last, "tfidf_score") else 0.0
-                    )
+                    tfidf_score = last.tfidf_score if hasattr(last, "tfidf_score") else 0.0
                     structural_bonus = (
-                        last.structural_bonus
-                        if hasattr(last, "structural_bonus")
-                        else 0.0
+                        last.structural_bonus if hasattr(last, "structural_bonus") else 0.0
                     )
             except Exception as e:
                 logger.warning(f"TF-IDF 计算失败: {e}")
@@ -617,9 +606,7 @@ class LobsterDatabase:
         # Phase 3: 使用事务确保原子性
         with self.conn:
             # Bug 1 修复：查询是否已存在（区分 INSERT vs REPLACE）
-            self.cursor.execute(
-                "SELECT id FROM messages WHERE message_id = ?", (message_id,)
-            )
+            self.cursor.execute("SELECT id FROM messages WHERE message_id = ?", (message_id,))
             existing = self.cursor.fetchone()
             old_rowid = existing[0] if existing else None
 
@@ -657,9 +644,7 @@ class LobsterDatabase:
 
             # 维护 FTS5 索引：先删旧，再插新
             if old_rowid is not None:
-                self.cursor.execute(
-                    "DELETE FROM messages_fts WHERE rowid = ?", (old_rowid,)
-                )
+                self.cursor.execute("DELETE FROM messages_fts WHERE rowid = ?", (old_rowid,))
             self.cursor.execute(
                 "INSERT INTO messages_fts (rowid, message_id, content) VALUES (?, ?, ?)",
                 (new_rowid, message_id, content),
@@ -804,9 +789,7 @@ class LobsterDatabase:
         # ── 检索衰减模式（half_life_override=336.0 for 14 days）──
         if half_life_override is not None:
             alpha = 0.3  # 地板值
-            decay_factor = alpha + (1.0 - alpha) * math.pow(
-                0.5, delta_hours / half_life_override
-            )
+            decay_factor = alpha + (1.0 - alpha) * math.pow(0.5, delta_hours / half_life_override)
             return base_score * decay_factor
 
         # ── C-HLR+ 压缩评分模式（默认）──
@@ -879,9 +862,7 @@ class LobsterDatabase:
         complexity = ttr + length_factor + min(structure_score, 1.0)
         return min(complexity, 3.0)  # 上限 3.0
 
-    def remove_messages_from_context(
-        self, conversation_id: str, message_ids: List[str]
-    ) -> int:
+    def remove_messages_from_context(self, conversation_id: str, message_ids: List[str]) -> int:
         """从 context_items 中移除指定消息（light 去重策略使用）
 
         注意：消息本体在 messages 表中永久保留（无损原则），只从上下文视图中移除。
@@ -953,9 +934,7 @@ class LobsterDatabase:
         # v4.0.3: 使用事务保护，确保 FTS 与主表写入原子性（Issue #137 New Bug 2）
         with self.conn:
             # Bug 1 修复：查询是否已存在
-            self.cursor.execute(
-                "SELECT id FROM summaries WHERE summary_id = ?", (summary_id,)
-            )
+            self.cursor.execute("SELECT id FROM summaries WHERE summary_id = ?", (summary_id,))
             existing = self.cursor.fetchone()
             old_rowid = existing[0] if existing else None
 
@@ -988,9 +967,7 @@ class LobsterDatabase:
 
             # 维护 FTS5 索引：先删旧，再插新
             if old_rowid is not None:
-                self.cursor.execute(
-                    "DELETE FROM summaries_fts WHERE rowid = ?", (old_rowid,)
-                )
+                self.cursor.execute("DELETE FROM summaries_fts WHERE rowid = ?", (old_rowid,))
             self.cursor.execute(
                 "INSERT INTO summaries_fts (rowid, summary_id, content) VALUES (?, ?, ?)",
                 (new_rowid, summary_id, content),
@@ -1314,9 +1291,7 @@ class LobsterDatabase:
         rows = self.cursor.fetchall()
         return [self._row_to_dict(row, "skills") for row in rows]
 
-    def get_skills_by_owner(
-        self, owner: str, include_public: bool = True
-    ) -> List[Dict]:
+    def get_skills_by_owner(self, owner: str, include_public: bool = True) -> List[Dict]:
         """获取指定所有者的技能
 
         Args:
@@ -1483,24 +1458,16 @@ class LobsterDatabase:
 
             if correction_type == "delete":
                 # 先查 rowid（Issue #129 Bug 3 修复）
-                self.cursor.execute(
-                    f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,)
-                )
+                self.cursor.execute(f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,))
                 row = self.cursor.fetchone()
                 if row:
                     # 删除 FTS 索引
-                    self.cursor.execute(
-                        f"DELETE FROM {fts_table} WHERE rowid = ?", (row[0],)
-                    )
+                    self.cursor.execute(f"DELETE FROM {fts_table} WHERE rowid = ?", (row[0],))
                 # 删除主表记录
-                self.cursor.execute(
-                    f"DELETE FROM {table} WHERE {id_field} = ?", (target_id,)
-                )
+                self.cursor.execute(f"DELETE FROM {table} WHERE {id_field} = ?", (target_id,))
             elif correction_type == "content":
                 # 先查 rowid（Issue #129 Bug 4 修复）
-                self.cursor.execute(
-                    f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,)
-                )
+                self.cursor.execute(f"SELECT id FROM {table} WHERE {id_field} = ?", (target_id,))
                 row = self.cursor.fetchone()
                 if row:
                     old_rowid = row[0]
@@ -1510,9 +1477,7 @@ class LobsterDatabase:
                         (new_value, target_id),
                     )
                     # 同步 FTS：删除旧记录
-                    self.cursor.execute(
-                        f"DELETE FROM {fts_table} WHERE rowid = ?", (old_rowid,)
-                    )
+                    self.cursor.execute(f"DELETE FROM {fts_table} WHERE rowid = ?", (old_rowid,))
                     # 插入新记录
                     self.cursor.execute(
                         f"INSERT INTO {fts_table} (rowid, {id_field}, content) VALUES (?, ?, ?)",
@@ -1605,9 +1570,7 @@ class LobsterDatabase:
         self.conn.commit()
         return entity_id
 
-    def sweep_decayed_messages(
-        self, conversation_id: str, days_threshold: int = 30
-    ) -> dict:
+    def sweep_decayed_messages(self, conversation_id: str, days_threshold: int = 30) -> dict:
         """v4.0.96: 基于 C-HLR+ 遗忘曲线的衰减清理
 
         使用 C-HLR+ 算法计算记忆保留率，将低保留率的消息标记为 decayed。
@@ -1920,9 +1883,7 @@ class LobsterDatabase:
         """估算 token 数量。委托给 utils.tokens.estimate_tokens。"""
         return _estimate_tokens_shared(text)
 
-    def _execute_fetch_all(
-        self, sql: str, params: tuple = (), table: str = None
-    ) -> List[Dict]:
+    def _execute_fetch_all(self, sql: str, params: tuple = (), table: str = None) -> List[Dict]:
         """v3.6.0: 安全的查询方法，修复 Issue #126 Bug 3
 
         在 execute 后立即保存 description，避免递归调用时光标竞争。
@@ -2145,9 +2106,7 @@ class LobsterDatabase:
             return {"message_count": result[0], "total_tokens": result[1] or 0}
         return None
 
-    def save_embedding(
-        self, target_type: str, target_id: str, vector: List[float]
-    ) -> str:
+    def save_embedding(self, target_type: str, target_id: str, vector: List[float]) -> str:
         """保存向量嵌入为 BLOB"""
         import struct
 

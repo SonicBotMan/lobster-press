@@ -313,9 +313,7 @@ class TestSearchSkills:
         """Should filter by visibility."""
         from src.skills.models import Skill
 
-        skill = Skill(
-            skill_id="skill_search_005", name="Visibility Test", visibility="public"
-        )
+        skill = Skill(skill_id="skill_search_005", name="Visibility Test", visibility="public")
         temp_db.save_skill(skill)
 
         results = temp_db.search_skills("*", visibility="public")
@@ -329,9 +327,7 @@ class TestGetSkillsByOwner:
         """Should return skills belonging to owner."""
         from src.skills.models import Skill
 
-        skill = Skill(
-            skill_id="skill_owner_001", name="Owner Test", owner="agent:owner_test"
-        )
+        skill = Skill(skill_id="skill_owner_001", name="Owner Test", owner="agent:owner_test")
         temp_db.save_skill(skill)
 
         results = temp_db.get_skills_by_owner("agent:owner_test", include_public=False)
@@ -341,9 +337,7 @@ class TestGetSkillsByOwner:
         """include_public=True should include public skills."""
         from src.skills.models import Skill
 
-        skill = Skill(
-            skill_id="skill_public_001", name="Public Skill", visibility="public"
-        )
+        skill = Skill(skill_id="skill_public_001", name="Public Skill", visibility="public")
         temp_db.save_skill(skill)
 
         results = temp_db.get_skills_by_owner("agent:other", include_public=True)

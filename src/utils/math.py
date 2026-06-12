@@ -35,8 +35,8 @@ def cosine_similarity(
     all_terms = set(tf_a.keys()) | set(tf_b.keys())
     dot_product = sum(tf_a.get(t, 0) * tf_b.get(t, 0) for t in all_terms)
 
-    norm_a = math.sqrt(sum(v ** 2 for v in tf_a.values()))
-    norm_b = math.sqrt(sum(v ** 2 for v in tf_b.values()))
+    norm_a = math.sqrt(sum(v**2 for v in tf_a.values()))
+    norm_b = math.sqrt(sum(v**2 for v in tf_b.values()))
 
     if norm_a == 0 or norm_b == 0:
         return 0.0

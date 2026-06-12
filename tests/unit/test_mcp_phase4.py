@@ -49,9 +49,7 @@ class TestPhase4ToolRegistration:
         from lobster_mcp_server import LobsterPressMCPServer
 
         server = LobsterPressMCPServer()
-        viewer_tool = next(
-            (t for t in server.tools if t.name == "lobster_viewer"), None
-        )
+        viewer_tool = next((t for t in server.tools if t.name == "lobster_viewer"), None)
 
         assert viewer_tool is not None
         assert viewer_tool.input_schema["type"] == "object"
@@ -71,9 +69,7 @@ class TestPhase4ToolRegistration:
         from lobster_mcp_server import LobsterPressMCPServer
 
         server = LobsterPressMCPServer()
-        import_tool = next(
-            (t for t in server.tools if t.name == "lobster_import"), None
-        )
+        import_tool = next((t for t in server.tools if t.name == "lobster_import"), None)
 
         assert import_tool is not None
         assert import_tool.input_schema["type"] == "object"
@@ -117,12 +113,8 @@ class TestHandleLobsterViewer:
         mock_viewer = Mock()
         mock_viewer.serve_forever = Mock()
 
-        with patch(
-            "src.viewer.server.start_viewer", return_value=mock_viewer
-        ) as mock_start:
-            result = run_async(
-                server._handle_lobster_viewer({"action": "start", "port": 18799})
-            )
+        with patch("src.viewer.server.start_viewer", return_value=mock_viewer) as mock_start:
+            result = run_async(server._handle_lobster_viewer({"action": "start", "port": 18799}))
 
         assert result["status"] == "started"
         assert result["port"] == 18799
@@ -136,9 +128,7 @@ class TestHandleLobsterViewer:
         server._viewer_server = mock_viewer
 
         with patch("src.viewer.server.start_viewer", return_value=mock_viewer):
-            result = run_async(
-                server._handle_lobster_viewer({"action": "start", "port": 18799})
-            )
+            result = run_async(server._handle_lobster_viewer({"action": "start", "port": 18799}))
 
         assert result["status"] == "already_running"
 

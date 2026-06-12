@@ -18,6 +18,7 @@ from typing import Optional, Dict, Any
 
 logger = logging.getLogger(__name__)
 
+
 class BaseLLMClient(ABC):
     """LLM 客户端基类"""
 

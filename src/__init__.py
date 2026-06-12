@@ -6,7 +6,6 @@ LobsterPress - Cognitive Memory System for AI Agents
 所有其他文件应从此处导入版本号。
 """
 
-
 __version__ = "5.0.0"
 __author__ = "SonicBotMan"
 __email__ = "sonicbotman@example.com"
@@ -21,9 +20,11 @@ VERSION_HISTORY = [
     ("4.0.34", "2026-03-21", "Issue #173 - TF-IDF optimization"),
 ]
 
+
 def get_version():
     """获取当前版本号"""
     return __version__
+
 
 def get_version_info():
     """获取版本详细信息"""

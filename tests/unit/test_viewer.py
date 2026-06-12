@@ -282,9 +282,7 @@ class TestApiSkills:
             data = json.loads(raw.decode())
             assert len(data["skills"]) == 1
             assert data["count"] == 1
-            mock_db.get_skills_by_owner.assert_called_with(
-                "agent:1", include_public=True
-            )
+            mock_db.get_skills_by_owner.assert_called_with("agent:1", include_public=True)
 
     def test_returns_unauthorized_when_not_authed(self):
         ViewerHandler.setup(MagicMock(), password="secret")

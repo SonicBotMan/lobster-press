@@ -67,9 +67,7 @@ class TestEnqueueDequeue:
         from src.async_queue import AsyncWorker
 
         worker = AsyncWorker(db=MagicMock())
-        worker.enqueue(
-            "embed", {"target_type": "message", "target_id": "123", "content": "hello"}
-        )
+        worker.enqueue("embed", {"target_type": "message", "target_id": "123", "content": "hello"})
 
         assert worker.queue_size == 1
 
@@ -146,9 +144,7 @@ class TestProcessEmbed:
         worker = AsyncWorker(db=MagicMock(), embedder=None)
 
         with patch("src.async_queue.worker.logger") as mock_logger:
-            worker._process_embed(
-                {"target_type": "msg", "target_id": "123", "content": "test"}
-            )
+            worker._process_embed({"target_type": "msg", "target_id": "123", "content": "test"})
             mock_logger.warning.assert_called_once_with("embed: embedder not available")
 
     def test_skips_when_missing_target_type_or_id(self):
@@ -160,9 +156,7 @@ class TestProcessEmbed:
         worker = AsyncWorker(db=MagicMock(), embedder=mock_embedder)
 
         with patch("src.async_queue.worker.logger") as mock_logger:
-            worker._process_embed(
-                {"target_type": "", "target_id": "123", "content": "test"}
-            )
+            worker._process_embed({"target_type": "", "target_id": "123", "content": "test"})
             assert any(
                 "missing target_type or target_id" in str(arg)
                 for arg in mock_logger.warning.call_args_list
@@ -184,9 +178,7 @@ class TestProcessEmbed:
         )
 
         mock_embedder.embed.assert_called_once_with("hello world")
-        mock_db.save_embedding.assert_called_once_with(
-            "message", "msg_123", [0.1, 0.2, 0.3]
-        )
+        mock_db.save_embedding.assert_called_once_with("message", "msg_123", [0.1, 0.2, 0.3])
 
 
 class TestProcessTaskDetect:
@@ -200,9 +192,7 @@ class TestProcessTaskDetect:
 
         with patch("src.async_queue.worker.logger") as mock_logger:
             worker._process_task_detect({"conversation_id": "conv1"})
-            mock_logger.warning.assert_called_once_with(
-                "task_detect: llm_client not available"
-            )
+            mock_logger.warning.assert_called_once_with("task_detect: llm_client not available")
 
     def test_skips_when_missing_conversation_id(self):
         """Should skip when conversation_id is missing."""
@@ -245,9 +235,7 @@ class TestProcessSkillEval:
         worker = AsyncWorker(db=MagicMock(), llm_client=None)
 
         with patch("src.async_queue.worker.logger") as mock_logger:
-            worker._process_skill_eval(
-                {"conversation_id": "conv1", "task": {"type": "test"}}
-            )
+            worker._process_skill_eval({"conversation_id": "conv1", "task": {"type": "test"}})
             mock_logger.warning.assert_called_once_with("skill_eval: llm_client not available")
 
     def test_skips_when_missing_conversation_id_or_task(self):
@@ -284,9 +272,7 @@ class TestProcessSkillEval:
         task = {"type": "coding", "description": "write tests"}
 
         worker = AsyncWorker(db=mock_db, llm_client=mock_llm)
-        result = worker._process_skill_eval(
-            {"conversation_id": "conv123", "task": task}
-        )
+        result = worker._process_skill_eval({"conversation_id": "conv123", "task": task})
 
         mock_evolver_class.assert_called_once_with(mock_db, mock_llm)
         mock_evolver.evaluate_and_generate.assert_called_once_with(task, "conv123")
@@ -307,9 +293,7 @@ class TestErrorHandling:
         mock_embedder.embed.side_effect = ValueError("embed error")
         worker.embedder = mock_embedder
 
-        worker.enqueue(
-            "embed", {"target_type": "msg", "target_id": "123", "content": "test"}
-        )
+        worker.enqueue("embed", {"target_type": "msg", "target_id": "123", "content": "test"})
         worker._running = True
 
         with patch("src.async_queue.worker.logger") as mock_logger:
@@ -318,13 +302,13 @@ class TestErrorHandling:
             t.join(timeout=2.0)
             worker._running = False
 
-            assert mock_logger.warning.call_count > 0, (
-                f"logger.warning was never called. calls={mock_logger.warning.call_args_list}"
-            )
+            assert (
+                mock_logger.warning.call_count > 0
+            ), f"logger.warning was never called. calls={mock_logger.warning.call_args_list}"
             warning_args = [str(c) for c in mock_logger.warning.call_args_list]
-            assert any("embed failed" in p for p in warning_args), (
-                f"Expected error message not found in {warning_args}"
-            )
+            assert any(
+                "embed failed" in p for p in warning_args
+            ), f"Expected error message not found in {warning_args}"
 
     def test_worker_continues_after_error(self):
         """Worker should continue processing after an error."""

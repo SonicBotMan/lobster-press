@@ -102,9 +102,7 @@ class HybridRetriever:
             )
 
         # 搜索摘要
-        sums = self.db.search_summaries(
-            query, conversation_id=conversation_id, limit=50
-        )
+        sums = self.db.search_summaries(query, conversation_id=conversation_id, limit=50)
         for i, s in enumerate(sums):
             results.append(
                 {
@@ -173,9 +171,7 @@ class HybridRetriever:
 
         return fused
 
-    def _mmr_rerank(
-        self, candidates: Dict[str, Dict], top_k: int, lam: float = 0.7
-    ) -> List[Dict]:
+    def _mmr_rerank(self, candidates: Dict[str, Dict], top_k: int, lam: float = 0.7) -> List[Dict]:
         """MMR 多样性重排
 
         Formula: MMR(d) = λ·rel(d) − (1−λ)·max_sim(d, d_s)
@@ -187,9 +183,7 @@ class HybridRetriever:
             return []
 
         # 按分数降序排列
-        sorted_items = sorted(
-            candidates.values(), key=lambda x: x["score"], reverse=True
-        )
+        sorted_items = sorted(candidates.values(), key=lambda x: x["score"], reverse=True)
 
         selected = []
         remaining = list(sorted_items)
@@ -206,10 +200,7 @@ class HybridRetriever:
                 rel = cand["score"]
                 # 简化相似度：用内容长度归一化的重叠度
                 max_sim = (
-                    max(
-                        self._text_similarity(cand["content"], s["content"])
-                        for s in selected
-                    )
+                    max(self._text_similarity(cand["content"], s["content"]) for s in selected)
                     if selected
                     else 0.0
                 )

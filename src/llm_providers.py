@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 # ==================== OpenAI-compatible 基类 ====================
 
+
 class OpenAICompatibleClient(BaseLLMClient):
     """OpenAI-compatible API 客户端基类。
 
@@ -30,7 +31,7 @@ class OpenAICompatibleClient(BaseLLMClient):
     """
 
     base_url: Optional[str] = None
-    env_key: str = ""           # 环境变量名，如 'DEEPSEEK_API_KEY'
+    env_key: str = ""  # 环境变量名，如 'DEEPSEEK_API_KEY'
     default_model: str = ""
 
     def __init__(
@@ -51,6 +52,7 @@ class OpenAICompatibleClient(BaseLLMClient):
         if self._client is None:
             try:
                 from openai import OpenAI
+
                 kwargs = {"api_key": self.api_key}
                 if self.base_url:
                     kwargs["base_url"] = self.base_url
@@ -65,12 +67,8 @@ class OpenAICompatibleClient(BaseLLMClient):
         params = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": kwargs.get(
-                "temperature", self.kwargs.get("temperature", 0.7)
-            ),
-            "max_tokens": kwargs.get(
-                "max_tokens", self.kwargs.get("max_tokens", 500)
-            ),
+            "temperature": kwargs.get("temperature", self.kwargs.get("temperature", 0.7)),
+            "max_tokens": kwargs.get("max_tokens", self.kwargs.get("max_tokens", 500)),
         }
 
         response = client.chat.completions.create(**params)
@@ -82,8 +80,10 @@ class OpenAICompatibleClient(BaseLLMClient):
 
 # ==================== 国际提供商 ====================
 
+
 class OpenAIClient(OpenAICompatibleClient):
     """OpenAI GPT 系列"""
+
     base_url = None  # 使用 SDK 默认值
     env_key = "OPENAI_API_KEY"
     default_model = "gpt-4o-mini"
@@ -107,6 +107,7 @@ class AnthropicClient(BaseLLMClient):
         if self._client is None:
             try:
                 from anthropic import Anthropic
+
                 self._client = Anthropic(api_key=self.api_key)
             except ImportError:
                 raise ImportError("请安装 anthropic: pip install anthropic")
@@ -116,9 +117,7 @@ class AnthropicClient(BaseLLMClient):
         client = self._get_client()
         params = {
             "model": self.model,
-            "max_tokens": kwargs.get(
-                "max_tokens", self.kwargs.get("max_tokens", 500)
-            ),
+            "max_tokens": kwargs.get("max_tokens", self.kwargs.get("max_tokens", 500)),
             "messages": [{"role": "user", "content": prompt}],
         }
         response = client.messages.create(**params)
@@ -146,27 +145,20 @@ class GeminiClient(BaseLLMClient):
         if self._client is None:
             try:
                 import google.generativeai as genai
+
                 genai.configure(api_key=self.api_key)
                 self._client = genai.GenerativeModel(self.model)
             except ImportError:
-                raise ImportError(
-                    "请安装 google-generativeai: pip install google-generativeai"
-                )
+                raise ImportError("请安装 google-generativeai: pip install google-generativeai")
         return self._client
 
     def generate(self, prompt: str, **kwargs) -> str:
         client = self._get_client()
         generation_config = {
-            "temperature": kwargs.get(
-                "temperature", self.kwargs.get("temperature", 0.7)
-            ),
-            "max_output_tokens": kwargs.get(
-                "max_tokens", self.kwargs.get("max_tokens", 500)
-            ),
+            "temperature": kwargs.get("temperature", self.kwargs.get("temperature", 0.7)),
+            "max_output_tokens": kwargs.get("max_tokens", self.kwargs.get("max_tokens", 500)),
         }
-        response = client.generate_content(
-            prompt, generation_config=generation_config
-        )
+        response = client.generate_content(prompt, generation_config=generation_config)
         return response.text
 
     def is_available(self) -> bool:
@@ -175,6 +167,7 @@ class GeminiClient(BaseLLMClient):
 
 class MistralClient(OpenAICompatibleClient):
     """Mistral AI"""
+
     base_url = None
     env_key = "MISTRAL_API_KEY"
     default_model = "mistral-small-latest"
@@ -182,8 +175,10 @@ class MistralClient(OpenAICompatibleClient):
 
 # ==================== 国内提供商 ====================
 
+
 class DeepSeekClient(OpenAICompatibleClient):
     """DeepSeek"""
+
     base_url = "https://api.deepseek.com"
     env_key = "DEEPSEEK_API_KEY"
     default_model = "deepseek-chat"
@@ -191,6 +186,7 @@ class DeepSeekClient(OpenAICompatibleClient):
 
 class ZhipuClient(OpenAICompatibleClient):
     """智谱 GLM 系列"""
+
     base_url = "https://open.bigmodel.cn/api/paas/v4"
     env_key = "ZHIPU_API_KEY"
     default_model = "glm-4-flash"
@@ -239,9 +235,7 @@ class BaiduClient(BaseLLMClient):
         )
         data = {
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": kwargs.get(
-                "temperature", self.kwargs.get("temperature", 0.7)
-            ),
+            "temperature": kwargs.get("temperature", self.kwargs.get("temperature", 0.7)),
         }
         req = urllib.request.Request(
             url,
@@ -258,12 +252,14 @@ class BaiduClient(BaseLLMClient):
 
 class AlibabaClient(OpenAICompatibleClient):
     """阿里通义千问系列"""
+
     base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     env_key = "ALIBABA_API_KEY"
     default_model = "qwen-turbo"
 
 
 # ==================== 工厂函数 ====================
+
 
 def get_provider_client(
     provider: str,
@@ -296,8 +292,7 @@ def get_provider_client(
     provider_class = providers.get(provider.lower())
     if provider_class is None:
         raise ValueError(
-            f"不支持的 LLM 提供商: {provider}。"
-            f"支持的提供商: {list(providers.keys())}"
+            f"不支持的 LLM 提供商: {provider}。" f"支持的提供商: {list(providers.keys())}"
         )
 
     return provider_class(api_key=api_key, model=model, **kwargs)

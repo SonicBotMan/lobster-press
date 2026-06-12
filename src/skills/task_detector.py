@@ -69,9 +69,7 @@ class TaskDetector:
                 gap_hours = (curr_time - prev_time).total_seconds() / 3600.0
                 if gap_hours > self.TOPIC_IDLE_HOURS:
                     if current_task_turns:
-                        tasks.append(
-                            self._summarize_task(current_task_turns, conversation_id)
-                        )
+                        tasks.append(self._summarize_task(current_task_turns, conversation_id))
                     current_task_turns = [turn]
                     continue
 
@@ -79,9 +77,7 @@ class TaskDetector:
             if self.llm_client and len(current_task_turns) >= 1:
                 is_same_topic = self._llm_judge_topic(current_task_turns, turn)
                 if not is_same_topic:
-                    tasks.append(
-                        self._summarize_task(current_task_turns, conversation_id)
-                    )
+                    tasks.append(self._summarize_task(current_task_turns, conversation_id))
                     current_task_turns = [turn]
                     continue
 
@@ -121,9 +117,7 @@ class TaskDetector:
 
         return turns
 
-    def _llm_judge_topic(
-        self, prev_turns: List[List[Dict]], new_turn: List[Dict]
-    ) -> bool:
+    def _llm_judge_topic(self, prev_turns: List[List[Dict]], new_turn: List[Dict]) -> bool:
         """LLM 话题判断（强偏向 SAME）
 
         返回 True 表示同一话题，False 表示话题切换。
@@ -136,9 +130,9 @@ class TaskDetector:
         Returns:
             True 表示同一话题，False 表示切换
         """
-        prev_text = " ".join(
-            m.get("content", "")[:200] for turn in prev_turns[-2:] for m in turn
-        )[:1000]
+        prev_text = " ".join(m.get("content", "")[:200] for turn in prev_turns[-2:] for m in turn)[
+            :1000
+        ]
         new_text = " ".join(m.get("content", "")[:200] for m in new_turn)[:500]
 
         prompt = f"""判断以下两段对话是否属于同一任务话题。
@@ -170,8 +164,7 @@ class TaskDetector:
         """
         all_msgs = [m for turn in turns for m in turn]
         combined = "\n".join(
-            f"[{m.get('role', '?')}]: {m.get('content', '')[:300]}"
-            for m in all_msgs[:30]
+            f"[{m.get('role', '?')}]: {m.get('content', '')[:300]}" for m in all_msgs[:30]
         )
 
         if self.llm_client:

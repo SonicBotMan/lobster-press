@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 from src.pipeline.chlr_scorer import CHLRScorer
 
-
 # ---------- helpers ----------
+
 
 def _msg(**kw):
     base = {"id": "m1", "token_count": 0, "metadata": {"entities": []}, "content": ""}
@@ -22,6 +22,7 @@ def _iso(dt):
 
 
 # ---------- calculate_complexity (pure math) ----------
+
 
 class TestCalculateComplexity:
     def test_empty_message_is_zero(self):
@@ -39,7 +40,7 @@ class TestCalculateComplexity:
         ) == pytest.approx(0.3, abs=1e-9)
 
     def test_ten_entities_saturate_entity_factor(self):
-        msg = {"token_count": 0, "metadata": {"entities": ["x"]*10}, "content": ""}
+        msg = {"token_count": 0, "metadata": {"entities": ["x"] * 10}, "content": ""}
         assert CHLRScorer().calculate_complexity(msg) == pytest.approx(0.3, abs=1e-9)
 
     def test_metadata_as_json_string_parses(self):
@@ -70,6 +71,7 @@ class TestCalculateComplexity:
 
 # ---------- calculate_half_life (pure math) ----------
 
+
 class TestCalculateHalfLife:
     def test_zero_complexity_yields_base(self):
         s = CHLRScorer(base_h=12.0, alpha=0.1)
@@ -99,6 +101,7 @@ class TestCalculateHalfLife:
 
 
 # ---------- calculate_retention (date-driven) ----------
+
 
 class TestCalculateRetention:
     def test_no_timestamps_returns_one(self):
@@ -139,9 +142,9 @@ class TestCalculateRetention:
             prev = r
 
     def test_invalid_timestamp_returns_one(self):
-        assert CHLRScorer().calculate_retention(
-            {"created_at": "not a date"}
-        ) == pytest.approx(1.0, abs=1e-9)
+        assert CHLRScorer().calculate_retention({"created_at": "not a date"}) == pytest.approx(
+            1.0, abs=1e-9
+        )
 
     def test_zero_half_life_returns_zero(self):
         s = CHLRScorer(base_h=0.0, alpha=0.0)
@@ -154,6 +157,7 @@ class TestCalculateRetention:
 # ---------- should_promote / should_decay ----------
 # Mock calculate_retention to remove datetime.now(timezone.utc) dependence.
 
+
 class TestPromotionAndDecay:
     def test_working_high_retention_promotes(self):
         with patch.object(CHLRScorer, "calculate_retention", return_value=0.9):
@@ -165,22 +169,21 @@ class TestPromotionAndDecay:
 
     def test_episodic_needs_retention_and_access(self):
         with patch.object(CHLRScorer, "calculate_retention", return_value=0.9):
-            assert CHLRScorer().should_promote(
-                _msg(memory_tier="episodic", access_count=3)
-            ) is True
-            assert CHLRScorer().should_promote(
-                _msg(memory_tier="episodic", access_count=2)
-            ) is False
+            assert CHLRScorer().should_promote(_msg(memory_tier="episodic", access_count=3)) is True
+            assert (
+                CHLRScorer().should_promote(_msg(memory_tier="episodic", access_count=2)) is False
+            )
             with patch.object(CHLRScorer, "calculate_retention", return_value=0.5):
-                assert CHLRScorer().should_promote(
-                    _msg(memory_tier="episodic", access_count=10)
-                ) is False
+                assert (
+                    CHLRScorer().should_promote(_msg(memory_tier="episodic", access_count=10))
+                    is False
+                )
 
     def test_semantic_never_promotes(self):
         with patch.object(CHLRScorer, "calculate_retention", return_value=1.0):
-            assert CHLRScorer().should_promote(
-                _msg(memory_tier="semantic", access_count=100)
-            ) is False
+            assert (
+                CHLRScorer().should_promote(_msg(memory_tier="semantic", access_count=100)) is False
+            )
 
     def test_decay_below_default_threshold(self):
         with patch.object(CHLRScorer, "calculate_retention", return_value=0.2):
@@ -197,6 +200,7 @@ class TestPromotionAndDecay:
 
 # ---------- batch_calculate ----------
 
+
 class TestBatchCalculate:
     def test_empty_list_returns_empty(self):
         assert CHLRScorer().batch_calculate([]) == []
@@ -207,13 +211,19 @@ class TestBatchCalculate:
         # 'rich' has 0.3 (token) + 0.3 (entities) = 0.6 complexity
         # 'plain' has 0.0 complexity
         rich = _msg(
-            id="rich", token_count=500,
-            metadata={"entities": ["e"]*10}, content="x",
-            created_at=_iso(now), last_accessed_at=_iso(now),
+            id="rich",
+            token_count=500,
+            metadata={"entities": ["e"] * 10},
+            content="x",
+            created_at=_iso(now),
+            last_accessed_at=_iso(now),
         )
         plain = _msg(
-            id="plain", token_count=0, content="x",
-            created_at=_iso(now), last_accessed_at=_iso(now),
+            id="plain",
+            token_count=0,
+            content="x",
+            created_at=_iso(now),
+            last_accessed_at=_iso(now),
         )
         out = s.batch_calculate([rich, plain])
         assert len(out) == 2

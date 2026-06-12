@@ -23,10 +23,12 @@ class TestCompressionRatio:
         # 模拟 1000 条消息（100K+ tokens 模拟）
         messages = []
         for i in range(1000):
-            messages.append({
-                "role": "user" if i % 2 == 0 else "assistant",
-                "content": f"这是第 {i} 条测试消息，包含一些内容用于模拟真实对话。" * 10
-            })
+            messages.append(
+                {
+                    "role": "user" if i % 2 == 0 else "assistant",
+                    "content": f"这是第 {i} 条测试消息，包含一些内容用于模拟真实对话。" * 10,
+                }
+            )
 
         # 计算原始 token 数（估算：每条消息约 100 tokens）
         original_tokens = len(messages) * 100
@@ -59,10 +61,7 @@ class TestBatchPerformance:
         """测试批量插入 vs 单条插入的性能差异"""
         db = LobsterDatabase(str(tmp_path / "test.db"))
 
-        messages = [
-            {"role": "user", "content": f"测试消息 {i}"}
-            for i in range(100)
-        ]
+        messages = [{"role": "user", "content": f"测试消息 {i}"} for i in range(100)]
 
         # 单条插入
         conversation_id_1 = db.create_conversation()
@@ -74,7 +73,7 @@ class TestBatchPerformance:
         # 批量插入（如果支持）
         conversation_id_2 = db.create_conversation()
         start_batch = time.time()
-        if hasattr(db, 'add_messages_batch'):
+        if hasattr(db, "add_messages_batch"):
             db.add_messages_batch(conversation_id_2, messages)
         else:
             # 如果不支持批量，记录为 0

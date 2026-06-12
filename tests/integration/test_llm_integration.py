@@ -14,9 +14,7 @@ import os
 
 import pytest
 
-sys.path.insert(
-    0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "src")
-)
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "src"))
 
 from src.prompts import (
     build_leaf_summary_prompt,
@@ -26,7 +24,6 @@ from src.prompts import (
     truncate_messages,
 )
 from src.llm_client import create_llm_client
-
 
 # 测试数据
 TEST_MESSAGES = [
@@ -80,6 +77,7 @@ def test_prompt_building():
     assert "稳定的语义知识" in note_prompt
     assert "JSON" in note_prompt
 
+
 def test_token_estimation():
     """测试 token 估算"""
     print("\n" + "=" * 60)
@@ -100,6 +98,7 @@ def test_token_estimation():
     print(f"截断后消息数: {len(truncated)}")
     assert len(truncated) < len(long_messages)
 
+
 def test_llm_integration_with_deepseek():
     """测试 DeepSeek LLM 集成"""
     print("\n" + "=" * 60)
@@ -112,9 +111,7 @@ def test_llm_integration_with_deepseek():
 
     try:
         # 创建客户端
-        client = create_llm_client(
-            provider="deepseek", api_key=api_key, model="deepseek-chat"
-        )
+        client = create_llm_client(provider="deepseek", api_key=api_key, model="deepseek-chat")
         print(f"✅ DeepSeek 客户端创建成功")
 
         # 测试叶子摘要生成
@@ -123,7 +120,6 @@ def test_llm_integration_with_deepseek():
         print(f"\n✅ 叶子摘要生成成功")
         print(f"   响应长度: {len(result)} 字符")
         print(f"   预览: {result[:100]}...")
-
 
     except Exception as e:
         print(f"❌ 测试失败: {e}")
@@ -145,9 +141,7 @@ def test_llm_integration_with_zhipu():
 
     try:
         # 创建客户端
-        client = create_llm_client(
-            provider="zhipu", api_key=api_key, model="glm-4-flash"
-        )
+        client = create_llm_client(provider="zhipu", api_key=api_key, model="glm-4-flash")
         print(f"✅ 智谱 GLM 客户端创建成功")
 
         # 测试 Note 提取
@@ -170,7 +164,6 @@ def test_llm_integration_with_zhipu():
         notes = json.loads(cleaned_result.strip())
         print(f"   提取的 notes 数量: {len(notes)}")
         print(f"   内容: {notes}")
-
 
     except Exception as e:
         print(f"❌ 测试失败: {e}")

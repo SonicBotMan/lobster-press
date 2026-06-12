@@ -148,116 +148,110 @@ CONFLICT_DETECTION_PROMPT = """你是一个矛盾检测助手。请判断以下�
 
 # ==================== Prompt 构建函数 ====================
 
+
 def build_leaf_summary_prompt(messages: List[Dict]) -> str:
     """构建叶子摘要 prompt
-    
+
     Args:
         messages: 消息列表
-    
+
     Returns:
         格式化后的 prompt
     """
-    conversation_text = '\n\n'.join([
-        f"**[{m.get('role', 'unknown').upper()}]**: {m.get('content', '')}"
-        for m in messages
-    ])
-    
+    conversation_text = "\n\n".join(
+        [f"**[{m.get('role', 'unknown').upper()}]**: {m.get('content', '')}" for m in messages]
+    )
+
     return LEAF_SUMMARY_PROMPT.format(conversation_text=conversation_text)
 
 
 def build_condensed_summary_prompt(combined_content: str, depth: int) -> str:
     """构建压缩摘要 prompt
-    
+
     Args:
         combined_content: 合并后的内容
         depth: 压缩深度
-    
+
     Returns:
         格式化后的 prompt
     """
-    return CONDENSED_SUMMARY_PROMPT.format(
-        combined_content=combined_content,
-        depth=depth
-    )
+    return CONDENSED_SUMMARY_PROMPT.format(combined_content=combined_content, depth=depth)
 
 
 def build_note_extraction_prompt(messages: List[Dict]) -> str:
     """构建 note 提取 prompt
-    
+
     Args:
         messages: 消息列表
-    
+
     Returns:
         格式化后的 prompt
     """
-    context = '\n\n'.join([
-        f"[{m.get('role', 'unknown')}]: {m.get('content', '')}"
-        for m in messages
-    ])
-    
+    context = "\n\n".join(
+        [f"[{m.get('role', 'unknown')}]: {m.get('content', '')}" for m in messages]
+    )
+
     return NOTE_EXTRACTION_PROMPT.format(context=context)
 
 
 def build_conflict_detection_prompt(statement1: str, statement2: str) -> str:
     """构建矛盾检测 prompt
-    
+
     Args:
         statement1: 陈述1
         statement2: 陈述2
-    
+
     Returns:
         格式化后的 prompt
     """
-    return CONFLICT_DETECTION_PROMPT.format(
-        statement1=statement1,
-        statement2=statement2
-    )
+    return CONFLICT_DETECTION_PROMPT.format(statement1=statement1, statement2=statement2)
 
 
 # ==================== Prompt 优化工具 ====================
 
+
 def truncate_messages(messages: List[Dict], max_tokens: int = 20000) -> List[Dict]:
     """截断消息列表以适应 token 限制
-    
+
     Args:
         messages: 消息列表
         max_tokens: 最大 token 数
-    
+
     Returns:
         截断后的消息列表
     """
     result = []
     total_tokens = 0
-    
+
     for msg in reversed(messages):  # 从最新的消息开始
-        content = msg.get('content', '')
+        content = msg.get("content", "")
         msg_tokens = estimate_tokens(content)
-        
+
         if total_tokens + msg_tokens <= max_tokens:
             result.insert(0, msg)
             total_tokens += msg_tokens
         else:
             break
-    
+
     return result
 
 
 # ==================== 示例和测试 ====================
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # 测试 prompt 构建
     test_messages = [
-        {'role': 'user', 'content': '我们决定使用 PostgreSQL'},
-        {'role': 'assistant', 'content': '好的，PostgreSQL 是个好选择'},
-        {'role': 'user', 'content': '版本是 15.2'},
-        {'role': 'assistant', 'content': '已记录，PostgreSQL 15.2'},
+        {"role": "user", "content": "我们决定使用 PostgreSQL"},
+        {"role": "assistant", "content": "好的，PostgreSQL 是个好选择"},
+        {"role": "user", "content": "版本是 15.2"},
+        {"role": "assistant", "content": "已记录，PostgreSQL 15.2"},
     ]
-    
+
     logger.info("=" * 60)
     logger.info("叶子摘要 Prompt:")
     logger.info("=" * 60)
     logger.info(build_leaf_summary_prompt(test_messages))
-    
+
     logger.info("=" * 60)
     logger.info("Note 提取 Prompt:")
     logger.info("=" * 60)
