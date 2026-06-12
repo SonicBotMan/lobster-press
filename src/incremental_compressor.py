@@ -115,6 +115,8 @@ class IncrementalCompressor:
         message['compression_exempt'] = scored_msg.compression_exempt
         
         # 1. 保存消息（包含新字段）
+        # 防御式设置 conversationId：客户端可能没传（mcp_server 实际有这个契约漏洞）
+        message["conversationId"] = conversation_id
         self.db.save_message(message)
         
         # 2. 更新上下文（支持 id 或 message_id 字段）
