@@ -49,11 +49,16 @@ def mcp_server():
     )
     yield proc, db
     if proc.poll() is None:
+        proc.stdout.close()
+        proc.stderr.close()
         proc.stdin.close()
         try:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
+    else:
+        proc.stdout.close()
+        proc.stderr.close()
     if os.path.exists(db):
         os.unlink(db)
 
