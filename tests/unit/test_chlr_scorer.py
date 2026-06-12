@@ -2,9 +2,10 @@
 # -*- coding: utf-8 -*-
 """Unit tests for CHLRScorer (src/pipeline/chlr_scorer.py)."""
 
-import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+
+import pytest
 
 from src.pipeline.chlr_scorer import CHLRScorer
 

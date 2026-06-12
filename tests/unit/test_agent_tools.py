@@ -7,10 +7,11 @@ import os
 import subprocess
 import sys
 import tempfile
+
 import pytest
 
+from src.agent_tools import lobster_describe, lobster_expand, lobster_grep
 from src.database import LobsterDatabase
-from src.agent_tools import lobster_grep, lobster_describe, lobster_expand, main
 
 
 @pytest.fixture

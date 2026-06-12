@@ -9,8 +9,8 @@ lobster_expand 用于将 DAG 摘要节点展开，还原原始消息（无损检
 - 返回展开的消息列表或错误信息
 """
 
-import json
 import asyncio
+import json
 
 
 def test_response_has_required_fields(mcp_server):

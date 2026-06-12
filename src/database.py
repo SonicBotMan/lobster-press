@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+from __future__ import annotations
+
 """
 LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
@@ -8,17 +11,16 @@ Author: LobsterPress Team
 Version: 5.1.0
 """
 
-import sqlite3
-import json
 import hashlib
-import uuid
-import math
-import sys
+import json
 import logging
-from typing import List, Dict, Optional, Any
-from pathlib import Path
+import math
+import sqlite3
+import uuid
 from datetime import datetime, timezone
+from typing import Dict, List, Optional
 
+from src.skills.models import Skill  # noqa: F401
 from src.utils.tokens import estimate_tokens as _estimate_tokens_shared
 
 logger = logging.getLogger(__name__)
@@ -167,7 +169,7 @@ class LobsterDatabase:
 
         # FTS5 全文搜索 - 消息
         self.cursor.execute("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts 
+            CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts
             USING fts5(
                 message_id,
                 content,
@@ -178,7 +180,7 @@ class LobsterDatabase:
 
         # FTS5 全文搜索 - 摘要
         self.cursor.execute("""
-            CREATE VIRTUAL TABLE IF NOT EXISTS summaries_fts 
+            CREATE VIRTUAL TABLE IF NOT EXISTS summaries_fts
             USING fts5(
                 summary_id,
                 content,
@@ -282,12 +284,12 @@ class LobsterDatabase:
 
         # 创建索引
         self.cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_messages_conversation 
+            CREATE INDEX IF NOT EXISTS idx_messages_conversation
             ON messages(conversation_id, seq);
         """)
 
         self.cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_summaries_conversation 
+            CREATE INDEX IF NOT EXISTS idx_summaries_conversation
             ON summaries(conversation_id, depth);
         """)
 
@@ -373,7 +375,7 @@ class LobsterDatabase:
         """)
 
         self.cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_corrections_target 
+            CREATE INDEX IF NOT EXISTS idx_corrections_target
             ON corrections(target_type, target_id)
         """)
 
@@ -663,8 +665,8 @@ class LobsterDatabase:
             消息列表
         """
         query = """
-            SELECT * FROM messages 
-            WHERE conversation_id = ? 
+            SELECT * FROM messages
+            WHERE conversation_id = ?
             ORDER BY seq ASC
         """
         # v4.0.13: 修复 SQL 注入风险（Issue #151 Bug #3）
@@ -854,7 +856,8 @@ class LobsterDatabase:
         structure_score = 0.0
         if "```" in content or "    " in content:  # 代码块
             structure_score += 0.5
-        if any(content.count(marker) > 2 for marker in ["- ", "* ", "1. "]):  # 列表
+        # 列表
+        if any(content.count(marker) > 2 for marker in ["- ", "* ", "1. "]):
             structure_score += 0.3
         if content.count("\n") > 5:  # 多段落
             structure_score += 0.2
@@ -941,8 +944,8 @@ class LobsterDatabase:
             # 执行 UPSERT（v4.0.2: 补充 r3_layer 和 memory_tier）
             self.cursor.execute(
                 """
-                INSERT OR REPLACE INTO summaries 
-                (summary_id, conversation_id, kind, depth, content, token_count, 
+                INSERT OR REPLACE INTO summaries
+                (summary_id, conversation_id, kind, depth, content, token_count,
                  earliest_at, latest_at, descendant_count, created_at,
                  r3_layer, memory_tier)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1010,7 +1013,7 @@ class LobsterDatabase:
         if depth is not None:
             self.cursor.execute(
                 """
-                SELECT * FROM summaries 
+                SELECT * FROM summaries
                 WHERE conversation_id = ? AND depth = ?
                 ORDER BY created_at ASC
             """,
@@ -1019,7 +1022,7 @@ class LobsterDatabase:
         else:
             self.cursor.execute(
                 """
-                SELECT * FROM summaries 
+                SELECT * FROM summaries
                 WHERE conversation_id = ?
                 ORDER BY depth ASC, created_at ASC
             """,
@@ -1434,7 +1437,7 @@ class LobsterDatabase:
             # 记录纠错（直接带 applied_at，避免两次 UPDATE）
             self.cursor.execute(
                 """
-                INSERT INTO corrections 
+                INSERT INTO corrections
                 (correction_id, target_type, target_id, correction_type, old_value, new_value, reason, created_at, applied_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -1585,6 +1588,7 @@ class LobsterDatabase:
             清理统计
         """
         from datetime import datetime, timedelta, timezone
+
         from pipeline.chlr_scorer import CHLRScorer
 
         cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days_threshold)).isoformat()
@@ -1594,7 +1598,7 @@ class LobsterDatabase:
         # 查找候选消息（增加 conversation_id 过滤 + 近期保护）
         self.cursor.execute(
             """
-            SELECT message_id, token_count, tfidf_score, access_count, 
+            SELECT message_id, token_count, tfidf_score, access_count,
                    last_accessed_at, created_at, content, metadata, memory_tier
             FROM messages
             WHERE conversation_id = ?
@@ -1650,7 +1654,7 @@ class LobsterDatabase:
 
             # 计算半衰期和保留率
             half_life = scorer.calculate_half_life(message)
-            retention = scorer.calculate_retention(message)
+            scorer.calculate_retention(message)
 
             # 更新 half_life 字段
             self.cursor.execute(
@@ -1874,7 +1878,7 @@ class LobsterDatabase:
                     elif block.get("type") == "toolCall":
                         texts.append(f"[Tool Call: {block.get('name', 'unknown')}]")
                     elif block.get("type") == "thinking":
-                        texts.append(f"[Thinking]")
+                        texts.append("[Thinking]")
             return "\n".join(texts)
 
         return str(content)
@@ -2133,6 +2137,7 @@ class LobsterDatabase:
     ) -> List[Dict]:
         """纯内存余弦相似度搜索"""
         import struct
+
         import numpy as np
 
         query = "SELECT chunk_id, target_type, target_id, vector FROM embeddings"

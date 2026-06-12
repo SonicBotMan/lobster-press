@@ -4,8 +4,8 @@
 验证 lobster_assemble 工具的响应结构符合 MCP 协议规范。
 """
 
-import json
 import asyncio
+import json
 
 
 def test_response_has_required_fields(mcp_server, sample_conversation_id):

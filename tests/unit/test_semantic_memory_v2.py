@@ -7,17 +7,18 @@ Author: 小云 (Xiao Yun)
 Date: 2026-03-19
 """
 
-import sys
 import json
-import pytest
+import sys
 from pathlib import Path
-from unittest.mock import Mock, MagicMock
+from unittest.mock import Mock
+
+import pytest
 
 # 添加 src 目录到 path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from semantic_memory import SemanticMemory
 from database import LobsterDatabase
+from semantic_memory import SemanticMemory
 
 
 class TestSemanticMemoryInit:
@@ -33,7 +34,7 @@ class TestSemanticMemoryInit:
     def test_ensure_schema(self):
         """测试创建 schema"""
         db = LobsterDatabase(":memory:")
-        memory = SemanticMemory(db)
+        SemanticMemory(db)
 
         # 检查 notes 表是否存在
         db.cursor.execute("""

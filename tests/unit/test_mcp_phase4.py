@@ -5,11 +5,11 @@ Phase 4.4 MCP Tools Tests
 Tests for lobster_viewer and lobster_import tools
 """
 
-import pytest
 import asyncio
-import threading
 import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
+
+import pytest
 
 
 def run_async(coro):
@@ -109,7 +109,7 @@ class TestHandleLobsterViewer:
         assert result["status"] == "running"
 
     def test_start_launches_server(self, server):
-        mock_db = Mock()
+        _mock_db = Mock()
         mock_viewer = Mock()
         mock_viewer.serve_forever = Mock()
 
@@ -122,7 +122,7 @@ class TestHandleLobsterViewer:
         mock_start.assert_called_once()
 
     def test_start_twice_fails(self, server):
-        mock_db = Mock()
+        _mock_db = Mock()
         mock_viewer = Mock()
         mock_viewer.serve_forever = Mock()
         server._viewer_server = mock_viewer

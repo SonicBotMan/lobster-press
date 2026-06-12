@@ -2,10 +2,6 @@
 Unit tests for SkillEvolver class.
 """
 
-import pytest
-import hashlib
-from datetime import datetime
-
 
 class TestSkillEvolverConstant:
     """Tests for SkillEvolver constants."""
@@ -149,8 +145,8 @@ class TestLLMEvaluate:
 
     def test_llm_returns_yes(self):
         """LLM returns YES should result in True."""
-        from src.skills.evolver import SkillEvolver
         from src.llm_client import MockLLMClient
+        from src.skills.evolver import SkillEvolver
 
         mock_llm = MockLLMClient(response="YES")
         evolver = SkillEvolver(db=None, llm_client=mock_llm)
@@ -159,8 +155,8 @@ class TestLLMEvaluate:
 
     def test_llm_returns_no(self):
         """LLM returns NO should result in False."""
-        from src.skills.evolver import SkillEvolver
         from src.llm_client import MockLLMClient
+        from src.skills.evolver import SkillEvolver
 
         mock_llm = MockLLMClient(response="NO")
         evolver = SkillEvolver(db=None, llm_client=mock_llm)
@@ -181,8 +177,8 @@ class TestLLMEvaluate:
 
     def test_case_insensitive_yes(self):
         """YES in any case should be accepted."""
-        from src.skills.evolver import SkillEvolver
         from src.llm_client import MockLLMClient
+        from src.skills.evolver import SkillEvolver
 
         mock_llm = MockLLMClient(response="yes")
         evolver = SkillEvolver(db=None, llm_client=mock_llm)
@@ -195,8 +191,8 @@ class TestGenerateSkillMd:
 
     def test_with_llm_generates_skill_md(self):
         """With LLM should generate SKILL.md format."""
-        from src.skills.evolver import SkillEvolver
         from src.llm_client import MockLLMClient
+        from src.skills.evolver import SkillEvolver
 
         mock_llm = MockLLMClient(response="# Test Skill\n## 目标\nTest")
         evolver = SkillEvolver(db=None, llm_client=mock_llm)
@@ -446,8 +442,8 @@ class TestEvaluateAndGenerate:
 
     def test_llm_rejected_tasks_return_none(self):
         """LLM rejected tasks should return None."""
-        from src.skills.evolver import SkillEvolver
         from src.llm_client import MockLLMClient
+        from src.skills.evolver import SkillEvolver
 
         mock_llm = MockLLMClient(response="NO")
         evolver = SkillEvolver(db=None, llm_client=mock_llm)

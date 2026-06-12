@@ -6,10 +6,12 @@ LobsterPress 性能测试
 2. 批量压缩性能优化: 6.67x
 """
 
-import pytest
 import time
-from src.database import LobsterDatabase
+
+import pytest
+
 from src.dag_compressor import DAGCompressor
+from src.database import LobsterDatabase
 
 
 class TestCompressionRatio:

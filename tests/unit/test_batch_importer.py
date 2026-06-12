@@ -5,6 +5,7 @@
 import json
 import os
 import tempfile
+
 import pytest
 
 from src.pipeline.batch_importer import BatchImporter

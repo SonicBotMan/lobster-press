@@ -9,20 +9,15 @@ Date: 2026-04-05
 """
 
 import hashlib
-import json
 import io
+import json
 import sys
-import tempfile
-import os
+from http.server import HTTPServer
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from http.server import HTTPServer
-
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from database import LobsterDatabase
 from viewer.server import ViewerHandler, start_viewer
 
 

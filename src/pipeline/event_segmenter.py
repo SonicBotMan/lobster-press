@@ -12,12 +12,11 @@ Author: LobsterPress Team
 Version: v2.6.0
 """
 
-import re
-import math
 import logging
-from typing import List, Dict, Optional
-from datetime import datetime
+import re
 from collections import Counter
+from datetime import datetime
+from typing import Dict, List, Optional
 
 from src.utils.math import cosine_similarity
 from src.utils.tokens import estimate_tokens

@@ -1,10 +1,7 @@
 """Unit tests for HybridRetriever - FTS5 + Vector → RRF → MMR → Time Decay pipeline."""
 
-import math
-import pytest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, patch
-
+from unittest.mock import MagicMock
 
 from src.vector.retriever import HybridRetriever
 

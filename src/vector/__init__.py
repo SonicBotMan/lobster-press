@@ -2,8 +2,8 @@
 
 from .embedder import (
     BaseEmbedder,
-    OpenAICompatibleEmbedder,
     NumpyOfflineEmbedder,
+    OpenAICompatibleEmbedder,
     create_embedder,
 )
 from .retriever import HybridRetriever

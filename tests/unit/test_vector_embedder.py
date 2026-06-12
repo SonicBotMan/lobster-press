@@ -1,10 +1,8 @@
 """Unit tests for vector embedder module."""
 
-import pytest
-import numpy as np
-import os
 import tempfile
-import struct
+
+import numpy as np
 
 
 class TestNumpyOfflineEmbedder:
@@ -69,14 +67,14 @@ class TestCreateEmbedder:
 
     def test_falls_back_to_numpy_when_no_api_config(self):
         """Should fall back to NumpyOfflineEmbedder when no API config."""
-        from src.vector.embedder import create_embedder, NumpyOfflineEmbedder
+        from src.vector.embedder import NumpyOfflineEmbedder, create_embedder
 
         embedder = create_embedder()
         assert isinstance(embedder, NumpyOfflineEmbedder)
 
     def test_returns_openai_when_api_configured(self, monkeypatch):
         """Should return OpenAICompatibleEmbedder when API is configured."""
-        from src.vector.embedder import create_embedder, OpenAICompatibleEmbedder
+        from src.vector.embedder import OpenAICompatibleEmbedder, create_embedder
 
         monkeypatch.setenv("LOBSTER_EMBED_ENDPOINT", "http://localhost:8080")
         monkeypatch.setenv("LOBSTER_EMBED_API_KEY", "test-key")

@@ -11,19 +11,20 @@ NOTE: These tests depend on Phase 2 (fix/phase2-dag-convergence) being merged fi
 Run after Phase 2 PR is merged to master.
 """
 
-import pytest
-import tempfile
 import os
-from pathlib import Path
-from datetime import datetime, timezone
 
 # 添加 src 到 path
 import sys
+import tempfile
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from database import LobsterDatabase
 from dag_compressor import DAGCompressor
+from database import LobsterDatabase
 
 
 class TestDagConvergence:
@@ -67,7 +68,7 @@ class TestDagConvergence:
         conversation_id = "test_conv"
 
         # 创建 12 个叶子摘要（应该生成 3 个 condensed 摘要，每个包含 4 个 leaf）
-        summary_ids = self._create_leaf_summaries(temp_db, conversation_id, 12)
+        self._create_leaf_summaries(temp_db, conversation_id, 12)
 
         # 执行压缩
         result = compressor.condensed_compact(conversation_id, depth=0, min_fanout=4)
@@ -87,14 +88,14 @@ class TestDagConvergence:
         for s in condensed_summaries:
             assert (
                 s["descendant_count"] == 40
-            ), f"每个 condensed 应该覆盖 40 条消息 (4 leaf * 10 msg)"
+            ), "每个 condensed 应该覆盖 40 条消息 (4 leaf * 10 msg)"
 
     def test_condensed_compact_respects_min_fanout(self, compressor, temp_db):
         """测试 condensed_compact 尊重 min_fanout"""
         conversation_id = "test_conv_2"
 
         # 只创建 3 个叶子摘要（小于 min_fanout=4）
-        summary_ids = self._create_leaf_summaries(temp_db, conversation_id, 3)
+        self._create_leaf_summaries(temp_db, conversation_id, 3)
 
         # 执行压缩
         result = compressor.condensed_compact(conversation_id, depth=0, min_fanout=4)
@@ -126,7 +127,7 @@ class TestDagConvergence:
         compressor.leaf_chunk_tokens = 1000  # 需要 1000 tokens 才触发压缩
 
         # 执行压缩
-        result = compressor.leaf_compact(conversation_id, max_tokens=1000)
+        _result = compressor.leaf_compact(conversation_id, max_tokens=1000)
 
         # 由于 episode tokens < max_tokens * 0.5 = 500，应该跳过
         # 但 total uncompressed tokens 也需要 >= max_tokens 才会触发

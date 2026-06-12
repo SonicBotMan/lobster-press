@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """v3.1.0 LLM 摘要功能测试"""
 
-import sys
 import os
+import sys
 
 _project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.join(_project_root, "src"))
 
-from src.database import LobsterDatabase
 from src.dag_compressor import DAGCompressor
+from src.database import LobsterDatabase
 
 
 class MockLLMClient:

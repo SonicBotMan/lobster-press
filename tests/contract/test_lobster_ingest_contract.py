@@ -2,8 +2,8 @@
 契约测试：lobster_ingest MCP 工具
 """
 
-import json
 import asyncio
+import json
 
 
 def test_response_has_required_fields(mcp_server):

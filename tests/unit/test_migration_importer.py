@@ -1,14 +1,11 @@
 # v5.0.0
 """OpenClaw 原生记忆导入器测试"""
 
-import pytest
-import json
 import hashlib
+import json
 import sqlite3
-import tempfile
 from pathlib import Path
-from unittest.mock import Mock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import Mock
 
 from src.migration.importer import MemoryImporter
 
@@ -222,7 +219,7 @@ class TestImportMemories:
         importer = MemoryImporter(mock_db, openclaw_path=str(tmp_path))
 
         # 计算已处理的 hash
-        content_hash = hashlib.sha256("Hello".encode()).hexdigest()[:16]
+        _content_hash = hashlib.sha256("Hello".encode()).hexdigest()[:16]
 
         result = importer.import_memories(checkpoint_file=str(checkpoint_file))
 

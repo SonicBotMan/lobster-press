@@ -13,11 +13,11 @@ Author: LobsterPress Team
 Version: v3.0.0
 """
 
-import re
 import logging
-from typing import List, Dict, Optional
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

@@ -8,23 +8,22 @@ Date: 2026-03-19
 """
 
 import sys
-import pytest
 from pathlib import Path
 
 # 添加 src 目录到 path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
 from prompts import (
-    build_leaf_summary_prompt,
+    CONDENSED_SUMMARY_PROMPT,
+    CONFLICT_DETECTION_PROMPT,
+    LEAF_SUMMARY_PROMPT,
+    NOTE_EXTRACTION_PROMPT,
     build_condensed_summary_prompt,
-    build_note_extraction_prompt,
     build_conflict_detection_prompt,
+    build_leaf_summary_prompt,
+    build_note_extraction_prompt,
     estimate_tokens,
     truncate_messages,
-    LEAF_SUMMARY_PROMPT,
-    CONDENSED_SUMMARY_PROMPT,
-    NOTE_EXTRACTION_PROMPT,
-    CONFLICT_DETECTION_PROMPT,
 )
 
 

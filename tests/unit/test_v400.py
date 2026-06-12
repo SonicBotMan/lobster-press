@@ -9,10 +9,10 @@ Date: 2026-03-19
 """
 
 import sys
-import os
 import uuid
-import pytest
 from pathlib import Path
+
+import pytest
 
 # 添加 src 目录到 path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -176,7 +176,7 @@ class TestR3Mem:
         # Layer 1 展开（返回子摘要，对于叶子摘要应该返回空列表或自身）
         # 注意：expand_summary 的 target_layer=1 对于叶子摘要可能返回空列表
         # 因为叶子摘要没有子摘要
-        result = db.expand_summary(summary_id, target_layer=1)
+        _result = db.expand_summary(summary_id, target_layer=1)
         # 叶子摘要没有子摘要，所以返回空列表是正常的
         # 改为测试 target_layer=2（返回原始消息）
         result_layer2 = db.expand_summary(summary_id, target_layer=2)

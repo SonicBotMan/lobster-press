@@ -9,9 +9,8 @@ CHLRScorer — C-HLR+ 自适应半衰期回归算法
 v4.0.96: 首次实现
 """
 
-import math
+from datetime import datetime, timezone
 from typing import Dict, List
-from datetime import datetime, timedelta, timezone
 
 
 class CHLRScorer:

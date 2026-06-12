@@ -13,19 +13,18 @@ Author: LobsterPress Team
 Version: v2.5.0
 """
 
-import sys
 import os
+import sys
 import unittest
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
 
 # 添加 src 模块
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from pipeline.tfidf_scorer import EXEMPT_TYPES
 from src.database import LobsterDatabase
 from src.incremental_compressor import IncrementalCompressor
-from src.agent_tools import lobster_grep
-from pipeline.tfidf_scorer import EXEMPT_TYPES
 
 
 class TestV25Integration(unittest.TestCase):
@@ -209,13 +208,13 @@ def connect_db():
                     mock_results[i]["relevance"], mock_results[i + 1]["relevance"]
                 )
 
-        print(f"\n  模拟搜索结果（按相关性排序）:")
+        print("\n  模拟搜索结果（按相关性排序）:")
         for result in mock_results:
             print(
                 f"    - {result['id']}: relevance={result['relevance']:.2f}, tfidf={result['tfidf_score']:.2f}"
             )
 
-        print(f"\n  ✅ 重排序逻辑正确")
+        print("\n  ✅ 重排序逻辑正确")
 
     def test_05_incremental_workflow(self):
         """测试增量压缩完整流程"""
@@ -248,7 +247,7 @@ def connect_db():
             self.assertIn("msg_type", msg)
             self.assertIn("compression_exempt", msg)
 
-        print(f"  ✅ 所有消息都已评分和打标签")
+        print("  ✅ 所有消息都已评分和打标签")
 
 
 if __name__ == "__main__":

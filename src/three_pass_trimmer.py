@@ -7,10 +7,10 @@ ThreePassTrimmer — 基于 CMV 论文(arXiv:2602.22402)的三遍无损压缩引
 arXiv: https://arxiv.org/abs/2602.22402
 """
 
-import re
-import json
 import hashlib
-from typing import List, Dict, Tuple
+import json
+import re
+from typing import Dict, List, Tuple
 
 
 class ThreePassTrimmer:
@@ -310,7 +310,6 @@ class ThreePassTrimmer:
         例如：每轮都注入的 [MEMORY REMINDER] 或 <system-reminder>，
         只保留最后一次，其余替换为 '[boilerplate folded]'。
         """
-        result = []
         saved = 0
         seen_boilerplate = set()
 

@@ -8,8 +8,8 @@ Version: v5.0.0
 """
 
 import json
-from typing import List, Dict, Optional
 from datetime import datetime
+from typing import Dict, List, Optional
 
 
 class TaskDetector:

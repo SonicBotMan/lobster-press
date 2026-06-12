@@ -7,13 +7,13 @@ ContextEngine 集成测试（v3.3.0+）
 - 自动触发逻辑
 """
 
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, MagicMock
-from pathlib import Path
 import sys
 import tempfile
-import json
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import pytest
 
 # 添加 src 到 path
 src_dir = Path(__file__).parent.parent.parent / "src"

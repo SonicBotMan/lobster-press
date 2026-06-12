@@ -12,12 +12,11 @@ Version: v5.0.0
 
 import hashlib
 import json
-import re
 import logging
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
-from typing import Optional, Dict, Any
 from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Dict
+from urllib.parse import parse_qs, urlparse
 
 logger = logging.getLogger(__name__)
 

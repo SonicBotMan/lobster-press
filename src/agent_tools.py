@@ -8,11 +8,10 @@ Author: LobsterPress Team
 Version: v4.0.41
 """
 
-import json
-import sys
 import argparse
+import json
 import logging
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 from src.database import LobsterDatabase

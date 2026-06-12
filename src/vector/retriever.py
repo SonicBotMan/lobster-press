@@ -8,9 +8,8 @@ Version: v5.0.0
 """
 
 import math
-import numpy as np
-from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timezone
+from typing import Dict, List
 
 
 class HybridRetriever:

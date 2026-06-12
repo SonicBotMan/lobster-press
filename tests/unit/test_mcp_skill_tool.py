@@ -2,7 +2,6 @@
 Unit tests for lobster_skill MCP tool.
 """
 
-import pytest
 import asyncio
 from unittest.mock import MagicMock, patch
 

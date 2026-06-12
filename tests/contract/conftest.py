@@ -9,14 +9,15 @@ from pathlib import Path
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-import pytest
-import tempfile
 import os
+import tempfile
 
+import pytest
+
+from mcp_server.lobster_mcp_server import LobsterPressMCPServer
+from src.dag_compressor import DAGCompressor
 from src.database import LobsterDatabase
 from src.llm_client import MockLLMClient
-from src.dag_compressor import DAGCompressor
-from mcp_server.lobster_mcp_server import LobsterPressMCPServer
 
 
 @pytest.fixture

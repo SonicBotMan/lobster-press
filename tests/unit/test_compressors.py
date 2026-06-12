@@ -9,16 +9,14 @@ Date: 2026-03-19
 """
 
 import sys
-import os
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 
 # 添加 src 目录到 path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from database import LobsterDatabase
 from dag_compressor import DAGCompressor
+from database import LobsterDatabase
 from incremental_compressor import IncrementalCompressor
 
 
@@ -145,7 +143,7 @@ class TestCompressorIntegration:
     def test_database_compressor_workflow(self):
         """测试数据库和压缩器工作流"""
         db = LobsterDatabase(":memory:")
-        compressor = DAGCompressor(db)
+        DAGCompressor(db)
 
         # 添加消息
         conv_id = "test_conv"

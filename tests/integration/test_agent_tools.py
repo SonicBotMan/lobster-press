@@ -4,17 +4,17 @@
 LobsterPress Agent Tools 测试脚本
 """
 
-import sys
 import os
-from pathlib import Path
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 # 添加 src 目录
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from database import LobsterDatabase
+from agent_tools import lobster_describe, lobster_expand, lobster_grep
 from dag_compressor import DAGCompressor
-from agent_tools import lobster_grep, lobster_describe, lobster_expand
+from database import LobsterDatabase
 
 
 def test_agent_tools():
@@ -35,12 +35,12 @@ def test_agent_tools():
 
     # 创建测试数据
     conversation_id = "conv_test"
-    print(f"\n📝 创建测试数据...\n")
+    print("\n📝 创建测试数据...\n")
 
     for i in range(1, 31):
         content = f"这是第 {i} 条消息，讨论了技术话题 {i % 10}。"
         if i % 5 == 0:
-            content += f" 关键词: Python, JavaScript, Rust, Go"
+            content += " 关键词: Python, JavaScript, Rust, Go"
 
         msg = {
             "id": f"msg_{i:03d}",
@@ -62,7 +62,7 @@ def test_agent_tools():
         )
 
     db.conn.commit()
-    print(f"✅ 创建了 30 条测试消息\n")
+    print("✅ 创建了 30 条测试消息\n")
 
     # 执行压缩
     print("=" * 60)
@@ -149,7 +149,7 @@ def test_agent_tools():
         print(f"  摘要 ID: {result['summary_id']}")
         print(f"  总消息数: {result['total_messages']}")
         print(f"  访问摘要: {result['visited_summaries']}")
-        print(f"  前 3 条消息:")
+        print("  前 3 条消息:")
         for i, msg in enumerate(result["messages"][:3], 1):
             print(f"    {i}. [{msg['role']}] {msg['content'][:60]}...")
 
@@ -168,21 +168,21 @@ def test_agent_tools():
     print("  ✅ 测试完成")
     print("=" * 60)
 
-    print(f"\n📊 测试统计:")
-    print(f"  - 消息数: 30 条")
+    print("\n📊 测试统计:")
+    print("  - 消息数: 30 条")
     print(f"  - 叶子摘要: {stats['leaf_summaries']} 个")
     print(f"  - 压缩摘要: {stats['condensed_summaries']} 个")
     print(f"  - 压缩消息: {stats['messages_compressed']} 条")
 
-    print(f"\n🔧 工具测试:")
-    print(f"  - lobster_grep: ✅ 搜索功能正常")
-    print(f"  - lobster_describe: ✅ 查看摘要正常")
-    print(f"  - lobster_expand: ✅ 展开功能正常")
+    print("\n🔧 工具测试:")
+    print("  - lobster_grep: ✅ 搜索功能正常")
+    print("  - lobster_describe: ✅ 查看摘要正常")
+    print("  - lobster_expand: ✅ 展开功能正常")
 
     # 清理
     db.close()
     os.remove("test_tools.db")
-    print(f"\n🗑️ 清理测试数据库")
+    print("\n🗑️ 清理测试数据库")
 
 
 if __name__ == "__main__":

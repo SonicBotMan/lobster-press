@@ -1,11 +1,12 @@
 """Vector embedding module for lobster-press."""
 
-import os
 import logging
-import numpy as np
-import requests
+import os
 from abc import ABC, abstractmethod
 from typing import List
+
+import numpy as np
+import requests
 
 logger = logging.getLogger(__name__)
 EMBEDDING_DIM = 1024
@@ -17,17 +18,14 @@ class BaseEmbedder(ABC):
     @abstractmethod
     def embed(self, text: str) -> List[float]:
         """Generate embedding for a single text."""
-        pass
 
     @abstractmethod
     def embed_batch(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for a batch of texts."""
-        pass
 
     @abstractmethod
     def is_available(self) -> bool:
         """Check if the embedder is available."""
-        pass
 
 
 class OpenAICompatibleEmbedder(BaseEmbedder):

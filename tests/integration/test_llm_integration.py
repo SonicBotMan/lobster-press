@@ -9,21 +9,21 @@ Author: LobsterPress Team
 Version: v3.2.1
 """
 
-import sys
 import os
+import sys
 
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "src"))
 
+from src.llm_client import create_llm_client
 from src.prompts import (
-    build_leaf_summary_prompt,
     build_condensed_summary_prompt,
+    build_leaf_summary_prompt,
     build_note_extraction_prompt,
     estimate_tokens,
     truncate_messages,
 )
-from src.llm_client import create_llm_client
 
 # 测试数据
 TEST_MESSAGES = [
@@ -56,7 +56,7 @@ def test_prompt_building():
 
     # 1. 叶子摘要 prompt
     leaf_prompt = build_leaf_summary_prompt(TEST_MESSAGES)
-    print(f"\n✅ 叶子摘要 Prompt 构建成功")
+    print("\n✅ 叶子摘要 Prompt 构建成功")
     print(f"   长度: {len(leaf_prompt)} 字符")
     print(f"   预估 tokens: {estimate_tokens(leaf_prompt)}")
     assert "对话摘要" in leaf_prompt
@@ -64,14 +64,14 @@ def test_prompt_building():
 
     # 2. 压缩摘要 prompt
     condensed_prompt = build_condensed_summary_prompt(TEST_COMBINED_CONTENT, depth=1)
-    print(f"\n✅ 压缩摘要 Prompt 构建成功")
+    print("\n✅ 压缩摘要 Prompt 构建成功")
     print(f"   长度: {len(condensed_prompt)} 字符")
     print(f"   预估 tokens: {estimate_tokens(condensed_prompt)}")
     assert "Level 1" in condensed_prompt
 
     # 3. Note 提取 prompt
     note_prompt = build_note_extraction_prompt(TEST_MESSAGES)
-    print(f"\n✅ Note 提取 Prompt 构建成功")
+    print("\n✅ Note 提取 Prompt 构建成功")
     print(f"   长度: {len(note_prompt)} 字符")
     print(f"   预估 tokens: {estimate_tokens(note_prompt)}")
     assert "稳定的语义知识" in note_prompt
@@ -112,12 +112,12 @@ def test_llm_integration_with_deepseek():
     try:
         # 创建客户端
         client = create_llm_client(provider="deepseek", api_key=api_key, model="deepseek-chat")
-        print(f"✅ DeepSeek 客户端创建成功")
+        print("✅ DeepSeek 客户端创建成功")
 
         # 测试叶子摘要生成
         prompt = build_leaf_summary_prompt(TEST_MESSAGES[:2])
         result = client.generate(prompt, temperature=0.7, max_tokens=300)
-        print(f"\n✅ 叶子摘要生成成功")
+        print("\n✅ 叶子摘要生成成功")
         print(f"   响应长度: {len(result)} 字符")
         print(f"   预览: {result[:100]}...")
 
@@ -142,12 +142,12 @@ def test_llm_integration_with_zhipu():
     try:
         # 创建客户端
         client = create_llm_client(provider="zhipu", api_key=api_key, model="glm-4-flash")
-        print(f"✅ 智谱 GLM 客户端创建成功")
+        print("✅ 智谱 GLM 客户端创建成功")
 
         # 测试 Note 提取
         prompt = build_note_extraction_prompt(TEST_MESSAGES[:2])
         result = client.generate(prompt, temperature=0.5, max_tokens=500)
-        print(f"\n✅ Note 提取成功")
+        print("\n✅ Note 提取成功")
         print(f"   响应长度: {len(result)} 字符")
         print(f"   预览: {result[:150]}...")
 

@@ -9,8 +9,8 @@ lobster_grep 是 FTS5 全文搜索工具，支持 TF-IDF 重排序。
 - 必需字段：results (array)
 """
 
-import json
 import asyncio
+import json
 
 
 def test_response_has_required_fields(mcp_server):

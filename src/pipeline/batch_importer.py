@@ -16,17 +16,16 @@ Author: LobsterPress Team
 Version: v2.5.0
 """
 
-import sys
-import os
-import json
 import csv
+import json
 import logging
+import sys
 from datetime import datetime, timezone
-from typing import List, Dict, Optional, Iterator
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 from src.database import LobsterDatabase
-from src.pipeline.tfidf_scorer import TFIDFScorer, ScoredMessage
+from src.pipeline.tfidf_scorer import TFIDFScorer
 
 
 class BatchImporter:

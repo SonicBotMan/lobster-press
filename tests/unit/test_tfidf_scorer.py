@@ -2,8 +2,6 @@
 Unit tests for TF-IDF scorer module.
 """
 
-import pytest
-
 
 class TestTFIDFScorer:
     """Tests for TFIDFScorer class."""

@@ -2,10 +2,8 @@
 Unit tests for AsyncWorker module.
 """
 
-import pytest
 import time
 from unittest.mock import MagicMock, patch
-from collections import deque
 
 
 class TestAsyncWorkerStartStop:
@@ -285,6 +283,7 @@ class TestErrorHandling:
     def test_exceptions_in_process_are_caught_and_logged(self):
         """Exceptions in _process should be caught and logged via _run_loop."""
         import threading
+
         from src.async_queue import AsyncWorker
 
         worker = AsyncWorker(db=MagicMock())
@@ -318,7 +317,7 @@ class TestErrorHandling:
         worker.start()
 
         call_count = [0]
-        original_process = worker._process
+        worker._process
 
         def track_process(task):
             call_count[0] += 1

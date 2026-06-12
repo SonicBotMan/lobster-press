@@ -66,16 +66,13 @@ jobs:
           echo "Node version: $(node --version)"
           echo "NPM version: $(npm --version)"
           echo "Installing dependencies..."
-          npm install --verbose 2>&1 | head -100 || npm install
-        continue-on-error: false
+          npm install
 
       - name: Build TypeScript
         run: npm run build
-        continue-on-error: true
 
       - name: Run Node.js tests
         run: npm test
-        continue-on-error: true
 
   lint:
     runs-on: ubuntu-latest
@@ -95,15 +92,12 @@ jobs:
 
       - name: Run Black
         run: black --check src/ tests/
-        continue-on-error: true
 
       - name: Run isort
         run: isort --check-only src/ tests/
-        continue-on-error: true
 
       - name: Run Flake8
         run: flake8 src/ tests/ --max-line-length=100 --exclude=src/llm_providers.py
-        continue-on-error: true
 
       - name: Set up Node.js
         uses: actions/setup-node@v6

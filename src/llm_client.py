@@ -11,10 +11,10 @@ Author: LobsterPress Team
 Version: v4.0.41
 """
 
-import os
 import logging
+import os
 from abc import ABC, abstractmethod
-from typing import Optional, Dict, Any
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +33,10 @@ class BaseLLMClient(ABC):
         Returns:
             生成的文本
         """
-        pass
 
     @abstractmethod
     def is_available(self) -> bool:
         """检查客户端是否可用"""
-        pass
 
 
 class MockLLMClient(BaseLLMClient):
