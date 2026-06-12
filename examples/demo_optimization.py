@@ -11,7 +11,7 @@ Version: v2.0.0-alpha
 import sys
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # 添加 src 到路径
 sys.path.insert(0, str(Path(__file__).parent / "src"))
@@ -61,7 +61,7 @@ def demo_basic_operations():
             'seq': i,
             'role': 'user' if i % 2 == 0 else 'assistant',
             'content': [{'type': 'text', 'text': f'这是第 {i} 条消息，讨论了 {"Python 编程" if i < 5 else "机器学习" if i < 10 else "数据库优化"}'}],
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         for i in range(1, 16)
     ]

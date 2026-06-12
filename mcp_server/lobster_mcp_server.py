@@ -34,7 +34,7 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 # 添加 src/ 目录到 Python 模块搜索路径
@@ -1498,7 +1498,7 @@ class LobsterPressMCPServer:
         conversation_id = args.get("conversation_id", "public")
 
         msg_id = f"pub_{hashlib.sha256(content.encode()).hexdigest()[:16]}"
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         self._get_db().save_message(
             {
@@ -1562,7 +1562,7 @@ class LobsterPressMCPServer:
             UPDATE skills SET visibility = ?, updated_at = ?
             WHERE skill_id = ?
         """,
-            (visibility, datetime.utcnow().isoformat(), skill_id),
+            (visibility, datetime.now(timezone.utc).isoformat(), skill_id),
         )
         db.conn.commit()
 
