@@ -2,10 +2,6 @@
 Unit tests for skill models and database operations.
 """
 
-import pytest
-import json
-from datetime import datetime
-
 
 class TestSkillDataclass:
     """Tests for Skill dataclass."""
@@ -151,7 +147,7 @@ class TestDatabaseSkillTables:
     def test_skills_table_created(self, temp_db):
         """skills table should be created correctly."""
         temp_db.cursor.execute("""
-            SELECT name, type FROM sqlite_master 
+            SELECT name, type FROM sqlite_master
             WHERE type='table' AND name='skills'
         """)
         result = temp_db.cursor.fetchone()
@@ -161,7 +157,7 @@ class TestDatabaseSkillTables:
     def test_skill_versions_table_created(self, temp_db):
         """skill_versions table should be created correctly."""
         temp_db.cursor.execute("""
-            SELECT name, type FROM sqlite_master 
+            SELECT name, type FROM sqlite_master
             WHERE type='table' AND name='skill_versions'
         """)
         result = temp_db.cursor.fetchone()
@@ -171,7 +167,7 @@ class TestDatabaseSkillTables:
     def test_task_skills_table_created(self, temp_db):
         """task_skills table should be created correctly."""
         temp_db.cursor.execute("""
-            SELECT name, type FROM sqlite_master 
+            SELECT name, type FROM sqlite_master
             WHERE type='table' AND name='task_skills'
         """)
         result = temp_db.cursor.fetchone()
@@ -181,7 +177,7 @@ class TestDatabaseSkillTables:
     def test_skills_fts_virtual_table_created(self, temp_db):
         """skills_fts virtual table should be created."""
         temp_db.cursor.execute("""
-            SELECT name, type FROM sqlite_master 
+            SELECT name, type FROM sqlite_master
             WHERE type='table' AND name='skills_fts'
         """)
         result = temp_db.cursor.fetchone()
@@ -190,13 +186,13 @@ class TestDatabaseSkillTables:
     def test_skills_indexes_created(self, temp_db):
         """Skills indexes should be created."""
         temp_db.cursor.execute("""
-            SELECT name FROM sqlite_master 
+            SELECT name FROM sqlite_master
             WHERE type='index' AND name='idx_skills_owner'
         """)
         assert temp_db.cursor.fetchone() is not None
 
         temp_db.cursor.execute("""
-            SELECT name FROM sqlite_master 
+            SELECT name FROM sqlite_master
             WHERE type='index' AND name='idx_skill_versions'
         """)
         assert temp_db.cursor.fetchone() is not None

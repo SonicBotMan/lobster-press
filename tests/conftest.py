@@ -8,9 +8,10 @@ from pathlib import Path
 # Add project root to Python path for CI environments
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-import pytest
-import tempfile
 import os
+import tempfile
+
+import pytest
 
 from src.database import LobsterDatabase
 from src.llm_client import MockLLMClient

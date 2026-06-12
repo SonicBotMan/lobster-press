@@ -8,13 +8,12 @@
 Version: v5.0.0
 """
 
-import asyncio
+import logging
 import threading
 import time
-import logging
-from typing import Callable, Dict, Any, Optional
 from collections import deque
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

@@ -9,8 +9,8 @@ lobster_status 返回系统健康报告，包含记忆分布、压缩统计等�
 - 必需字段：version, tier_distribution
 """
 
-import json
 import asyncio
+import json
 
 
 def test_response_has_required_fields(mcp_server):

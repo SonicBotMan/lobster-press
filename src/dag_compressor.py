@@ -8,15 +8,14 @@ Author: LobsterPress Team
 Version: v4.0.41
 """
 
-import json
 import logging
-from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timezone
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 from src.database import LobsterDatabase
 from src.pipeline.event_segmenter import EventSegmenter
-from src.prompts import build_leaf_summary_prompt, build_condensed_summary_prompt
+from src.prompts import build_condensed_summary_prompt, build_leaf_summary_prompt
 
 
 class DAGCompressor:
@@ -110,7 +109,7 @@ class DAGCompressor:
             return None
 
         # 2. 分离 fresh tail 和 older messages
-        fresh_tail = messages[-self.fresh_tail_count :]
+        _fresh_tail = messages[-self.fresh_tail_count :]
         older_messages = messages[: -self.fresh_tail_count]
 
         # 3. 获取已经被压缩的消息（从 context_items 中排除）
@@ -271,7 +270,7 @@ class DAGCompressor:
             summary_parts.append(
                 f"- 助手消息: {sum(1 for m in messages if m.get('role') == 'assistant')} 条"
             )
-            summary_parts.append(f"- 生成方式: LLM (v3.2.1)")
+            summary_parts.append("- 生成方式: LLM (v3.2.1)")
             summary_parts.append("")
             summary_parts.append("### 核心内容:")
             summary_parts.append(summary)
@@ -442,7 +441,7 @@ class DAGCompressor:
             summary_parts.append(f"## 压缩摘要 (Depth {depth + 1})")
             summary_parts.append(f"- 原始长度: {len(combined_content)} 字符")
             summary_parts.append(f"- 摘要长度: {len(summary)} 字符")
-            summary_parts.append(f"- 生成方式: LLM (v3.2.1)")
+            summary_parts.append("- 生成方式: LLM (v3.2.1)")
             summary_parts.append("")
             summary_parts.append("### 核心要点:")
             summary_parts.append(summary)
@@ -495,7 +494,6 @@ class DAGCompressor:
         Returns:
             是否执行了压缩
         """
-        import sys
 
         logger.info(f"增量压缩检查: {conversation_id}")
 
@@ -838,7 +836,7 @@ class DAGCompressor:
         import json as _json
 
         combined = "\n".join(
-            f"[{m.get('role','?')}]: {m.get('content','')[:300]}" for m in messages
+            f"[{m.get('role', '?')}]: {m.get('content', '')[:300]}" for m in messages
         )
         prompt = (
             "从以下对话片段中提取所有关键实体（人名、文件路径、技术概念、重要决策）。\n"

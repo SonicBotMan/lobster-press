@@ -8,10 +8,9 @@ Author: lobster-press
 Date: 2026-04-05
 """
 
-import sys
 import os
+import sys
 import tempfile
-import pytest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -148,8 +147,8 @@ class TestSearchWithOwner:
             conv_id = db.create_conversation()
 
             # 添加消息
-            msg1_id = db.add_message(conv_id, "user", "test message one")
-            msg2_id = db.add_message(conv_id, "assistant", "test message two")
+            db.add_message(conv_id, "user", "test message one")
+            db.add_message(conv_id, "assistant", "test message two")
 
             # 默认 owner = 'default'，应该能搜到
             results = db.search_messages("test")
@@ -202,7 +201,7 @@ class TestBackwardCompatibility:
 
             # 创建对话和消息
             conv_id = db.create_conversation()
-            msg_id = db.add_message(conv_id, "user", "hello world")
+            db.add_message(conv_id, "user", "hello world")
 
             # 验证消息能正常获取
             messages = db.get_messages(conv_id)

@@ -14,14 +14,15 @@ Date: 2026-03-19
 """
 
 import sys
-import pytest
 from pathlib import Path
+
+import pytest
 
 # 添加 src 目录到 path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
-from database import LobsterDatabase
 from dag_compressor import DAGCompressor
+from database import LobsterDatabase
 from incremental_compressor import IncrementalCompressor
 from three_pass_trimmer import ThreePassTrimmer
 
@@ -37,11 +38,11 @@ class TestMessageWorkflow:
     def test_add_and_retrieve_messages(self, db):
         """测试添加和检索消息"""
         # 1. 添加消息
-        msg_id_1 = db.add_message(
+        _msg_id_1 = db.add_message(
             conversation_id="conv_1", role="user", content="Hello, this is a test"
         )
 
-        msg_id_2 = db.add_message(
+        _msg_id_2 = db.add_message(
             conversation_id="conv_1", role="assistant", content="Hi, I received your message"
         )
 
@@ -165,7 +166,7 @@ class TestSummaryWorkflow:
         )
 
         # 3. 创建压缩摘要
-        condensed_summary = db.save_summary(
+        _condensed_summary = db.save_summary(
             {
                 "summary_id": "sum_condensed_1",
                 "conversation_id": "conv_1",
@@ -351,7 +352,7 @@ class TestErrorHandling:
     def test_message_with_empty_content(self, db):
         """测试空内容的消息"""
         # 1. 添加空内容消息
-        msg_id = db.add_message(conversation_id="conv_1", role="user", content="")
+        _msg_id = db.add_message(conversation_id="conv_1", role="user", content="")
 
         # 2. 验证消息被添加
         messages = db.get_messages("conv_1")

@@ -13,16 +13,16 @@ Author: LobsterPress Team
 Version: v2.5.0
 """
 
-import re
-import math
-import time
 import logging
-from datetime import datetime
+import math
+import re
+import time
 from collections import Counter
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
-from typing import List, Dict, Union
 from dataclasses import dataclass
+from typing import Dict, List, Union
 
 from src.utils.math import cosine_similarity
 

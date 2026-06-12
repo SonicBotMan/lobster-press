@@ -9,8 +9,8 @@ lobster_prune 用于删除已标记为 decayed 的消息，释放存储空间（
 - 必需字段：dry_run, decayed_count (dry_run) 或 deleted_count (实际删除)
 """
 
-import json
 import asyncio
+import json
 
 
 def test_response_has_required_fields(mcp_server, sample_conversation_id):

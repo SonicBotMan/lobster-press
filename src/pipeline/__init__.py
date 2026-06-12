@@ -8,9 +8,9 @@ LobsterPress Pipeline - v2.5.0 智能压缩流水线
 - BatchImporter: 历史数据迁移
 """
 
-from .tfidf_scorer import TFIDFScorer, ScoredMessage, EXEMPT_TYPES
-from .semantic_dedup import SemanticDeduplicator
 from .batch_importer import BatchImporter
+from .semantic_dedup import SemanticDeduplicator
+from .tfidf_scorer import EXEMPT_TYPES, ScoredMessage, TFIDFScorer
 
 __all__ = [
     "TFIDFScorer",

@@ -9,8 +9,8 @@ lobster_sweep 用于清理衰减消息（基于遗忘曲线，标记低价值消
 - 返回清理结果或错误信息
 """
 
-import json
 import asyncio
+import json
 
 
 def test_response_has_required_fields(mcp_server, sample_conversation_id):

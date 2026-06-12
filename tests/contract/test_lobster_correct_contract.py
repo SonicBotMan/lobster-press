@@ -9,8 +9,8 @@ lobster_correct 用于应用记忆纠错（修改或删除错误记忆）。
 - 返回纠错结果或错误信息
 """
 
-import json
 import asyncio
+import json
 
 
 def test_response_has_required_fields(mcp_server):

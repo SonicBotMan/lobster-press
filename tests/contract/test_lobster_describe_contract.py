@@ -9,8 +9,8 @@ lobster_describe 用于查看 DAG 摘要层级结构。
 - 返回 DAG 节点信息或错误信息
 """
 
-import json
 import asyncio
+import json
 
 
 def test_response_has_required_fields(mcp_server):

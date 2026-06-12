@@ -2,9 +2,10 @@
 Unit tests for semantic memory module.
 """
 
-import pytest
-import tempfile
 import os
+import tempfile
+
+import pytest
 
 
 class TestSemanticMemory:

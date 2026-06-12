@@ -17,11 +17,12 @@ API facts confirmed by reading the source:
 
 import os
 import tempfile
+
 import pytest
 
 from src.database import LobsterDatabase
-from src.llm_client import MockLLMClient
 from src.incremental_compressor import IncrementalCompressor
+from src.llm_client import MockLLMClient
 
 
 @pytest.fixture

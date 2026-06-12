@@ -2,8 +2,6 @@
 Unit tests for event segmenter module.
 """
 
-import pytest
-
 
 class TestEventSegmenter:
     """Tests for EventSegmenter class."""

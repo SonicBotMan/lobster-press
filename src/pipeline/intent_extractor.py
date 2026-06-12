@@ -7,11 +7,11 @@ LobsterPress - Intent Extractor
 - HiMem：关键信息提取
 """
 
-import re
 import json
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass, field
+import re
 from collections import Counter
+from dataclasses import dataclass, field
+from typing import Dict, List
 
 
 @dataclass

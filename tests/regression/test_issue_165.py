@@ -8,18 +8,16 @@
 - TC-P06: lobster_ingest(conversation_id, messages=[]) 写入验证
 """
 
-import sys
-import os
-import json
 import asyncio
+import sys
 from pathlib import Path
 
 # 添加 src 目录到 path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mcp_server"))
 
-from database import LobsterDatabase
 from agent_tools import lobster_describe, lobster_expand
+from database import LobsterDatabase
 
 
 class TestTCP03:
@@ -102,8 +100,9 @@ class TestTCP05:
 
     def test_lobster_compress_force_reduces_message_count(self):
         """验证强制压缩后消息数下降"""
-        from dag_compressor import DAGCompressor
         from unittest.mock import Mock
+
+        from dag_compressor import DAGCompressor
 
         db = LobsterDatabase(":memory:")
         conv_id = "test_conv_compress"
@@ -228,7 +227,7 @@ class TestTCP06:
         async def run_test():
             # 测试缺少 conversation_id
             try:
-                result = await server._call_tool(
+                _result = await server._call_tool(
                     "lobster_ingest", {"messages": [{"role": "user", "content": "test"}]}
                 )
                 assert False, "Should raise ValueError for missing conversation_id"

@@ -12,10 +12,8 @@ Author: LobsterPress Team
 Version: v2.5.0
 """
 
-import math
 import logging
-from typing import List, Tuple, Set
-from collections import Counter
+from typing import List, Set, Tuple
 
 from src.utils.math import cosine_similarity
 

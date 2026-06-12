@@ -10,7 +10,7 @@ Version: v4.0.41
 """
 
 import logging
-from typing import List, Dict
+from typing import Dict, List
 
 from src.utils.tokens import estimate_tokens
 

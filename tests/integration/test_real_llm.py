@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """实际 LLM API 调用测试"""
 
-import sys
 import os
+import sys
+
 import pytest
 
 _project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -41,21 +42,21 @@ def test_deepseek():
             provider="deepseek", api_key=DEEPSEEK_API_KEY, model="deepseek-chat"
         )
 
-        print(f"✅ 客户端创建成功")
-        print(f"   Provider: DeepSeek")
-        print(f"   Model: deepseek-chat")
+        print("✅ 客户端创建成功")
+        print("   Provider: DeepSeek")
+        print("   Model: deepseek-chat")
         # v4.0.9: 移除 API Key 打印（CodeQL 安全警告）
 
         # 调用 API
-        print(f"\n📤 发送请求...")
+        print("\n📤 发送请求...")
         result = client.generate(TEST_PROMPT, temperature=0.7, max_tokens=200)
 
-        print(f"\n✅ API 调用成功！")
-        print(f"\n📝 生成结果：")
+        print("\n✅ API 调用成功！")
+        print("\n📝 生成结果：")
         print("-" * 60)
         print(result)
         print("-" * 60)
-        print(f"\n📊 统计：")
+        print("\n📊 统计：")
         print(f"   响应长度: {len(result)} 字符")
 
     except Exception as e:
@@ -76,21 +77,21 @@ def test_zhipu():
         # 创建客户端
         client = create_llm_client(provider="zhipu", api_key=ZHIPU_API_KEY, model="glm-4-flash")
 
-        print(f"✅ 客户端创建成功")
-        print(f"   Provider: 智谱 GLM")
-        print(f"   Model: glm-4-flash")
+        print("✅ 客户端创建成功")
+        print("   Provider: 智谱 GLM")
+        print("   Model: glm-4-flash")
         # v4.0.9: 移除 API Key 打印（CodeQL 安全警告）
 
         # 调用 API
-        print(f"\n📤 发送请求...")
+        print("\n📤 发送请求...")
         result = client.generate(TEST_PROMPT, temperature=0.7, max_tokens=200)
 
-        print(f"\n✅ API 调用成功！")
-        print(f"\n📝 生成结果：")
+        print("\n✅ API 调用成功！")
+        print("\n📝 生成结果：")
         print("-" * 60)
         print(result)
         print("-" * 60)
-        print(f"\n📊 统计：")
+        print("\n📊 统计：")
         print(f"   响应长度: {len(result)} 字符")
 
     except Exception as e:

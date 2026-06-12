@@ -7,13 +7,13 @@ OpenClaw 原生记忆导入器
 Version: v5.0.0
 """
 
-import sqlite3
-import json
 import hashlib
+import json
 import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Callable
+import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class MemoryImporter:
 
                 # 检查 messages 表是否存在
                 cursor.execute("""
-                    SELECT COUNT(*) FROM sqlite_master 
+                    SELECT COUNT(*) FROM sqlite_master
                     WHERE type='table' AND name='messages'
                 """)
                 if cursor.fetchone()[0] == 0:
@@ -78,7 +78,7 @@ class MemoryImporter:
                 stats["messages"] += count
 
                 conn.close()
-            except Exception as e:
+            except Exception:
                 stats["errors"] += 1
                 continue
 
@@ -136,7 +136,7 @@ class MemoryImporter:
             # 获取消息
             cursor.execute("""
                 SELECT message_id, role, content, created_at, metadata
-                FROM messages 
+                FROM messages
                 ORDER BY created_at ASC
             """)
             rows = cursor.fetchall()
@@ -166,7 +166,7 @@ class MemoryImporter:
                     self._import_message(msg, content_hash)
                     processed_hashes.add(content_hash)
                     self._progress["stored"] += 1
-                except Exception as e:
+                except Exception:
                     self._progress["errors"] += 1
 
         finally:

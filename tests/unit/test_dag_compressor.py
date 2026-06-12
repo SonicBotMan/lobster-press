@@ -4,11 +4,12 @@
 
 import os
 import tempfile
+
 import pytest
 
+from src.dag_compressor import DAGCompressor
 from src.database import LobsterDatabase
 from src.llm_client import MockLLMClient
-from src.dag_compressor import DAGCompressor
 
 
 @pytest.fixture
@@ -197,7 +198,7 @@ class TestFullCompact:
         assert isinstance(result, dict)
 
     def test_compressed_message_ids_tracked(self, compressor, db):
-        ids = _seed(db, "c1", ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf"])
+        _seed(db, "c1", ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot", "golf"])
         compressor.full_compact("c1")
         compressed = compressor._get_compressed_message_ids("c1")
         # Some messages should be marked as compressed

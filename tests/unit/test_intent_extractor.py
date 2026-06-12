@@ -2,9 +2,7 @@
 # -*- coding: utf-8 -*-
 """Unit tests for IntentExtractor (src/pipeline/intent_extractor.py)."""
 
-import pytest
-
-from src.pipeline.intent_extractor import IntentExtractor, Intent, Conclusion
+from src.pipeline.intent_extractor import Conclusion, Intent, IntentExtractor
 
 
 def _msg(role, content):

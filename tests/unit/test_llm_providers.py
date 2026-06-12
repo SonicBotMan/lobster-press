@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """v3.2.0 多 LLM 提供商测试"""
 
-import sys
 import os
+import sys
 
 _project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 sys.path.insert(0, os.path.join(_project_root, "src"))
 
-from src.llm_client import create_llm_client, get_llm_client, MockLLMClient
+from src.llm_client import MockLLMClient, create_llm_client, get_llm_client
 from src.llm_providers import get_provider_client
 
 
@@ -25,7 +25,7 @@ def test_mock_client():
     assert len(result) > 0
     assert client.is_available()
 
-    print(f"✅ Mock 客户端测试通过")
+    print("✅ Mock 客户端测试通过")
 
 
 def test_openai_client():
@@ -41,7 +41,7 @@ def test_openai_client():
     assert client.model == "gpt-4o-mini"
     assert client.is_available()
 
-    print(f"✅ OpenAI 客户端初始化成功")
+    print("✅ OpenAI 客户端初始化成功")
 
 
 def test_deepseek_client():
@@ -57,7 +57,7 @@ def test_deepseek_client():
     assert client.model == "deepseek-chat"
     assert client.is_available()
 
-    print(f"✅ DeepSeek 客户端初始化成功")
+    print("✅ DeepSeek 客户端初始化成功")
 
 
 def test_zhipu_client():
@@ -73,7 +73,7 @@ def test_zhipu_client():
     assert client.model == "glm-4-flash"
     assert client.is_available()
 
-    print(f"✅ 智谱 GLM 客户端初始化成功")
+    print("✅ 智谱 GLM 客户端初始化成功")
 
 
 def test_alibaba_client():
@@ -89,7 +89,7 @@ def test_alibaba_client():
     assert client.model == "qwen-turbo"
     assert client.is_available()
 
-    print(f"✅ 阿里通义千问客户端初始化成功")
+    print("✅ 阿里通义千问客户端初始化成功")
 
 
 def test_anthropic_client():
@@ -107,7 +107,7 @@ def test_anthropic_client():
     assert client.model == "claude-3-5-sonnet-20241022"
     assert client.is_available()
 
-    print(f"✅ Anthropic Claude 客户端初始化成功")
+    print("✅ Anthropic Claude 客户端初始化成功")
 
 
 def test_gemini_client():
@@ -123,7 +123,7 @@ def test_gemini_client():
     assert client.model == "gemini-pro"
     assert client.is_available()
 
-    print(f"✅ Google Gemini 客户端初始化成功")
+    print("✅ Google Gemini 客户端初始化成功")
 
 
 def test_mistral_client():
@@ -139,7 +139,7 @@ def test_mistral_client():
     assert client.model == "mistral-small-latest"
     assert client.is_available()
 
-    print(f"✅ Mistral 客户端初始化成功")
+    print("✅ Mistral 客户端初始化成功")
 
 
 def test_baidu_client():
@@ -161,7 +161,7 @@ def test_baidu_client():
     assert client.model == "ernie-speed-8k"
     assert client.is_available()
 
-    print(f"✅ 百度文心客户端初始化成功")
+    print("✅ 百度文心客户端初始化成功")
 
 
 def test_factory_function():
@@ -170,12 +170,12 @@ def test_factory_function():
 
     # 测试不支持的提供商
     try:
-        client = get_provider_client("unsupported_provider")
+        get_provider_client("unsupported_provider")
         assert False, "应该抛出 ValueError"
     except ValueError as e:
         assert "不支持的 LLM 提供商" in str(e)
 
-    print(f"✅ 工厂函数测试通过")
+    print("✅ 工厂函数测试通过")
 
 
 def test_environment_variable():
@@ -193,7 +193,7 @@ def test_environment_variable():
     assert client is not None
     assert isinstance(client, MockLLMClient)
 
-    print(f"✅ 环境变量配置测试通过")
+    print("✅ 环境变量配置测试通过")
 
 
 def test_graceful_fallback():
@@ -207,7 +207,7 @@ def test_graceful_fallback():
     assert client is not None
     assert isinstance(client, MockLLMClient)
 
-    print(f"✅ 优雅降级测试通过")
+    print("✅ 优雅降级测试通过")
 
 
 def main():

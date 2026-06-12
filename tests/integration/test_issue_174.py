@@ -15,13 +15,14 @@ Author: LobsterPress Team
 Version: v4.0.37
 """
 
-import pytest
-import tempfile
 import os
-from pathlib import Path
 
 # 添加项目根目录到路径
 import sys
+import tempfile
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
@@ -35,7 +36,7 @@ class TestIssue174Fixes:
 
     def test_fix1_decision_keywords_not_dead_code(self):
         """Fix 1: 验证 DECISION_KEYWORDS 不是死代码"""
-        compressor = DAGCompressor.__new__(DAGCompressor)
+        DAGCompressor.__new__(DAGCompressor)
 
         # 验证 DECISION_KEYWORDS 存在
         assert hasattr(DAGCompressor, "DECISION_KEYWORDS")
@@ -86,7 +87,7 @@ class TestIssue174Fixes:
 
         # 分词
         chinese_tokens = scorer.tokenize(chinese_text)
-        english_tokens = scorer.tokenize(english_text)
+        scorer.tokenize(english_text)
 
         # 验证中文 bi-gram 提取
         chinese_bigrams = [

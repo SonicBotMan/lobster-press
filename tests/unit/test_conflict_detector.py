@@ -2,8 +2,6 @@
 Unit tests for conflict detector module.
 """
 
-import pytest
-
 
 class TestConflictDetector:
     """Tests for ConflictDetector class."""
@@ -52,8 +50,9 @@ class TestConflictDetector:
 
     def test_reconcile_without_llm_client(self):
         """reconcile should fallback to message truncation without LLM."""
+        from unittest.mock import Mock
+
         from src.pipeline.conflict_detector import ConflictDetector, ConflictResult
-        from unittest.mock import Mock, MagicMock
 
         detector = ConflictDetector(use_nli=False)
 
@@ -91,8 +90,9 @@ class TestConflictDetector:
 
     def test_reconcile_with_llm_client(self):
         """reconcile should use LLM extraction when available."""
+        from unittest.mock import Mock
+
         from src.pipeline.conflict_detector import ConflictDetector, ConflictResult
-        from unittest.mock import Mock, MagicMock
 
         detector = ConflictDetector(use_nli=False)
 
@@ -132,9 +132,9 @@ class TestConflictDetector:
 
     def test_reconcile_marks_old_note_superseded(self):
         """reconcile should mark old note as superseded."""
-        from src.pipeline.conflict_detector import ConflictDetector, ConflictResult
         from unittest.mock import Mock
-        from datetime import datetime
+
+        from src.pipeline.conflict_detector import ConflictDetector, ConflictResult
 
         detector = ConflictDetector(use_nli=False)
 

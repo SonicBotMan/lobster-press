@@ -11,9 +11,9 @@ Author: LobsterPress Team
 Version: v5.0.0
 """
 
-import os
 import logging
-from typing import Optional, Dict, Any
+import os
+from typing import Optional
 
 from src.llm_client import BaseLLMClient
 
@@ -210,8 +210,8 @@ class BaiduClient(BaseLLMClient):
 
     def _get_access_token(self):
         if self._access_token is None:
-            import urllib.request
             import json as _json
+            import urllib.request
 
             url = (
                 "https://aip.baidubce.com/oauth/2.0/token"
@@ -225,8 +225,8 @@ class BaiduClient(BaseLLMClient):
         return self._access_token
 
     def generate(self, prompt: str, **kwargs) -> str:
-        import urllib.request
         import json as _json
+        import urllib.request
 
         access_token = self._get_access_token()
         url = (

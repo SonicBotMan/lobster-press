@@ -9,19 +9,19 @@ Version: v4.0.41
 """
 
 import logging
-from typing import Dict, Optional
 from datetime import datetime, timezone
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
-from src.database import LobsterDatabase
 from src.dag_compressor import DAGCompressor
-from src.pipeline.tfidf_scorer import TFIDFScorer, EXEMPT_TYPES
+from src.database import LobsterDatabase
 from src.pipeline.semantic_dedup import SemanticDeduplicator
+from src.pipeline.tfidf_scorer import TFIDFScorer
 
 # v3.0.0: 语义记忆和矛盾检测
 try:
-    from src.semantic_memory import SemanticMemory
     from src.pipeline.conflict_detector import ConflictDetector
+    from src.semantic_memory import SemanticMemory
 
     SEMANTIC_MEMORY_AVAILABLE = True
 except ImportError:

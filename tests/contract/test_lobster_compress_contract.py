@@ -10,8 +10,8 @@ lobster_compress 是 v3.3.0 引入的增量压缩工具。
 - 可选字段：tokens_saved (int), compression_ratio (float)
 """
 
-import json
 import asyncio
+import json
 
 
 def test_response_has_required_fields(mcp_server, sample_conversation_id):
