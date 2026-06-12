@@ -551,7 +551,27 @@ class LobsterDatabase:
         """
         message_id = message.get("id") or self._generate_id("msg")
         conversation_id = message.get("conversationId")
-        seq = message.get("seq", 0)
+        # v5.1.0 修复：隐式创建 conversation 行
+        # 原因：search_messages 用 INNER JOIN conversations 过滤 namespace，
+        #       SQLite FK 默认关闭，save_message 不建 conversation 行时
+        #       整条 JOIN 返 0 行（v3.6.0 命名空间功能因此失效）。
+        if conversation_id:
+            now_iso = datetime.utcnow().isoformat()
+            self.cursor.execute(
+                "INSERT OR IGNORE INTO conversations"
+                "(conversation_id, namespace, created_at, updated_at) VALUES (?, ?, ?, ?)",
+                (conversation_id, self.namespace, now_iso, now_iso),
+            )
+        # v5.1.0 修复：seq 缺失/为 None 时自动分配下一个序号
+        # 原因：原 message.get("seq", 0) 在调用方传 None 时直通 SQL 触发 NOT NULL 约束。
+        #       lobster_grep / lobster_describe / lobster_expand 这些 agent_tools API
+        #       不传 seq 但调 save_message 间接写入。
+        if "seq" in message and message["seq"] is not None:
+            seq = message["seq"]
+        elif conversation_id:
+            seq = self._get_next_seq(conversation_id)
+        else:
+            seq = 0
         role = message.get("role", "user")
         content = self._extract_content(message)
         token_count = self._estimate_tokens(content)
