@@ -1634,10 +1634,12 @@ ${JSON.stringify(fullConfig, null, 2)}
   },
 };
 
-export default definePluginEntry({
+const pluginEntry: ReturnType<typeof definePluginEntry> = definePluginEntry({
   id: "lobster-press",
   name: "LobsterPress Memory Engine",
   description: "Cognitive memory system for AI Agents: DAG compression, Ebbinghaus forgetting curve, semantic notes, contradiction detection",
   configSchema: lobsterPlugin.configSchema,
   register: (api) => lobsterPlugin.register(api),
 });
+
+export default pluginEntry;
