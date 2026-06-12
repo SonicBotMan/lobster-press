@@ -39,7 +39,29 @@
 - 覆盖：62.20% → 70.77%（+8.57pp）
 - 推送：6 个 feature/fix 分支各 1–2 个 commit 已合并 master 可达
 
-## [Unreleased]
+### Fixed (lint & deps — round 6)
+- **DeprecationWarning 消除**: `datetime.utcnow()` → `datetime.now(timezone.utc)`，634 测试 0 警告
+- **semantic_memory.py 导入**: `from prompts` → `from src.prompts`
+- **database.py `__del__`**: 自动关闭 sqlite 连接，消除 ResourceWarning
+- **TypeScript TS2742**: `definePluginEntry()` 默认导出加显式 `ReturnType<>` 类型注解
+- **Black 格式化**: 78 个 Python 文件统一格式（之前被 `continue-on-error` 掩盖）
+- **autoflake**: 移除 87 个未使用 import，51 个空 f-string → 普通字符串
+- **`.flake8` 配置**: 忽略 E203/E402/E501/F841（Black 冲突 + 结构性）
+- **`npm install` 修复**: 移除 CI 中 `| head -100` 管道截断导致的 SIGPIPE 不完整安装
+
+### Changed (dependencies)
+- openclaw 2026.5.27 → 2026.6.6
+- vitest 4.1.7 → 4.1.8, @vitest/coverage-v8 4.1.7 → 4.1.8
+- @types/node 25.9.1 → 25.9.3
+
+### Stats (final)
+- Tests: 634 passed, 0 failed, 4 skipped
+- Coverage: 77% (gate: 60%)
+- Security alerts: 0 open
+- Lint: Black / isort / flake8 / tsc — all clean
+
+
+## [5.0.3] - 2026-05-29
 
 ### Added
 - ✨ **pyproject.toml**: 标准 Python 包定义，支持 `pip install -e .`，定义 `[project]` 元数据、依赖、工具配置
