@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 # v3.2.1: 使用集中的 prompt 模块
-from prompts import build_note_extraction_prompt
+from src.prompts import build_note_extraction_prompt
 
 
 class SemanticMemory:
