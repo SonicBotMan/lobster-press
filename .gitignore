@@ -91,3 +91,4 @@ build/
 # IDE/tooling
 .codegraph/
 .cursor/
+.pytest_cache/

@@ -28,7 +28,7 @@ jobs:
           pip install pytest pytest-cov
 
       - name: Run tests
-        run: pytest tests/ -v --cov=src --cov-fail-under=20
+        run: pytest tests/ -v --cov=src --cov-fail-under=60
 
   build:
     needs: test

@@ -15,41 +15,48 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Check database.py version matches tag
         run: |
-          # 从文件头提取版本号（支持可选的 v 前缀）
           FILE_VER=$(grep '^Version:' src/database.py | sed 's/^Version: v\?\([0-9.]*\).*/\1/')
-          
-          # 从 git tag 获取当前版本（去掉 v 前缀）
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
             GIT_TAG=${GITHUB_REF#refs/tags/}
             GIT_TAG_NUM=${GIT_TAG#v}
             if [ "$FILE_VER" != "$GIT_TAG_NUM" ]; then
-              echo "❌ 版本号不一致：database.py=$FILE_VER, tag=$GIT_TAG_NUM"
-              echo "请更新 src/database.py 文件头的 Version: 字段为 $GIT_TAG_NUM"
+              echo "::error::版本号不一致：database.py=$FILE_VER, tag=$GIT_TAG_NUM"
               exit 1
             fi
             echo "✅ 版本号一致：$FILE_VER"
           else
-            echo "ℹ️  非 tag 触发，跳过版本号检查"
-            echo "当前 database.py 版本号：$FILE_VER"
+            echo "ℹ️  非 tag 触发，跳过 tag 检查（database.py=$FILE_VER）"
           fi
-      
+
       - name: Check package.json version consistency
         run: |
-          # 从 package.json 提取版本号
           PKG_VER=$(node -p "require('./package.json').version")
-          
-          # 从文件头提取版本号
-          FILE_VER=$(grep '^Version:' src/database.py | awk '{print $2}')
-          
-          # 去掉 v 前缀比较
-          FILE_VER_NUM=${FILE_VER#v}
-          
-          if [ "$PKG_VER" != "$FILE_VER_NUM" ]; then
-            echo "⚠️  版本号不一致：package.json=$PKG_VER, database.py=$FILE_VER"
-            echo "建议统一版本号"
+          DB_VER=$(grep '^Version:' src/database.py | awk '{print $2}' | sed 's/^v//')
+          if [ "$PKG_VER" != "$DB_VER" ]; then
+            echo "::warning::版本号不一致：package.json=$PKG_VER, database.py=$DB_VER"
           else
             echo "✅ package.json 与 database.py 版本号一致：$PKG_VER"
+          fi
+
+      - name: Check pyproject.toml version consistency
+        run: |
+          PYPROJ_VER=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          DB_VER=$(grep '^Version:' src/database.py | awk '{print $2}' | sed 's/^v//')
+          if [ "$PYPROJ_VER" != "$DB_VER" ]; then
+            echo "::warning::版本号不一致：pyproject.toml=$PYPROJ_VER, database.py=$DB_VER"
+          else
+            echo "✅ pyproject.toml 与 database.py 版本号一致：$PYPROJ_VER"
+          fi
+
+      - name: Check __init__.py fallback version consistency
+        run: |
+          INIT_VER=$(grep '"[0-9]\+\.[0-9]\+\.[0-9]\+"' src/__init__.py | sed 's/.*"\([0-9.]*\)".*/\1/')
+          DB_VER=$(grep '^Version:' src/database.py | awk '{print $2}' | sed 's/^v//')
+          if [ "$INIT_VER" != "$DB_VER" ]; then
+            echo "::warning::版本号不一致：__init__.py fallback=$INIT_VER, database.py=$DB_VER"
+          else
+            echo "✅ __init__.py fallback 与 database.py 版本号一致：$INIT_VER"
           fi

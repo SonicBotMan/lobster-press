@@ -1,0 +1,12 @@
+{
+  "lobster-press": {
+    "enabled": true,
+    "namespace": "default",
+    "dbPath": "~/.openclaw/lobster.db",
+    "contextThreshold": 0.75,
+    "freshTailCount": 32,
+    "maxContextTokens": 40000,
+    "llmProvider": "",
+    "llmModel": ""
+  }
+}

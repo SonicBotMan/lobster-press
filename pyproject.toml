@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lobster-press"
-version = "5.0.0"
+version = "5.1.0"
 description = "🦞 LobsterPress — Cognitive Memory System for AI Agents"
 readme = "README_EN.md"
 license = "MIT"
@@ -58,7 +58,7 @@ include = ["src*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-v --tb=short --cov=src --cov-fail-under=60"
+addopts = "--import-mode=importlib -v --tb=short --cov=src --cov-fail-under=60"
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning",
