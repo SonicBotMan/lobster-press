@@ -2229,6 +2229,13 @@ class LobsterDatabase:
         if self.conn:
             self.conn.close()
 
+    def __del__(self):
+        """Ensure database connection is closed on garbage collection."""
+        try:
+            self.close()
+        except Exception:
+            pass
+
 
 # ==================== 测试代码 ====================
 
