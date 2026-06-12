@@ -1,5 +1,13 @@
 # 自定义指南
 
+> **v2-era examples (removed in v5.0)**: The `~/bin/*.sh` and `scripts/*.sh` referenced below were removed in v5.0 (see `fix/remove-dead-code`). **The commands in the sections below will not work on a v5.0 install.**
+>
+> For v5.0 customization points see:
+> - `src/pipeline/tfidf_scorer.py` — TF-IDF weights
+> - `src/skills/evolver.py` — Skill evolution rules
+> - `src/utils/tokens.py` — token estimation
+> - [`tests/integration/test_mcp_e2e.py`](../../tests/integration/test_mcp_e2e.py) — end-to-end examples
+
 ## 🎨 自定义权重
 
 ### 修改基础权重
