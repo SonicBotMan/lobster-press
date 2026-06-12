@@ -10,7 +10,7 @@ Version: v5.0.0
 import math
 import numpy as np
 from typing import List, Dict, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class HybridRetriever:
@@ -233,7 +233,7 @@ class HybridRetriever:
         半衰期 14d（与 MemOS retrieval_half_life 一致）
         α=0.3 为地板值：极老内容仍保留 30% 分数
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         for r in results:
             score = r.get("score", 0)
@@ -245,6 +245,8 @@ class HybridRetriever:
 
             try:
                 created = datetime.fromisoformat(created_at)
+                if created.tzinfo is None:
+                    created = created.replace(tzinfo=timezone.utc)
                 t_days = max((now - created).total_seconds() / 86400.0, 0.0)
             except (ValueError, TypeError):
                 t_days = 999.0

@@ -15,7 +15,7 @@ import pytest
 import tempfile
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # 添加 src 到 path
 import sys
@@ -53,8 +53,8 @@ class TestDagConvergence:
                 'depth': 0,
                 'content': f'Leaf summary {i}',
                 'source_messages': [f'msg_{i}'],
-                'earliest_at': datetime.utcnow().isoformat(),
-                'latest_at': datetime.utcnow().isoformat(),
+                'earliest_at': datetime.now(timezone.utc).isoformat(),
+                'latest_at': datetime.now(timezone.utc).isoformat(),
                 'descendant_count': 10
             }
             summary_id = db.save_summary(summary)
@@ -113,7 +113,7 @@ class TestDagConvergence:
                 'seq': i,
                 'role': 'user' if i % 2 == 0 else 'assistant',
                 'content': f'Short message {i}',  # 约 30 tokens
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
             temp_db.save_message(msg)
         

@@ -21,7 +21,7 @@ import os
 import json
 import csv
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional, Iterator
 
 logger = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ class BatchImporter:
                     'conversationId': row.get(conversation_id_field, 'default'),
                     'content': row.get(content_field, ''),
                     'role': row.get(role_field, 'user'),
-                    'timestamp': row.get(timestamp_field, datetime.utcnow().isoformat())
+                    'timestamp': row.get(timestamp_field, datetime.now(timezone.utc).isoformat())
                 })
         
         # 按 conversation_id 分组

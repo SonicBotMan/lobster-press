@@ -14,7 +14,7 @@ import time
 import logging
 from typing import Callable, Dict, Any, Optional
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +69,7 @@ class AsyncWorker:
                 {
                     "type": task_type,
                     "payload": payload,
-                    "enqueued_at": datetime.utcnow().isoformat(),
+                    "enqueued_at": datetime.now(timezone.utc).isoformat(),
                 }
             )
 

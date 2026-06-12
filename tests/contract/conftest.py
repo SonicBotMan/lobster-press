@@ -25,6 +25,7 @@ def temp_db():
         db_path = f.name
     db = LobsterDatabase(db_path)
     yield db
+    db.close()
     # 清理
     if os.path.exists(db_path):
         os.unlink(db_path)
@@ -56,7 +57,10 @@ def mcp_server(temp_db, mock_llm):
     )
     # Manually inject the mock LLM client
     server._llm_client = mock_llm
-    return server
+    yield server
+    # Close the server's database connection
+    if hasattr(server, 'db') and server.db:
+        server.db.close()
 
 
 @pytest.fixture

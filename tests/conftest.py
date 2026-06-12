@@ -22,6 +22,7 @@ def temp_db():
         db_path = f.name
     db = LobsterDatabase(db_path)
     yield db
+    db.close()
     # Cleanup
     if os.path.exists(db_path):
         os.unlink(db_path)

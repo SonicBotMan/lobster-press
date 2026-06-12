@@ -2,7 +2,7 @@
 
 import math
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 
@@ -242,7 +242,7 @@ class TestTimeDecay:
     def test_recent_items_little_decay(self):
         """Recent items should retain most of their score."""
         retriever = HybridRetriever(db=MagicMock())
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         results = [{"score": 1.0, "created_at": now}]
         decayed = retriever._apply_retrieval_decay(results)
         # t=0: decay = 0.3 + 0.7 * 0.5^0 = 0.3 + 0.7 = 1.0
@@ -251,7 +251,7 @@ class TestTimeDecay:
     def test_14day_old_half_decay(self):
         """14-day old items: score × (0.3 + 0.7 × 0.5) = score × 0.65."""
         retriever = HybridRetriever(db=MagicMock())
-        created = (datetime.utcnow() - timedelta(days=14)).isoformat()
+        created = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
         results = [{"score": 1.0, "created_at": created}]
         decayed = retriever._apply_retrieval_decay(results)
         expected = 0.3 + 0.7 * 0.5  # = 0.65
@@ -260,7 +260,7 @@ class TestTimeDecay:
     def test_very_old_items_floor_0_3(self):
         """Very old items (999d) should approach floor of score × 0.3."""
         retriever = HybridRetriever(db=MagicMock())
-        created = (datetime.utcnow() - timedelta(days=999)).isoformat()
+        created = (datetime.now(timezone.utc) - timedelta(days=999)).isoformat()
         results = [{"score": 1.0, "created_at": created}]
         decayed = retriever._apply_retrieval_decay(results)
         # decay ≈ 0.3 + 0.7 * 0.5^(999/14) ≈ 0.3 (practically)
@@ -285,7 +285,7 @@ class TestTimeDecay:
         """Decay should not change the number of results."""
         retriever = HybridRetriever(db=MagicMock())
         results = [
-            {"score": 1.0, "created_at": datetime.utcnow().isoformat()},
+            {"score": 1.0, "created_at": datetime.now(timezone.utc).isoformat()},
             {"score": 0.8, "created_at": ""},
             {"score": 0.5, "created_at": "invalid"},
         ]
@@ -295,7 +295,7 @@ class TestTimeDecay:
     def test_7day_old_partial_decay(self):
         """7-day old items should be between fresh and 14-day decay."""
         retriever = HybridRetriever(db=MagicMock())
-        created = (datetime.utcnow() - timedelta(days=7)).isoformat()
+        created = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
         results = [{"score": 1.0, "created_at": created}]
         decayed = retriever._apply_retrieval_decay(results)
         # decay = 0.3 + 0.7 * 0.5^(7/14) = 0.3 + 0.7 * 0.7071 ≈ 0.795
@@ -490,7 +490,7 @@ class TestFullPipeline:
                 {
                     "message_id": "m1",
                     "content": "hello world",
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                 }
             ],
         )
@@ -506,7 +506,7 @@ class TestFullPipeline:
                 {
                     "message_id": "m1",
                     "content": "hello",
-                    "created_at": datetime.utcnow().isoformat(),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
                 }
             ],
             vec_results=[{"target_id": "v1", "target_type": "message", "score": 0.9}],
@@ -517,7 +517,7 @@ class TestFullPipeline:
 
     def test_results_sorted_by_normalized_score_descending(self):
         """Results should be sorted by normalized_score in descending order."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         retriever = self._make_retriever(
             with_embedder=False,
             msgs=[
@@ -532,7 +532,7 @@ class TestFullPipeline:
 
     def test_respects_top_k(self):
         """Should not return more than top_k results."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         retriever = self._make_retriever(
             with_embedder=False,
             msgs=[
@@ -564,7 +564,7 @@ class TestFullPipeline:
 
     def test_normalized_score_max_is_one(self):
         """Top result should have normalized_score == 1.0."""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         retriever = self._make_retriever(
             with_embedder=False,
             msgs=[

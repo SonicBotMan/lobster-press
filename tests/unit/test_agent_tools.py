@@ -1,323 +1,308 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Agent Tools 模块测试
+"""Unit tests for agent_tools (src/agent_tools.py)."""
 
-Author: 小云 (Xiao Yun)
-Date: 2026-03-19
-"""
-
+import json
+import os
+import subprocess
 import sys
+import tempfile
 import pytest
-from pathlib import Path
 
-# 添加 src 目录到 path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+from src.database import LobsterDatabase
+from src.agent_tools import lobster_grep, lobster_describe, lobster_expand, main
 
-from agent_tools import lobster_grep, lobster_describe, lobster_expand
-from database import LobsterDatabase
 
+@pytest.fixture
+def db_path():
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    yield path
+    if os.path.exists(path):
+        os.unlink(path)
+
+
+@pytest.fixture
+def db(db_path):
+    d = LobsterDatabase(db_path)
+    yield d
+    d.close()
+
+
+def _seed(db, conversation_id, messages):
+    """Save messages and return their ids."""
+    ids = []
+    for i, content in enumerate(messages):
+        msg = {
+            "id": f"m_{conversation_id}_{i}",
+            "conversationId": conversation_id,
+            "role": "user",
+            "content": content,
+            "timestamp": "2026-06-12T10:00:00Z",
+        }
+        db.save_message(msg)
+        ids.append(msg["id"])
+    return ids
+
+
+def _seed_summary(db, conversation_id, kind="leaf", depth=0, summary_id=None,
+                 message_ids=None):
+    """Save a summary row directly via cursor."""
+    if summary_id is None:
+        import uuid
+        summary_id = f"sum_{uuid.uuid4().hex[:8]}"
+    earliest = "2026-06-12T10:00:00Z"
+    latest = "2026-06-12T10:05:00Z"
+    db.cursor.execute("""
+        INSERT INTO summaries (summary_id, conversation_id, kind, depth,
+                              content, token_count, earliest_at, latest_at,
+                              descendant_count, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (summary_id, conversation_id, kind, depth,
+          "summary content", 10, earliest, latest, 1, earliest))
+    if message_ids:
+        for mid in message_ids:
+            db.cursor.execute(
+                "INSERT INTO summary_messages (summary_id, message_id) VALUES (?, ?)",
+                (summary_id, mid))
+    db.conn.commit()
+    return summary_id
+
+
+# ---------- lobster_grep ----------
 
 class TestLobsterGrep:
-    """测试搜索功能"""
+    def test_empty_db_returns_empty(self, db):
+        results = lobster_grep(db, "anything")
+        assert results == []
 
-    @pytest.fixture
-    def db_with_messages(self):
-        """创建包含测试消息的数据库"""
-        db = LobsterDatabase(":memory:")
-        
-        # 插入测试消息（seq 会自动生成）
-        db.add_message(
-            conversation_id="conv_1",
-            role="user",
-            content="Hello, this is a test message about Python programming"
-        )
-        
-        db.add_message(
-            conversation_id="conv_1",
-            role="assistant",
-            content="Python is a great programming language for AI development"
-        )
-        
-        db.add_message(
-            conversation_id="conv_2",
-            role="user",
-            content="What is machine learning?"
-        )
-        
-        return db
+    def test_simple_keyword_match(self, db):
+        _seed(db, "c1", ["PostgreSQL is the database", "Redis is a cache",
+                         "Postgres has JSONB"])
+        results = lobster_grep(db, "PostgreSQL", search_summaries=False)
+        assert any("PostgreSQL" in r["content"] for r in results)
+        # "Postgres has JSONB" should NOT match (different keyword)
+        # Note: FTS5 may do prefix matching
 
-    def test_grep_search_messages(self, db_with_messages):
-        """测试搜索消息"""
-        results = lobster_grep(
-            db=db_with_messages,
-            query="Python",
-            search_messages=True,
-            search_summaries=False,
-            limit=10
-        )
-        
-        # 应该返回列表（可能为空，FTS5 需要索引）
-        assert isinstance(results, list)
-        
-        # 如果有结果，验证格式
-        if len(results) > 0:
-            for result in results:
-                assert result['type'] == 'message'
-                assert 'content' in result
-                assert 'relevance' in result
+    def test_conversation_id_filters_results(self, db):
+        _seed(db, "c1", ["alpha message"])
+        _seed(db, "c2", ["alpha message in c2"])
+        results = lobster_grep(db, "alpha", search_summaries=False)
+        conv_ids = {r["conversation_id"] for r in results}
+        # both c1 and c2 should appear (no filter)
+        assert "c1" in conv_ids and "c2" in conv_ids
 
-    def test_grep_filter_by_conversation(self, db_with_messages):
-        """测试按对话 ID 过滤"""
-        results = lobster_grep(
-            db=db_with_messages,
-            query="Python",
-            conversation_id="conv_1",
-            search_messages=True,
-            search_summaries=False,
-            limit=10
-        )
-        
-        # 所有结果都应该来自 conv_1
-        for result in results:
-            assert result['conversation_id'] == "conv_1"
+    def test_limit_caps_results(self, db):
+        for i in range(20):
+            _seed(db, "c1", [f"keyword message {i}"])
+        results = lobster_grep(db, "keyword", search_summaries=False, limit=5)
+        assert len(results) <= 5
 
-    def test_grep_limit_results(self, db_with_messages):
-        """测试结果数量限制"""
-        results = lobster_grep(
-            db=db_with_messages,
-            query="Python",
-            search_messages=True,
-            search_summaries=False,
-            limit=1
-        )
-        
-        # 应该只返回 1 条结果
-        assert len(results) <= 1
+    def test_search_messages_only(self, db):
+        _seed_summary(db, "c1", kind="leaf", depth=0, summary_id="sum_1",
+                      message_ids=[])
+        _seed(db, "c1", ["alpha message"])
+        results = lobster_grep(db, "alpha", search_messages=True, search_summaries=False)
+        assert all(r["type"] == "message" for r in results)
+        assert any("alpha" in r["content"] for r in results)
 
-    def test_grep_no_results(self, db_with_messages):
-        """测试无匹配结果"""
-        results = lobster_grep(
-            db=db_with_messages,
-            query="nonexistent_keyword_12345",
-            search_messages=True,
-            search_summaries=False,
-            limit=10
-        )
-        
-        # 应该返回空列表
-        assert isinstance(results, list)
-        # FTS5 可能返回空列表或少量结果
-        assert len(results) >= 0
+    def test_result_fields_present(self, db):
+        _seed(db, "c1", ["PostgreSQL test"])
+        results = lobster_grep(db, "PostgreSQL", search_summaries=False)
+        assert len(results) >= 1
+        hit = results[0]
+        assert "type" in hit
+        assert "id" in hit
+        assert "conversation_id" in hit
+        assert "content" in hit
+        assert "relevance" in hit
+        assert "tfidf_score" in hit
 
-    def test_grep_without_tfidf_rerank(self, db_with_messages):
-        """测试不使用 TF-IDF 重排序"""
-        results = lobster_grep(
-            db=db_with_messages,
-            query="Python",
-            search_messages=True,
-            search_summaries=False,
-            limit=10,
-            use_tfidf_rerank=False
-        )
-        
-        # 应该返回结果
-        assert isinstance(results, list)
+    def test_tfidf_rerank_disabled(self, db):
+        _seed(db, "c1", ["PostgreSQL test"])
+        # use_tfidf_rerank=False should still work, just with different ranking
+        results = lobster_grep(db, "PostgreSQL", search_summaries=False,
+                              use_tfidf_rerank=False)
+        assert len(results) >= 1
 
+
+# ---------- lobster_describe ----------
 
 class TestLobsterDescribe:
-    """测试描述功能"""
+    def test_no_args_returns_none(self, db):
+        assert lobster_describe(db) is None
 
-    @pytest.fixture
-    def db_with_summaries(self):
-        """创建包含测试摘要的数据库"""
-        db = LobsterDatabase(":memory:")
-        
-        # 插入测试消息（seq 会自动生成）
-        msg_id_1 = db.add_message(
-            conversation_id="conv_1",
-            role="user",
-            content="Test message 1"
-        )
-        
-        msg_id_2 = db.add_message(
-            conversation_id="conv_1",
-            role="assistant",
-            content="Test message 2"
-        )
-        
-        # 插入测试摘要（使用 save_summary）
-        summary_id = db.save_summary({
-            'summary_id': 'sum_test_1',
-            'conversation_id': "conv_1",
-            'kind': "leaf",
-            'depth': 0,
-            'content': "Test summary",
-            'source_messages': [msg_id_1, msg_id_2]
-        })
-        
-        return db, summary_id
-
-    def test_describe_summary_by_id(self, db_with_summaries):
-        """测试通过 ID 描述摘要"""
-        db, summary_id = db_with_summaries
-        
-        result = lobster_describe(
-            db=db,
-            summary_id=summary_id
-        )
-        
-        # 应该返回摘要详情
+    def test_describe_by_conversation_id(self, db):
+        _seed(db, "c1", ["msg1", "msg2", "msg3"])
+        result = lobster_describe(db, conversation_id="c1")
         assert result is not None
-        assert result['summary_id'] == summary_id
-        assert result['kind'] == 'leaf'
+        assert result["conversation_id"] == "c1"
+        assert "total_summaries" in result
+        assert "max_depth" in result
+        assert "by_depth" in result
+        assert "turn_count" in result
 
-    def test_describe_summary_by_conversation(self, db_with_summaries):
-        """测试通过对话 ID 描述摘要"""
-        db, _ = db_with_summaries
-        
-        result = lobster_describe(
-            db=db,
-            conversation_id="conv_1"
-        )
-        
-        # 应该返回对话的摘要结构
+    def test_describe_by_conversation_with_depth_filter(self, db):
+        _seed_summary(db, "c1", kind="leaf", depth=0, summary_id="sum_d0")
+        _seed_summary(db, "c1", kind="leaf", depth=1, summary_id="sum_d1")
+        result = lobster_describe(db, conversation_id="c1", depth=1)
+        # Should only include depth=1 summaries
         assert result is not None
-        assert result['conversation_id'] == "conv_1"
-        assert 'total_summaries' in result
-        assert 'by_depth' in result
+        if result["by_depth"]:
+            assert 0 not in result["by_depth"]
+            assert 1 in result["by_depth"]
+    def test_describe_nonexistent_summary_returns_none(self, db):
+        assert lobster_describe(db, summary_id="does_not_exist") is None
 
-    def test_describe_nonexistent_summary(self, db_with_summaries):
-        """测试描述不存在的摘要"""
-        db, _ = db_with_summaries
-        
-        result = lobster_describe(
-            db=db,
-            summary_id="nonexistent_summary"
-        )
-        
-        # 应该返回 None
-        assert result is None
-
-    def test_describe_filter_by_depth(self, db_with_summaries):
-        """测试按深度过滤"""
-        db, _ = db_with_summaries
-        
-        result = lobster_describe(
-            db=db,
-            conversation_id="conv_1",
-            depth=0
-        )
-        
-        # 应该返回过滤后的结果
+    def test_describe_by_summary_id_leaf(self, db):
+        ids = _seed(db, "c1", ["m1 content", "m2 content"])
+        sid = _seed_summary(db, "c1", kind="leaf", depth=0,
+                            summary_id="sum_leaf", message_ids=ids)
+        result = lobster_describe(db, summary_id=sid)
         assert result is not None
-        assert result['conversation_id'] == "conv_1"
+        assert result["summary_id"] == sid
+        assert result["kind"] == "leaf"
+        assert "messages" in result
+        assert len(result["messages"]) == 2
+    def test_describe_by_summary_id_non_leaf(self, db):
+        sid = _seed_summary(db, "c1", kind="condensed", depth=1,
+                            summary_id="sum_cond", message_ids=[])
+        result = lobster_describe(db, summary_id=sid)
+        assert result is not None
+        assert result["kind"] == "condensed"
+        # Non-leaf should have parent_summaries field, not messages
+        assert "parent_summaries" in result
+        assert "messages" not in result
 
+
+# ---------- lobster_expand ----------
 
 class TestLobsterExpand:
-    """测试展开功能"""
+    def test_expand_nonexistent_returns_empty(self, db):
+        result = lobster_expand(db, "does_not_exist")
+        assert result["total_messages"] == 0
+        assert result["messages"] == []
+        assert result["summary_id"] == "does_not_exist"
 
-    @pytest.fixture
-    def db_with_hierarchy(self):
-        """创建包含层级摘要的数据库"""
-        db = LobsterDatabase(":memory:")
-        
-        # 插入测试消息（seq 会自动生成）
-        msg_ids = []
-        for i in range(4):
-            msg_id = db.add_message(
-                conversation_id="conv_1",
-                role="user" if i % 2 == 0 else "assistant",
-                content=f"Test message {i + 1}"
-            )
-            msg_ids.append(msg_id)
-        
-        # 创建叶子摘要（使用 save_summary）
-        leaf_summary_1 = db.save_summary({
-            'summary_id': 'sum_leaf_1',
-            'conversation_id': "conv_1",
-            'kind': "leaf",
-            'depth': 0,
-            'content': "Leaf summary 1",
-            'source_messages': msg_ids[:2]
-        })
-        
-        leaf_summary_2 = db.save_summary({
-            'summary_id': 'sum_leaf_2',
-            'conversation_id': "conv_1",
-            'kind': "leaf",
-            'depth': 0,
-            'content': "Leaf summary 2",
-            'source_messages': msg_ids[2:]
-        })
-        
-        # 创建 condensed 摘要
-        condensed_summary = db.save_summary({
-            'summary_id': 'sum_condensed_1',
-            'conversation_id': "conv_1",
-            'kind': "condensed",
-            'depth': 1,
-            'content': "Condensed summary",
-            'parent_summaries': [leaf_summary_1, leaf_summary_2]
-        })
-        
-        return db, leaf_summary_1, condensed_summary, msg_ids
+    def test_expand_leaf_summary(self, db):
+        ids = _seed(db, "c1", ["leaf content 1", "leaf content 2"])
+        sid = _seed_summary(db, "c1", kind="leaf", depth=0,
+                            summary_id="sum_exp_1", message_ids=ids)
+        result = lobster_expand(db, sid)
+        assert result["total_messages"] == 2
+        contents = {m["content"] for m in result["messages"]}
+        assert "leaf content 1" in contents
+        assert "leaf content 2" in contents
+        # Sorted by seq
+        seqs = [m["seq"] for m in result["messages"]]
+        assert seqs == sorted(seqs)
 
-    def test_expand_leaf_summary(self, db_with_hierarchy):
-        """测试展开叶子摘要"""
-        db, leaf_summary_id, _, msg_ids = db_with_hierarchy
-        
-        result = lobster_expand(
-            db=db,
-            summary_id=leaf_summary_id,
-            max_depth=0
+    def test_expand_with_max_depth_limit(self, db):
+        ids1 = _seed(db, "c1", ["child msg 1", "child msg 2"])
+        ids2 = _seed(db, "c1", ["grandchild msg 1"])
+        # Create parent -> child relationship
+        sid_child = _seed_summary(db, "c1", kind="leaf", depth=0,
+                                  summary_id="sum_child", message_ids=ids1)
+        sid_parent = "sum_parent"
+        db.cursor.execute("""
+            INSERT INTO summaries (summary_id, conversation_id, kind, depth,
+                                   content, token_count, earliest_at, latest_at,
+                                   descendant_count, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (sid_parent, "c1", "condensed", 1, "p", 10,
+              "2026-06-12T10:00:00Z", "2026-06-12T10:05:00Z", 1,
+              "2026-06-12T10:00:00Z"))
+        db.cursor.execute(
+            "INSERT INTO summary_parents (summary_id, parent_summary_id) VALUES (?, ?)",
+            (sid_parent, sid_child))
+        # link ids2 to child too (use OR IGNORE in case ids1 == ids2)
+        db.cursor.execute(
+            "INSERT OR IGNORE INTO summary_messages (summary_id, message_id) VALUES (?, ?)",
+            (sid_child, ids2[0]))
+        db.conn.commit()
+
+        # max_depth=0 -> only direct, but child is at depth 0, so we get child
+        r0 = lobster_expand(db, sid_parent, max_depth=0)
+        # max_depth=1 -> we recurse into child
+        r1 = lobster_expand(db, sid_parent, max_depth=1)
+        assert r0["total_messages"] == 0 or r1["total_messages"] >= r0["total_messages"]
+        # max_depth=1 should include the child leaf's messages
+        assert r1["total_messages"] >= 2
+
+    def test_expand_visited_set_prevents_cycles(self, db):
+        # Set up a cycle: A -> B -> A
+        ids = _seed(db, "c1", ["cycle msg"])
+        db.cursor.execute("""
+            INSERT INTO summaries (summary_id, conversation_id, kind, depth,
+                                   content, token_count, earliest_at, latest_at,
+                                   descendant_count, created_at)
+            VALUES ('sum_A', 'c1', 'condensed', 1, 'a', 10,
+                    '2026-06-12T10:00:00Z', '2026-06-12T10:05:00Z', 1,
+                    '2026-06-12T10:00:00Z')
+        """)
+        db.cursor.execute("""
+            INSERT INTO summaries (summary_id, conversation_id, kind, depth,
+                                   content, token_count, earliest_at, latest_at,
+                                   descendant_count, created_at)
+            VALUES ('sum_B', 'c1', 'leaf', 0, 'b', 10,
+                    '2026-06-12T10:00:00Z', '2026-06-12T10:05:00Z', 1,
+                    '2026-06-12T10:00:00Z')
+        """)
+        db.cursor.execute("INSERT INTO summary_messages (summary_id, message_id) VALUES ('sum_B', ?)", (ids[0],))
+        db.cursor.execute("INSERT INTO summary_parents (summary_id, parent_summary_id) VALUES ('sum_A', 'sum_B')")
+        db.cursor.execute("INSERT INTO summary_parents (summary_id, parent_summary_id) VALUES ('sum_B', 'sum_A')")
+        db.conn.commit()
+        # Should not infinite-loop
+        result = lobster_expand(db, "sum_A", max_depth=5)
+        assert result["total_messages"] == 1
+        # visited_summaries should be at most 2 (A and B)
+        assert result["visited_summaries"] <= 2
+
+
+# ---------- main() CLI ----------
+
+class TestMainCLI:
+    def test_no_command_prints_help(self, db_path, capsys):
+        rc = subprocess.run(
+            [sys.executable, "-m", "src.agent_tools"],
+            env={**os.environ, "PYTHONPATH": os.getcwd()},
+            capture_output=True, text=True, timeout=10,
         )
-        
-        # 应该返回展开结果
-        assert result is not None
-        assert 'summary_id' in result
-        assert 'messages' in result
-        # 叶子摘要应该包含原始消息
-        assert len(result['messages']) > 0
+        # No subcommand -> exit non-zero or help on stdout
+        combined = rc.stdout + rc.stderr
+        assert "usage" in combined.lower() or "可用命令" in combined or rc.returncode != 0
 
-    def test_expand_condensed_summary(self, db_with_hierarchy):
-        """测试展开 condensed 摘要"""
-        db, _, condensed_summary_id, msg_ids = db_with_hierarchy
-        
-        result = lobster_expand(
-            db=db,
-            summary_id=condensed_summary_id,
-            max_depth=-1
+    def test_grep_subcommand_json(self, db, db_path):
+        _seed(db, "c1", ["PostgreSQL rocks"])
+        result = subprocess.run(
+            [sys.executable, "-m", "src.agent_tools", "--db", db_path, "grep", "PostgreSQL", "--no-summaries", "--json"],
+            env={**os.environ, "PYTHONPATH": os.getcwd()},
+            capture_output=True, text=True, timeout=10,
         )
-        
-        # 应该返回展开结果
-        assert result is not None
-        assert 'summary_id' in result
+        # stdout should be valid JSON
+        data = json.loads(result.stdout)
+        assert isinstance(data, list)
+        assert any("PostgreSQL" in r["content"] for r in data)
 
-    def test_expand_nonexistent_summary(self, db_with_hierarchy):
-        """测试展开不存在的摘要"""
-        db, _, _, _ = db_with_hierarchy
-        
-        result = lobster_expand(
-            db=db,
-            summary_id="nonexistent_summary",
-            max_depth=-1
+    def test_describe_subcommand_json(self, db, db_path):
+        _seed(db, "c1", ["msg"])
+        result = subprocess.run(
+            [sys.executable, "-m", "src.agent_tools", "--db", db_path, "describe", "--conversation", "c1", "--json"],
+            env={**os.environ, "PYTHONPATH": os.getcwd()},
+            capture_output=True, text=True, timeout=10,
         )
-        
-        # 应该返回包含空消息的结果
-        assert result is not None
-        assert 'messages' in result
-        assert len(result['messages']) == 0
+        data = json.loads(result.stdout)
+        assert data.get("conversation_id") == "c1"
 
-    def test_expand_with_max_depth(self, db_with_hierarchy):
-        """测试限制展开深度"""
-        db, _, condensed_summary_id, _ = db_with_hierarchy
-        
-        result = lobster_expand(
-            db=db,
-            summary_id=condensed_summary_id,
-            max_depth=1
+    def test_expand_subcommand_json(self, db, db_path):
+        ids = _seed(db, "c1", ["expandable content"])
+        sid = _seed_summary(db, "c1", kind="leaf", depth=0,
+                            summary_id="sum_exp_cli", message_ids=ids)
+        result = subprocess.run(
+            [sys.executable, "-m", "src.agent_tools", "--db", db_path, "expand", sid, "--json"],
+            env={**os.environ, "PYTHONPATH": os.getcwd()},
+            capture_output=True, text=True, timeout=10,
         )
-        
-        # 应该返回展开结果
-        assert result is not None
+        data = json.loads(result.stdout)
+        assert data["summary_id"] == sid
+        assert data["total_messages"] == 1

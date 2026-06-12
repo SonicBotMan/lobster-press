@@ -12,7 +12,7 @@ import sys
 import math
 import pytest
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
 
@@ -48,16 +48,16 @@ class TestDefaultCompressionBehavior:
             "tfidf_score": 1.0,
             "structural_bonus": 0.0,
             "msg_type": "unknown",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        current = datetime.utcnow()
+        current = datetime.now(timezone.utc)
         retention1 = self.db._compute_retention(msg, current, half_life_override=None)
         retention2 = self.db._compute_retention(msg, current)
         assert retention1 == retention2
 
     def test_message_type_affects_base_half_life(self):
         """消息类型应影响基础半衰期"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         created = now - timedelta(days=1)
 
         chitchat_msg = {
@@ -80,7 +80,7 @@ class TestDefaultCompressionBehavior:
 
     def test_12h_window_shows_differential_retention(self):
         """12h 窗口应显示差异保留率"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         recent_msg = {
             "content": "recent message",
@@ -112,9 +112,9 @@ class TestRetrievalOverride:
         msg = {
             "content": "test message",
             "tfidf_score": 1.0,
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        current = datetime.utcnow()
+        current = datetime.now(timezone.utc)
         retention = self.db._compute_retention(msg, current, half_life_override=336.0)
         assert 0.0 < retention <= 1.0
 

@@ -11,7 +11,7 @@ Version: v4.0.41
 import json
 import logging
 from typing import List, Dict, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 logger = logging.getLogger(__name__)
@@ -125,7 +125,7 @@ class DAGCompressor:
         # v4.0.34: 按遗忘曲线保留率升序排列，优先压缩"最应该被遗忘"的消息（Issue #173 修复二）
         # 保留率越低 = 记忆价值越低 = 越应该先被压缩
         # Ref: arXiv:2004.11327 — Adaptive Forgetting Curves
-        _now = datetime.utcnow()
+        _now = datetime.now(timezone.utc)
         uncompressed_messages.sort(
             key=lambda m: self.db._compute_retention(m, _now)
         )
@@ -875,7 +875,7 @@ if __name__ == "__main__":
             'seq': i,
             'role': 'user' if i % 2 == 0 else 'assistant',
             'content': content,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         db.save_message(msg)
     
