@@ -10,7 +10,7 @@ Version: v4.0.41
 
 import logging
 from typing import Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 from src.database import LobsterDatabase
@@ -215,7 +215,7 @@ class IncrementalCompressor:
             self.stats['total_compressions'] += 1
             self.stats['total_messages_compressed'] += dag_stats['messages_compressed']
             self.stats['total_tokens_saved'] += dag_stats.get('tokens_saved', 0)
-            self.stats['last_compression'] = datetime.utcnow().isoformat()
+            self.stats['last_compression'] = datetime.now(timezone.utc).isoformat()
             
             # v3.0.0: 提取语义知识（仅在 DAG 压缩后且启用语义记忆时）
             if self.semantic_memory and self.llm_client:
@@ -410,7 +410,7 @@ if __name__ == "__main__":
             'seq': i,
             'role': 'user' if i % 2 == 0 else 'assistant',
             'content': content * 5,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         
         # 添加消息（自动压缩）

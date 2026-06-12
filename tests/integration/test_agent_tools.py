@@ -7,7 +7,7 @@ LobsterPress Agent Tools 测试脚本
 import sys
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # 添加 src 目录
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
@@ -48,7 +48,7 @@ def test_agent_tools():
             'seq': i,
             'role': 'user' if i % 2 == 0 else 'assistant',
             'content': content * 5,  # 增加长度
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         db.save_message(msg)
         

@@ -13,7 +13,7 @@ import hashlib
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Callable
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +197,7 @@ class MemoryImporter:
             msg: 消息字典
             content_hash: 内容 hash
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         # 添加元数据
         metadata = json.loads(msg.get("metadata") or "{}")
@@ -256,7 +256,7 @@ class MemoryImporter:
                 json.dump(
                     {
                         "processed_hashes": list(processed_hashes),
-                        "saved_at": datetime.utcnow().isoformat(),
+                        "saved_at": datetime.now(timezone.utc).isoformat(),
                     },
                     f,
                 )

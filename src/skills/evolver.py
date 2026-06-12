@@ -10,7 +10,7 @@ Version: v5.0.0
 import json
 import hashlib
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class SkillEvolver:
@@ -266,7 +266,7 @@ class SkillEvolver:
 
         goal = task.get("goal", "untitled")[:50]
         skill_id = f"skill_{hashlib.sha256((owner + goal).encode()).hexdigest()[:16]}"
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         skill = Skill(
             skill_id=skill_id,

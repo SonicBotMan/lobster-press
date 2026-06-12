@@ -3,7 +3,7 @@
 """Unit tests for CHLRScorer (src/pipeline/chlr_scorer.py)."""
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from src.pipeline.chlr_scorer import CHLRScorer
@@ -106,13 +106,13 @@ class TestCalculateRetention:
 
     def test_just_created_returns_one(self):
         s = CHLRScorer()
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         msg = _msg(created_at=_iso(now), last_accessed_at=_iso(now))
         assert s.calculate_retention(msg, current_time=now) == pytest.approx(1.0, abs=1e-6)
 
     def test_one_half_life_returns_half(self):
         s = CHLRScorer(base_h=12.0)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         past = now - timedelta(hours=12)
         msg = _msg(created_at=_iso(past), last_accessed_at=_iso(past))
         # After one half-life, retention = 2^(-12/12) = 0.5
@@ -120,7 +120,7 @@ class TestCalculateRetention:
 
     def test_two_half_lives_returns_quarter(self):
         s = CHLRScorer(base_h=10.0)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         past = now - timedelta(hours=20)
         msg = _msg(created_at=_iso(past), last_accessed_at=_iso(past))
         # 2 half-lives -> 2^(-20/10) = 0.25
@@ -128,7 +128,7 @@ class TestCalculateRetention:
 
     def test_retention_monotonically_decreasing_with_age(self):
         s = CHLRScorer(base_h=12.0)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         prev = 1.1
         for h in [0, 1, 5, 10, 24, 100, 1000]:
             past = now - timedelta(hours=h)
@@ -145,14 +145,14 @@ class TestCalculateRetention:
 
     def test_zero_half_life_returns_zero(self):
         s = CHLRScorer(base_h=0.0, alpha=0.0)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         past = now - timedelta(hours=1)
         msg = _msg(created_at=_iso(past), last_accessed_at=_iso(past))
         assert s.calculate_retention(msg, current_time=now) == 0.0
 
 
 # ---------- should_promote / should_decay ----------
-# Mock calculate_retention to remove datetime.utcnow() dependence.
+# Mock calculate_retention to remove datetime.now(timezone.utc) dependence.
 
 class TestPromotionAndDecay:
     def test_working_high_retention_promotes(self):
@@ -203,7 +203,7 @@ class TestBatchCalculate:
 
     def test_batch_enriches_each_message(self):
         s = CHLRScorer(base_h=12.0)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         # 'rich' has 0.3 (token) + 0.3 (entities) = 0.6 complexity
         # 'plain' has 0.0 complexity
         rich = _msg(

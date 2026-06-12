@@ -14,7 +14,7 @@ import json
 import hashlib
 import logging
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 # v3.2.1: 使用集中的 prompt 模块
@@ -119,7 +119,7 @@ class SemanticMemory:
         note_id = 'note_' + hashlib.sha256(
             (conversation_id + content).encode()
         ).hexdigest()[:16]
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         
         self.db.cursor.execute("""
             INSERT INTO notes

@@ -17,7 +17,7 @@ import sys
 import logging
 from typing import List, Dict, Optional, Any
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.utils.tokens import estimate_tokens as _estimate_tokens_shared
 
@@ -556,7 +556,7 @@ class LobsterDatabase:
         #       SQLite FK 默认关闭，save_message 不建 conversation 行时
         #       整条 JOIN 返 0 行（v3.6.0 命名空间功能因此失效）。
         if conversation_id:
-            now_iso = datetime.utcnow().isoformat()
+            now_iso = datetime.now(timezone.utc).isoformat()
             self.cursor.execute(
                 "INSERT OR IGNORE INTO conversations"
                 "(conversation_id, namespace, created_at, updated_at) VALUES (?, ?, ?, ?)",
@@ -575,7 +575,7 @@ class LobsterDatabase:
         role = message.get("role", "user")
         content = self._extract_content(message)
         token_count = self._estimate_tokens(content)
-        created_at = message.get("timestamp") or datetime.utcnow().isoformat()
+        created_at = message.get("timestamp") or datetime.now(timezone.utc).isoformat()
         metadata = json.dumps(message, ensure_ascii=False)
 
         # v2.5.0 新字段
@@ -705,7 +705,7 @@ class LobsterDatabase:
             带 dynamic_score 字段的消息列表
         """
         if current_time is None:
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc)
 
         messages = self.get_messages(conversation_id)
         for msg in messages:
@@ -726,7 +726,7 @@ class LobsterDatabase:
         Args:
             message_id: 消息 ID
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         self.cursor.execute(
             """
             UPDATE messages
@@ -791,6 +791,8 @@ class LobsterDatabase:
         ref_time_str = msg.get("last_accessed_at") or msg.get("created_at", "")
         try:
             ref_time = datetime.fromisoformat(ref_time_str)
+            if ref_time.tzinfo is None and current_time.tzinfo is not None:
+                ref_time = ref_time.replace(tzinfo=timezone.utc)
             delta_hours = max((current_time - ref_time).total_seconds() / 3600.0, 0.0)
         except Exception:
             delta_hours = 0.0
@@ -944,7 +946,7 @@ class LobsterDatabase:
         earliest_at = summary.get("earliest_at")
         latest_at = summary.get("latest_at")
         descendant_count = summary.get("descendant_count", 0)
-        created_at = datetime.utcnow().isoformat()
+        created_at = datetime.now(timezone.utc).isoformat()
         r3_layer = summary.get("r3_layer", 1)  # v4.0.0: R³Mem 层级
         memory_tier = summary.get("memory_tier", "episodic")  # v3.6.0: 记忆层级
 
@@ -1234,7 +1236,7 @@ class LobsterDatabase:
         Returns:
             skill_id
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         self.cursor.execute(
             """
@@ -1359,7 +1361,7 @@ class LobsterDatabase:
         self, skill_id: str, version: int, content: str, quality_score: float
     ) -> None:
         """保存技能版本"""
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         self.cursor.execute(
             """
             INSERT INTO skill_versions (skill_id, version, content, quality_score, created_at)
@@ -1445,12 +1447,12 @@ class LobsterDatabase:
             纠错结果
         """
         import uuid
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         # 生成纠错 ID
         correction_id = f"corr_{uuid.uuid4().hex[:16]}"
-        created_at = datetime.utcnow().isoformat()
-        applied_at = datetime.utcnow().isoformat()
+        created_at = datetime.now(timezone.utc).isoformat()
+        applied_at = datetime.now(timezone.utc).isoformat()
 
         # v4.0.3: 使用整体事务保护，纠错日志与修改原子提交（Issue #137 New Bug 3）
         with self.conn:
@@ -1562,7 +1564,7 @@ class LobsterDatabase:
 
         Ref: arXiv:2502.15957 — R³Mem: Bridging Memory Retention and Retrieval
         """
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         # v4.0.3: 改用 SHA-256[:24] 恢复幂等性（Issue #137 New Bug 1）
         # 兼顾无碰撞（96 bit）和幂等性（相同输入产生相同 ID）
         entity_id = f"ent_{hashlib.sha256((namespace + conversation_id + entity_name).encode()).hexdigest()[:24]}"
@@ -1619,12 +1621,12 @@ class LobsterDatabase:
         Returns:
             清理统计
         """
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         from pipeline.chlr_scorer import CHLRScorer
 
-        cutoff_date = (datetime.utcnow() - timedelta(days=days_threshold)).isoformat()
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days_threshold)).isoformat()
         # v4.0.2: 增加近期消息保护期（7 天），避免误标未评分的新消息（Issue #136 Bug 5）
-        protect_cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
+        protect_cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
 
         # 查找候选消息（增加 conversation_id 过滤 + 近期保护）
         self.cursor.execute(
@@ -2074,7 +2076,7 @@ class LobsterDatabase:
             conversation_id
         """
         conversation_id = self._generate_id("conv")
-        created_at = datetime.utcnow().isoformat()
+        created_at = datetime.now(timezone.utc).isoformat()
 
         # v4.0.12: 添加事务保护（Issue #150 Bug #3）
         with self.conn:
@@ -2151,7 +2153,7 @@ class LobsterDatabase:
 
         chunk_id = f"emb_{target_type}_{target_id}"
         blob = struct.pack(f"{len(vector)}f", *vector)
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         self.cursor.execute(
             """
@@ -2243,7 +2245,7 @@ if __name__ == "__main__":
         "seq": 1,
         "role": "user",
         "content": [{"type": "text", "text": "这是一条测试消息"}],
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     msg_id = db.save_message(test_message)
@@ -2261,8 +2263,8 @@ if __name__ == "__main__":
         "depth": 0,
         "content": "这是测试摘要内容",
         "source_messages": ["msg_test123"],
-        "earliest_at": datetime.utcnow().isoformat(),
-        "latest_at": datetime.utcnow().isoformat(),
+        "earliest_at": datetime.now(timezone.utc).isoformat(),
+        "latest_at": datetime.now(timezone.utc).isoformat(),
         "descendant_count": 1,
     }
 

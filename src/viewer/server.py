@@ -17,7 +17,7 @@ import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -192,7 +192,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
             "summaries_count": 0,
             "skills_count": 0,
             "embeddings_count": 0,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         # 统计消息数
@@ -281,7 +281,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(
             json.dumps(
-                {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+                {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
             ).encode()
         )
 

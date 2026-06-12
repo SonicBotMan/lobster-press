@@ -17,7 +17,7 @@ import re
 import logging
 from typing import List, Dict, Optional
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ class ConflictDetector:
                     SET superseded_by = ?, updated_at = ?
                     WHERE note_id = ?
                 """, (new_note_id, 
-                       datetime.utcnow().isoformat(),
+                       datetime.now(timezone.utc).isoformat(),
                        conflict.old_note_id))
                 semantic_memory.db.conn.commit()
                 

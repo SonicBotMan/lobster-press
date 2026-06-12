@@ -174,11 +174,11 @@ class TestLobsterCompressTool:
         assert success is True
 
 
-class TestCompressSessionReal:
-    """测试 compress_session 使用真实 DAGCompressor（v3.3.1）"""
+class TestDagCompressorReal:
+    """Verify v5.0 DAGCompressor exposes leaf_compact / condensed_compact / incremental_compact."""
 
     def test_compress_session_uses_real_dag(self):
-        """测试 compress_session 调用真实 DAGCompressor"""
+        """Verify v5.0 DAGCompressor methods exist (replace v2 compress_session)."""
         from dag_compressor import DAGCompressor
         
         # 创建临时数据库

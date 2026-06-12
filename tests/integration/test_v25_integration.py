@@ -17,7 +17,7 @@ import sys
 import os
 import unittest
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # 添加 src 模块
 sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
@@ -70,7 +70,7 @@ class TestV25Integration(unittest.TestCase):
                 'seq': 1,
                 'role': 'user',
                 'content': '决定：使用 PostgreSQL 作为主数据库',
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             },
             {
                 'id': 'msg_code_1',
@@ -83,7 +83,7 @@ def connect_db():
     import psycopg2
     return psycopg2.connect(DB_URL)
                 ''',
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             },
             {
                 'id': 'msg_error_1',
@@ -91,7 +91,7 @@ def connect_db():
                 'seq': 3,
                 'role': 'assistant',
                 'content': '错误：连接超时 - Error: Connection timeout at 192.168.1.100',
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             },
             {
                 'id': 'msg_config_1',
@@ -99,7 +99,7 @@ def connect_db():
                 'seq': 4,
                 'role': 'user',
                 'content': '配置：DB_HOST=localhost, DB_PORT=5432, DB_NAME=test',
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             },
             {
                 'id': 'msg_chitchat_1',
@@ -107,7 +107,7 @@ def connect_db():
                 'seq': 5,
                 'role': 'user',
                 'content': '今天天气不错啊',
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
         ]
         
@@ -163,7 +163,7 @@ def connect_db():
             'seq': 1,
             'role': 'user',
             'content': '决定：这是一个重要决策',
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         }
         
         self.compressor.on_new_message('conv_exempt', exempt_msg, auto_compress=False)
@@ -231,7 +231,7 @@ def connect_db():
                 'seq': i,
                 'role': 'user' if i % 2 == 0 else 'assistant',
                 'content': f'这是第 {i} 条消息，讨论了技术话题 {i % 5}。',
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
             
             self.compressor.on_new_message(conversation_id, msg, auto_compress=False)

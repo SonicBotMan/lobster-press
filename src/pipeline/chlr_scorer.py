@@ -11,7 +11,7 @@ v4.0.96: 首次实现
 
 import math
 from typing import Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 class CHLRScorer:
@@ -128,7 +128,7 @@ class CHLRScorer:
             保留率 0-1
         """
         if current_time is None:
-            current_time = datetime.utcnow()
+            current_time = datetime.now(timezone.utc)
 
         # 计算距离上次访问的时间（小时）
         last_accessed_str = message.get("last_accessed_at") or message.get("created_at")
@@ -141,6 +141,8 @@ class CHLRScorer:
             )
             if last_accessed.tzinfo:
                 last_accessed = last_accessed.replace(tzinfo=None)
+            if current_time.tzinfo:
+                current_time = current_time.replace(tzinfo=None)
 
             hours_since_access = (current_time - last_accessed).total_seconds() / 3600
         except (ValueError, TypeError):
