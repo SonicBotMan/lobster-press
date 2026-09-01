@@ -15,6 +15,7 @@ import hashlib
 import json
 import logging
 import math
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -362,6 +363,15 @@ class LobsterDatabase:
            （见 search_messages / search_summaries）。
         """
         return '"' + query.replace('"', '""') + '"'
+
+    @staticmethod
+    def _like_pattern(query: str) -> str:
+        """v5.1.1 (Bugbot): LIKE 回退时转义 % 与 _ 通配符，并拒绝空查询。
+
+        LIKE 里 % 和 _ 是通配符：不转义时搜 '_' 会匹配任意单字符、
+        空查询变成 '%%' 匹配全表。ESCAPE '\\' 声明转义字符。
+        """
+        return "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
     def migrate_v25(self):
         """v2.5.0 schema 迁移
@@ -1153,6 +1163,9 @@ class LobsterDatabase:
         """
         # v5.1.1 (audit P0-3): trigram 分词器要求查询 ≥3 字符；
         # 更短的查询（如中文两字词"决定"）回退 LIKE 扫描（50k 行实测 ~3ms，可接受）。
+        # v5.1.1 (Bugbot): 空查询直接返回，防 LIKE '%%' 全表匹配。
+        if not query:
+            return []
         if conversation_id:
             # v3.6.0: 按 conversation_id 和 namespace 过滤
             # v5.0.0: 添加 owner 过滤
@@ -1163,7 +1176,7 @@ class LobsterDatabase:
                     SELECT m.*, '' as snippet
                     FROM messages m
                     JOIN conversations c ON m.conversation_id = c.conversation_id
-                    WHERE m.content LIKE ?
+                    WHERE m.content LIKE ? ESCAPE '\\'
                       AND m.conversation_id = ?
                       AND (? OR c.namespace = ?)
                       AND (m.owner = ? OR m.owner = 'public')
@@ -1171,7 +1184,7 @@ class LobsterDatabase:
                     LIMIT ?
                 """,
                     (
-                        f"%{query}%",
+                        self._like_pattern(query),
                         conversation_id,
                         cross_namespace,
                         self.namespace,
@@ -1211,13 +1224,13 @@ class LobsterDatabase:
                     SELECT m.*, '' as snippet
                     FROM messages m
                     JOIN conversations c ON m.conversation_id = c.conversation_id
-                    WHERE m.content LIKE ?
+                    WHERE m.content LIKE ? ESCAPE '\\'
                       AND (? OR c.namespace = ?)
                       AND (m.owner = ? OR m.owner = 'public')
                     ORDER BY m.seq DESC
                     LIMIT ?
                 """,
-                    (f"%{query}%", cross_namespace, self.namespace, self.owner, limit),
+                    (self._like_pattern(query), cross_namespace, self.namespace, self.owner, limit),
                 )
             else:
                 self.cursor.execute(
@@ -1259,6 +1272,9 @@ class LobsterDatabase:
             匹配的摘要列表
         """
         # v5.1.1 (audit P0-3): trigram ≥3 字符要求，短查询 LIKE 回退；输入统一转义
+        # v5.1.1 (Bugbot): 空查询直接返回，防 LIKE '%%' 全表匹配。
+        if not query:
+            return []
         if conversation_id:
             # v3.6.0: 按 conversation_id 和 namespace 过滤
             # v5.0.0: 添加 owner 过滤
@@ -1268,7 +1284,7 @@ class LobsterDatabase:
                     SELECT s.*, '' as snippet
                     FROM summaries s
                     JOIN conversations c ON s.conversation_id = c.conversation_id
-                    WHERE s.content LIKE ?
+                    WHERE s.content LIKE ? ESCAPE '\\'
                       AND s.conversation_id = ?
                       AND (? OR c.namespace = ?)
                       AND (s.owner = ? OR s.owner = 'public')
@@ -1276,7 +1292,7 @@ class LobsterDatabase:
                     LIMIT ?
                 """,
                     (
-                        f"%{query}%",
+                        self._like_pattern(query),
                         conversation_id,
                         cross_namespace,
                         self.namespace,
@@ -1316,13 +1332,13 @@ class LobsterDatabase:
                     SELECT s.*, '' as snippet
                     FROM summaries s
                     JOIN conversations c ON s.conversation_id = c.conversation_id
-                    WHERE s.content LIKE ?
+                    WHERE s.content LIKE ? ESCAPE '\\'
                       AND (? OR c.namespace = ?)
                       AND (s.owner = ? OR s.owner = 'public')
                     ORDER BY s.created_at DESC
                     LIMIT ?
                 """,
-                    (f"%{query}%", cross_namespace, self.namespace, self.owner, limit),
+                    (self._like_pattern(query), cross_namespace, self.namespace, self.owner, limit),
                 )
             else:
                 self.cursor.execute(

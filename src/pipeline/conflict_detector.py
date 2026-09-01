@@ -123,9 +123,11 @@ class ConflictDetector:
             r"don't use|switch to|replace|migrate to|no longer use",
         ]
         # premise 必须含明确主张（采用/决定使用 X），否则不构成可被否定的旧主张
+        # v5.1.1 (Bugbot): 英文动词加 \b 词边界——无边界时 "use" 会命中
+        # "the user likes react" 里的 "user"，导致无主张的笔记也能进规则检测。
         ADOPT_PATTERNS = [
             r"采用|使用|选择|决定用|部署",
-            r"adopt|use|choose|deploy",
+            r"\b(adopt|use|choose|deploy|using)\b",
         ]
 
         premise_lower = premise.lower()
