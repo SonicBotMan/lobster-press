@@ -809,7 +809,7 @@ class LobsterDatabase:
             这确保短半衰期内容（如 chitchat）优先进入压缩队列
 
         Retrieval decay (half_life_override=336.0 for 14 days):
-            由 HybridRetriever._apply_retrieval_decay() 调用
+            由检索衰减路径调用（v5.1.1: 原 HybridRetriever 已移除）
             Formula: score × (0.3 + 0.7 × 0.5^(t/14d))
             α=0.3 地板值确保极老内容仍保留 30% 分数
 

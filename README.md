@@ -2,7 +2,7 @@
 
 <img src="assets/lobster-press-banner.png" alt="LobsterPress - 让AI的每一次对话，从'阅后即焚的幻影'进化为'数字海马体中的永久养分'" width="100%">
 
-# 🧠 LobsterPress v5.0.0「MemOS 4-Phase」
+# 🧠 LobsterPress v5.1.1「MemOS 4-Phase」
 
 **Cognitive Memory System for AI Agents**
 *基于认知科学的 LLM 永久记忆引擎*
@@ -14,7 +14,7 @@
 
 **中文** | [English](README_EN.md)
 
-**最新版本**: [v5.0.3](https://github.com/SonicBotMan/lobster-press/releases/tag/v5.0.3) · [更新日志](CHANGELOG.md)
+**最新版本**: [v5.1.1](https://github.com/SonicBotMan/lobster-press/releases/tag/v5.1.1) · [更新日志](CHANGELOG.md)
 
 </div>
 
@@ -393,9 +393,9 @@ systemctl --user restart openclaw-gateway
 ┌─────────────────────────────────────────────────────────────┐
 │                    LobsterPress v5.0「MemOS」                  │
 ├─────────────────────────────────────────────────────────────┤
-│  Phase 1: Core Intelligence (向量嵌入 + RRF/MMR)           │
-│  ├── Vector Embedder: OpenAI兼容API + numpy离线             │
-│  ├── Hybrid Retriever: FTS5+Vector → RRF(k=60) → MMR     │
+│  Phase 1: Core Intelligence (FTS5 trigram + 语义记忆)      │
+│  ├── 中文全文检索: FTS5 trigram 分词 + LIKE 短查询回退      │
+│  ├── 语义记忆: SemanticMemory notes + 矛盾检测             │
 │  ├── LLM Fallback Chain: skill→summary→native→mock        │
 │  └── Dual Decay: 12h压缩 / 14d检索                        │
 ├─────────────────────────────────────────────────────────────┤
@@ -411,7 +411,6 @@ systemctl --user restart openclaw-gateway
 ├─────────────────────────────────────────────────────────────┤
 │  Phase 4: Engineering (工程化)                              │
 │  ├── Viewer Web UI: 127.0.0.1 + SHA-256认证                 │
-│  ├── Async Queue: 后台任务队列                             │
 │  └── OpenClaw Migration: 🦐标识 + 断点续传                  │
 ├─────────────────────────────────────────────────────────────┤
 │  Legacy: CMV三遍无损压缩 + C-HLR+遗忘曲线 + R³Mem三层      │
@@ -441,7 +440,7 @@ LobsterPress 通过 OpenClaw lifecycle hooks 实现自动记忆管理：
 
 | 工具 | 说明 | 必需参数 |
 |------|------|----------|
-| `lobster_grep` | 全文搜索（FTS5 + TF-IDF） | `query` |
+| `lobster_grep` | 全文搜索（FTS5 trigram 中文分词，≥3 字符走索引、短查询 LIKE 回退） | `query` |
 | `lobster_describe` | 查看 DAG 摘要结构 | `conversation_id` 或 `summary_id` |
 | `lobster_expand` | 展开摘要到原始消息 | `summary_id` |
 | `lobster_status` | 系统健康报告 | - |
@@ -541,15 +540,6 @@ messages = lobster_expand(db, "sum_abc123", max_depth=2)
 ### v5.0 Python API
 
 ```python
-# v5.0: Vector Embedder
-from src.vector.embedder import create_embedder
-embedder = create_embedder()  # 自动降级
-
-# v5.0: Hybrid Retriever
-from src.vector.retriever import HybridRetriever
-retriever = HybridRetriever(db, embedder)
-results = retriever.search("PostgreSQL", top_k=5)
-
 # v5.0: Skill Evolution
 from src.skills.task_detector import TaskDetector
 from src.skills.evolver import SkillEvolver
@@ -559,13 +549,7 @@ tasks = detector.detect_tasks("conv_123")
 evolver = SkillEvolver(db, llm_client)
 skill_id = evolver.evaluate_and_generate(task, "conv_123")
 
-# v5.0: Async Queue
-from src.async_queue.worker import AsyncWorker
-worker = AsyncWorker(db, embedder, llm_client)
-worker.start()
-worker.enqueue('embed', {'target_type': 'message', 'target_id': 'msg_xxx', 'content': '...'})
-
-# v5.0: Viewer Web UI
+# v5.1.1: Viewer Web UI（v5.1.1 修复 setup() 遮蔽导致的 500，所有请求可用）
 from src.viewer.server import start_viewer
 server = start_viewer(db, port=18799, password="mypassword")
 ```
@@ -657,15 +641,10 @@ export LOBSTER_LLM_SUMMARY_PROVIDER=openai   # 可选
     ├── llm_providers.py        # 8 个提供商适配
     ├── prompts.py              # Prompt 模板
     ├── agent_tools.py          # Python API
-    ├── vector/                  # v5.0: 向量嵌入
-    │   ├── embedder.py         # OpenAI兼容 + numpy离线
-    │   └── retriever.py        # RRF/MMR/Decay
     ├── skills/                 # v5.0: 技能进化
     │   ├── models.py          # Skill, TaskSummary
     │   ├── task_detector.py   # 2h超时 + LLM判断
     │   └── evolver.py         # 规则过滤→评分→SKILL.md
-    ├── async_queue/            # v5.0: 异步队列
-    │   └── worker.py          # 后台任务处理
     ├── viewer/                 # v5.0: Web UI
     │   └── server.py          # HTTP服务
     ├── migration/              # v5.0: OpenClaw迁移
@@ -682,6 +661,7 @@ export LOBSTER_LLM_SUMMARY_PROVIDER=openai   # 可选
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| **v5.1.1** 🔧 | 2026-09-01 | 全面审计修复: 压缩真实缩容 + condensed 幂等 + 中文 FTS trigram + semantic 层接 notes + viewer 修复 + 移除死代码 (~1900 行) |
 | **v5.0.0+** 🔧 | 2026-05-30 | 工程化加固: pyproject.toml + logging + provider去重 + 安全修复 |
 | **v5.0.0** ⭐ | 2026-04-05 | MemOS 4-Phase优化: 向量嵌入/技能进化/多智能体/工程化 |
 | **v4.0.89** ⭐ | 2026-03-24 | 记忆优先级排序：semantic > episodic > working，长期记忆优先注入 |

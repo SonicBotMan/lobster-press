@@ -11,7 +11,7 @@
 [![Test](https://github.com/SonicBotMan/lobster-press/workflows/Test/badge.svg)](https://github.com/SonicBotMan/lobster-press/actions/workflows/test.yml)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org)
 [中文](README.md) | **English**
-**Latest**: [v5.0.3](https://github.com/SonicBotMan/lobster-press/releases/tag/v5.0.3) · [Changelog](CHANGELOG.md)
+**Latest**: [v5.1.1](https://github.com/SonicBotMan/lobster-press/releases/tag/v5.1.1) · [Changelog](CHANGELOG.md)
 </div>
 ---
 
@@ -332,16 +332,6 @@ manager = IncrementalCompressor(
     llm_client=your_llm_client,   # Optional: for semantic extraction and conflict detection
 )
 # v5.0 new parameters:
-embedder = VectorEmbedder(
-    provider="openai",            # "openai" (default) or "local"
-    model="text-embedding-3-small",
-    api_base="https://api.openai.com/v1",  # OpenAI-compatible base URL
-)
-retriever = HybridRetriever(
-    rrf_k=60,                    # RRF constant
-    mmr_lambda=0.7,              # MMR diversity weight
-    decay_retrieval_days=14,     # Retrieval half-life (independent of compression)
-)
 ```
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -375,15 +365,10 @@ src/
 ├── semantic_memory.py        # Semantic memory layer (structured notes)
 ├── agent_tools.py            # lobster_grep / lobster_describe / lobster_expand
 ├── llm_client.py             # FallbackLLMClient + multi-provider support ⭐ v5.0
-├── vector/
-│   ├── embedder.py          # Vector embedding (Phase 1)
-│   └── retriever.py         # Hybrid retrieval with RRF + MMR (Phase 1)
 ├── skills/
 │   ├── models.py            # Skill data models (Phase 2)
 │   ├── task_detector.py     # Task detection + topic classification (Phase 2)
 │   └── evolver.py           # Skill evolution engine (Phase 2)
-├── async_queue/
-│   └── worker.py            # Async background task worker (Phase 4)
 ├── viewer/
 │   └── server.py            # Web viewer UI (Phase 4)
 ├── migration/
@@ -408,10 +393,10 @@ src/
 <details>
 <summary>View Full Version Details</summary>
 ### v5.0.0 (2026-04-05) - MemOS 4-Phase Optimization
-- ✅ Phase 1: Vector embedder + HybridRetriever (RRF + MMR) + FallbackLLMClient
+- ✅ Phase 1: FallbackLLMClient (v5.1.1: vector retriever removed — was dead code with random embeddings)
 - ✅ Phase 2: Skill data models + Task detector + Skill evolver + MCP skill tools
 - ✅ Phase 3: Public memory + Skill marketplace + Owner/Namespace isolation
-- ✅ Phase 4: OpenClaw importer + Viewer Web UI + Async queue worker
+- ✅ Phase 4: OpenClaw importer + Viewer Web UI (async queue removed in v5.1.1)
 - ✅ C-HLR+ formula fix: R(t) = 0.5^(-t/h) (corrected from math.exp)
 - ✅ definePluginEntry() migration for OpenClaw v2026.4.2 compatibility
 ### v4.0.97 (2026-03-26) - C-HLR+ Forgetting Curve
