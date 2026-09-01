@@ -11,7 +11,7 @@ from importlib.metadata import version as _pkg_version
 try:
     __version__ = _pkg_version("lobster-press")
 except PackageNotFoundError:
-    __version__ = "5.1.0"
+    __version__ = "5.1.1"
 
 __author__ = "SonicBotMan"
 

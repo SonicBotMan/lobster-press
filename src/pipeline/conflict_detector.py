@@ -109,20 +109,39 @@ class ConflictDetector:
         """
         规则降级检测：检查否定词 + 关键词共现。
         精度较低，但零依赖。
+
+        v5.1.1 (audit P1-9): 原实现只要 hypothesis 中 20 字符内同时出现
+        "否定词 + premise 任意词"就报矛盾（实测 note="用户喜欢 React 和 Vue"
+        vs 新消息"我们要替换掉老旧的数据库，顺便聊聊 React 生态"被误判）。
+        修正为要求 premise 含**明确主张动词**（采用/使用/选择类），且否定
+        紧邻该主张的宾语——即"之前主张用 X，现在不用/改掉 X"才算矛盾。
         """
         NEGATION_PATTERNS = [
             r"不(用|要|采用|使用|选择)",
             r"改(用|为|成)",
-            r"放弃|弃用|替换|迁移到",
-            r"don't use|switch to|replace|migrate to|no longer",
+            r"放弃|弃用|替换掉|迁移到|不再使用",
+            r"don't use|switch to|replace|migrate to|no longer use",
+        ]
+        # premise 必须含明确主张（采用/决定使用 X），否则不构成可被否定的旧主张
+        # v5.1.1 (Bugbot): 英文动词加 \b 词边界——无边界时 "use" 会命中
+        # "the user likes react" 里的 "user"，导致无主张的笔记也能进规则检测。
+        ADOPT_PATTERNS = [
+            r"采用|使用|选择|决定用|部署",
+            r"\b(adopt|use|choose|deploy|using)\b",
         ]
 
-        # 提取 premise 中的关键词（技术名词、版本号等）
+        premise_lower = premise.lower()
+        if not any(re.search(p, premise_lower, re.IGNORECASE) for p in ADOPT_PATTERNS):
+            return None
+
+        # 提取 premise 中的技术名词（大写词 / 英文词 / 2-4 字中文词）
         tech_words = re.findall(
             r"[A-Z][a-zA-Z]+|[a-z]{3,}(?:\s+\d+\.\d+)?|[\u4e00-\u9fff]{2,4}", premise
         )
+        # 过滤掉主张动词本身等停用词，避免"采用/使用"被当作宾语
+        stopwords = {"采用", "使用", "选择", "决定", "部署", "用户", "喜欢", "希望"}
+        tech_words = [w for w in tech_words if w not in stopwords]
 
-        # 检查 hypothesis 是否包含「否定 + 关键词」
         for word in tech_words:
             for neg in NEGATION_PATTERNS:
                 pattern = neg + r"[^\n]{0,20}" + re.escape(word)

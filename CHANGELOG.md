@@ -5,6 +5,28 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [5.1.1] - 2026-09-01
+
+### Fixed (P0 — 核心承诺未兑现)
+- 🐛 **压缩后上下文真正收缩**（`dag_compressor.py`）：`_update_context_after_compression` 只插入 summary、从不删除被压缩消息——实测 12 条消息压缩后 context 反而 12→13 项。现在压缩的消息从 `context_items` 移除（messages 表无损保留）
+- 🐛 **condensed 摘要无限重复生成**（`dag_compressor.py`）：depth-0 叶子摘要从未标记"已消费"，重复调用 `_check_and_condense` 时同一批叶子被反复压缩（实测 3→8 个且 depth 无限增长）。现在用 `summary_parents` 表作为已消费标记，幂等
+- 🐛 **中文全文搜索失效**（`database.py`）：FTS5 默认 unicode61 把整句中文当一个 token，中文关键词搜索永远 0 结果。改用 `tokenize='trigram'`（≥3 字符），<3 字符查询自动回退 LIKE；用户查询统一引号包裹转义（`"a AND ("` 之类输入不再抛 fts5 syntax error）；旧库打开时自动重建 FTS 索引
+- 🐛 **semantic 三层记忆空架子**（`lobster_mcp_server.py`）：`lobster_assemble` 的 semantic 层查 `memory_tier='semantic'` 但全仓无任何写入方，永远为空。现在 semantic 层从 SemanticMemory notes 表取数（矛盾检测维护的稳定知识），真正注入上下文
+
+### Fixed (P1/P2)
+- 🐛 **sweep 裸 import 炸弹**：`from pipeline.chlr_scorer import`（无 `src.` 前缀）在纯 Python API 路径必抛 `ModuleNotFoundError`；同类修复 tfidf fallback、`_get_db`/`_get_llm`、assemble 内 event_segmenter/intent_extractor/three_pass_trimmer
+- 🐛 **index.ts seq 硬编码时序错乱**：user 固定 seq=0、assistant 固定 1/2，第二轮 seq 重复，`lobster_expand` 按 seq 还原的对话顺序错误。改为全部由 Python 层 `_get_next_seq()` 自动分配
+- 🐛 **conflict_detector 规则反向误判**：任意句子里 20 字符内出现"否定词+任意旧词"就报矛盾（实测"替换掉老旧的数据库，顺便聊聊 React 生态"误判与"喜欢 React"矛盾）。现在要求 premise 含明确主张动词（采用/使用/选择），否定需紧邻主张宾语
+- 🐛 **viewer `setup()` 方法遮蔽 BaseHTTPRequestHandler.setup()**：每个 HTTP 请求都 TypeError——viewer 从未真正可用。更名 `configure()`；顺带修复 `LOBSTERPRESS_VERSION` 取值与 tasks 接口的诚实标注
+- 🐛 **SQLite 跨线程**：`sqlite3.connect` 加 `check_same_thread=False`（viewer/plugin 跨线程共享连接）
+- 🐛 **examples/basic_usage.py 首跑即 TypeError**：调用了不存在的参数，重写为可运行版本
+- 📝 **touch_message stability 公式注释对齐**：消除对 UPDATE 列求值顺序的隐式依赖
+
+### Removed (dead code, ~1900 行)
+- 🗑️ `src/async_queue/`（199 行，0 生产调用方）
+- 🗑️ `src/vector/`（HybridRetriever/NumpyOfflineEmbedder——README 宣传的 RRF/MMR 混合检索从未接入 MCP/index.ts 主链路；且 NumpyOfflineEmbedder 用随机向量，检索结果是噪声）及 3 个对应测试文件
+- 🗑️ MCP 5 个 v2 工具（compress_session/preview_compression/get_compression_stats/update_weights/list_sessions）+ `_call_tool` 分支 + 7 个辅助方法 + `self.stats`/`self.config`——mcp_server/README.md 早已声明这些工具"调用会收到 Unknown tool"，现在代码与文档一致（注册数 22 → 17）
+
 ## [5.1.0] - 2026-06-12
 
 ### Fixed (end-to-end runtime)
