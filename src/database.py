@@ -15,7 +15,6 @@ import hashlib
 import json
 import logging
 import math
-import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
