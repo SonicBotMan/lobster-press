@@ -73,14 +73,20 @@ class LobsterDatabase:
                 try:
                     from .pipeline.tfidf_scorer import TFIDFScorer as _TFIDFScorer
                 except ImportError:
-                    from pipeline.tfidf_scorer import TFIDFScorer as _TFIDFScorer
+                    # audit 2026-09-01: fallback 改为 src. 前缀（裸 pipeline 在
+                    # 项目根导入场景下 ModuleNotFoundError）
+                    from src.pipeline.tfidf_scorer import TFIDFScorer as _TFIDFScorer
                 TFIDFScorer = _TFIDFScorer
             self._tfidf_scorer = TFIDFScorer()
         return self._tfidf_scorer
 
     def _init_database(self):
         """初始化数据库结构 - 借鉴 lossless-claw"""
-        self.conn = sqlite3.connect(self.db_path)
+        # v5.1.1 (audit: viewer e2e 发现): 加 check_same_thread=False。
+        # Viewer/插件会跨线程共享 LobsterDatabase（HTTPServer 每请求一个线程），
+        # SQLite 默认拒绝跨线程复用连接直接抛 ProgrammingError。
+        # 线程安全由上层职责保证（viewer 单进程低并发 + 写路径集中在短事务）。
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
         self.cursor = self.conn.cursor()
 
         # 消息表（永久保存）
@@ -168,13 +174,17 @@ class LobsterDatabase:
         """)
 
         # FTS5 全文搜索 - 消息
+        # v5.1.1 (audit P0-3): trigram 分词器替代默认 unicode61。
+        # unicode61 把整句中文当一个 token，中文关键词搜索永远 0 结果；
+        # trigram 按 3 字符窗口索引，中文/英文子串检索都可用（50k 行实测 2.5ms）。
         self.cursor.execute("""
             CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts
             USING fts5(
                 message_id,
                 content,
                 content='messages',
-                content_rowid='id'
+                content_rowid='id',
+                tokenize='trigram'
             );
         """)
 
@@ -185,9 +195,14 @@ class LobsterDatabase:
                 summary_id,
                 content,
                 content='summaries',
-                content_rowid='id'
+                content_rowid='id',
+                tokenize='trigram'
             );
         """)
+
+        # v5.1.1 (audit P0-3): 旧库迁移——若 FTS 表存在但仍是旧分词器，
+        # 重建为 trigram 并重灌索引（FTS 是派生索引，重建无损）。
+        self._migrate_fts_trigram()
 
         # 大文件表（借鉴 lossless-claw）
         self.cursor.execute("""
@@ -308,6 +323,45 @@ class LobsterDatabase:
         self.migrate_v40()  # v4.0.0 R³Mem 可逆三层压缩
         self.migrate_v41()  # v4.0.96 C-HLR+ 遗忘曲线
         self.migrate_v50()  # v5.0.0: 多智能体协同
+
+    def _migrate_fts_trigram(self):
+        """v5.1.1 (audit P0-3): 旧 FTS 表迁移到 trigram 分词器。
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS 不会更新已存在表的分词器配置。
+        检测方式：比对 sqlite_master 中保存的建表 SQL 是否含 tokenize='trigram'。
+        FTS 是派生索引，DROP + 重建 + rebuild（external content 模式）无损。
+        """
+        self.cursor.execute("SELECT sql FROM sqlite_master WHERE name = 'messages_fts'")
+        row = self.cursor.fetchone()
+        if not row or "trigram" in (row[0] or ""):
+            return  # 不存在（刚新建已是 trigram）或已是 trigram
+        logger.info("FTS 迁移: messages_fts/summaries_fts 重建为 trigram 分词器")
+        self.cursor.execute("DROP TABLE IF EXISTS messages_fts")
+        self.cursor.execute("DROP TABLE IF EXISTS summaries_fts")
+        self.cursor.execute("""
+            CREATE VIRTUAL TABLE messages_fts
+            USING fts5(message_id, content, content='messages',
+                       content_rowid='id', tokenize='trigram')
+        """)
+        self.cursor.execute("""
+            CREATE VIRTUAL TABLE summaries_fts
+            USING fts5(summary_id, content, content='summaries',
+                       content_rowid='id', tokenize='trigram')
+        """)
+        self.cursor.execute("INSERT INTO messages_fts(messages_fts) VALUES ('rebuild')")
+        self.cursor.execute("INSERT INTO summaries_fts(summaries_fts) VALUES ('rebuild')")
+        self.conn.commit()
+
+    def _fts_query(self, query: str) -> str:
+        """v5.1.1 (audit P0-3): 把任意用户输入包装成安全的 FTS5 短语查询。
+
+        1. 整体加双引号 → FTS5 语法字符 (AND/OR/NOT/NEAR/括号) 全部失效为字面量，
+           'a AND (' 之类的输入不再抛 fts5 syntax error。
+        2. 内部双引号按 FTS5 规则翻倍转义。
+        3. trigram 下 <3 字符的查询无索引可命中，调用方应走 LIKE 回退
+           （见 search_messages / search_summaries）。
+        """
+        return '"' + query.replace('"', '""') + '"'
 
     def migrate_v25(self):
         """v2.5.0 schema 迁移
@@ -714,6 +768,10 @@ class LobsterDatabase:
             message_id: 消息 ID
         """
         now = datetime.now(timezone.utc).isoformat()
+        # v5.1.1 (audit P2): stability 增长公式与 docstring 对齐，且不再依赖
+        # 同一 UPDATE 内列的求值顺序（SQLite 未定义该顺序，属未指定行为）：
+        # docstring 公式 = old_stability * (1 + 0.5 / sqrt(access_count + 1))，
+        # 其中 access_count 是本次访问前的旧值。
         self.cursor.execute(
             """
             UPDATE messages
@@ -1093,48 +1151,89 @@ class LobsterDatabase:
         Returns:
             匹配的消息列表
         """
+        # v5.1.1 (audit P0-3): trigram 分词器要求查询 ≥3 字符；
+        # 更短的查询（如中文两字词"决定"）回退 LIKE 扫描（50k 行实测 ~3ms，可接受）。
         if conversation_id:
             # v3.6.0: 按 conversation_id 和 namespace 过滤
             # v5.0.0: 添加 owner 过滤
-            self.cursor.execute(
-                """
-                SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
-                FROM messages m
-                JOIN messages_fts fts ON m.id = fts.rowid
-                JOIN conversations c ON m.conversation_id = c.conversation_id
-                WHERE messages_fts MATCH ?
-                  AND m.conversation_id = ?
-                  AND (? OR c.namespace = ?)
-                  AND (m.owner = ? OR m.owner = 'public')
-                ORDER BY rank
-                LIMIT ?
-            """,
-                (
-                    query,
-                    conversation_id,
-                    cross_namespace,
-                    self.namespace,
-                    self.owner,
-                    limit,
-                ),
-            )
+            # v5.1.1: _fts_query 转义用户输入，防 FTS5 语法错误
+            if len(query) < 3:
+                self.cursor.execute(
+                    """
+                    SELECT m.*, '' as snippet
+                    FROM messages m
+                    JOIN conversations c ON m.conversation_id = c.conversation_id
+                    WHERE m.content LIKE ?
+                      AND m.conversation_id = ?
+                      AND (? OR c.namespace = ?)
+                      AND (m.owner = ? OR m.owner = 'public')
+                    ORDER BY m.seq DESC
+                    LIMIT ?
+                """,
+                    (
+                        f"%{query}%",
+                        conversation_id,
+                        cross_namespace,
+                        self.namespace,
+                        self.owner,
+                        limit,
+                    ),
+                )
+            else:
+                self.cursor.execute(
+                    """
+                    SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                    FROM messages m
+                    JOIN messages_fts fts ON m.id = fts.rowid
+                    JOIN conversations c ON m.conversation_id = c.conversation_id
+                    WHERE messages_fts MATCH ?
+                      AND m.conversation_id = ?
+                      AND (? OR c.namespace = ?)
+                      AND (m.owner = ? OR m.owner = 'public')
+                    ORDER BY rank
+                    LIMIT ?
+                """,
+                    (
+                        self._fts_query(query),
+                        conversation_id,
+                        cross_namespace,
+                        self.namespace,
+                        self.owner,
+                        limit,
+                    ),
+                )
         else:
             # v3.6.0: 按 namespace 过滤
             # v5.0.0: 添加 owner 过滤
-            self.cursor.execute(
-                """
-                SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
-                FROM messages m
-                JOIN messages_fts fts ON m.id = fts.rowid
-                JOIN conversations c ON m.conversation_id = c.conversation_id
-                WHERE messages_fts MATCH ?
-                  AND (? OR c.namespace = ?)
-                  AND (m.owner = ? OR m.owner = 'public')
-                ORDER BY rank
-                LIMIT ?
-            """,
-                (query, cross_namespace, self.namespace, self.owner, limit),
-            )
+            if len(query) < 3:
+                self.cursor.execute(
+                    """
+                    SELECT m.*, '' as snippet
+                    FROM messages m
+                    JOIN conversations c ON m.conversation_id = c.conversation_id
+                    WHERE m.content LIKE ?
+                      AND (? OR c.namespace = ?)
+                      AND (m.owner = ? OR m.owner = 'public')
+                    ORDER BY m.seq DESC
+                    LIMIT ?
+                """,
+                    (f"%{query}%", cross_namespace, self.namespace, self.owner, limit),
+                )
+            else:
+                self.cursor.execute(
+                    """
+                    SELECT m.*, snippet(messages_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                    FROM messages m
+                    JOIN messages_fts fts ON m.id = fts.rowid
+                    JOIN conversations c ON m.conversation_id = c.conversation_id
+                    WHERE messages_fts MATCH ?
+                      AND (? OR c.namespace = ?)
+                      AND (m.owner = ? OR m.owner = 'public')
+                    ORDER BY rank
+                    LIMIT ?
+                """,
+                    (self._fts_query(query), cross_namespace, self.namespace, self.owner, limit),
+                )
 
         rows = self.cursor.fetchall()
         return [self._row_to_dict(row, "messages") for row in rows]
@@ -1159,48 +1258,87 @@ class LobsterDatabase:
         Returns:
             匹配的摘要列表
         """
+        # v5.1.1 (audit P0-3): trigram ≥3 字符要求，短查询 LIKE 回退；输入统一转义
         if conversation_id:
             # v3.6.0: 按 conversation_id 和 namespace 过滤
             # v5.0.0: 添加 owner 过滤
-            self.cursor.execute(
-                """
-                SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
-                FROM summaries s
-                JOIN summaries_fts fts ON s.id = fts.rowid
-                JOIN conversations c ON s.conversation_id = c.conversation_id
-                WHERE summaries_fts MATCH ?
-                  AND s.conversation_id = ?
-                  AND (? OR c.namespace = ?)
-                  AND (s.owner = ? OR s.owner = 'public')
-                ORDER BY rank
-                LIMIT ?
-            """,
-                (
-                    query,
-                    conversation_id,
-                    cross_namespace,
-                    self.namespace,
-                    self.owner,
-                    limit,
-                ),
-            )
+            if len(query) < 3:
+                self.cursor.execute(
+                    """
+                    SELECT s.*, '' as snippet
+                    FROM summaries s
+                    JOIN conversations c ON s.conversation_id = c.conversation_id
+                    WHERE s.content LIKE ?
+                      AND s.conversation_id = ?
+                      AND (? OR c.namespace = ?)
+                      AND (s.owner = ? OR s.owner = 'public')
+                    ORDER BY s.created_at DESC
+                    LIMIT ?
+                """,
+                    (
+                        f"%{query}%",
+                        conversation_id,
+                        cross_namespace,
+                        self.namespace,
+                        self.owner,
+                        limit,
+                    ),
+                )
+            else:
+                self.cursor.execute(
+                    """
+                    SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                    FROM summaries s
+                    JOIN summaries_fts fts ON s.id = fts.rowid
+                    JOIN conversations c ON s.conversation_id = c.conversation_id
+                    WHERE summaries_fts MATCH ?
+                      AND s.conversation_id = ?
+                      AND (? OR c.namespace = ?)
+                      AND (s.owner = ? OR s.owner = 'public')
+                    ORDER BY rank
+                    LIMIT ?
+                """,
+                    (
+                        self._fts_query(query),
+                        conversation_id,
+                        cross_namespace,
+                        self.namespace,
+                        self.owner,
+                        limit,
+                    ),
+                )
         else:
             # v3.6.0: 按 namespace 过滤
             # v5.0.0: 添加 owner 过滤
-            self.cursor.execute(
-                """
-                SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
-                FROM summaries s
-                JOIN summaries_fts fts ON s.id = fts.rowid
-                JOIN conversations c ON s.conversation_id = c.conversation_id
-                WHERE summaries_fts MATCH ?
-                  AND (? OR c.namespace = ?)
-                  AND (s.owner = ? OR s.owner = 'public')
-                ORDER BY rank
-                LIMIT ?
-            """,
-                (query, cross_namespace, self.namespace, self.owner, limit),
-            )
+            if len(query) < 3:
+                self.cursor.execute(
+                    """
+                    SELECT s.*, '' as snippet
+                    FROM summaries s
+                    JOIN conversations c ON s.conversation_id = c.conversation_id
+                    WHERE s.content LIKE ?
+                      AND (? OR c.namespace = ?)
+                      AND (s.owner = ? OR s.owner = 'public')
+                    ORDER BY s.created_at DESC
+                    LIMIT ?
+                """,
+                    (f"%{query}%", cross_namespace, self.namespace, self.owner, limit),
+                )
+            else:
+                self.cursor.execute(
+                    """
+                    SELECT s.*, snippet(summaries_fts, 1, '>>>', '<<<', '...', 10) as snippet
+                    FROM summaries s
+                    JOIN summaries_fts fts ON s.id = fts.rowid
+                    JOIN conversations c ON s.conversation_id = c.conversation_id
+                    WHERE summaries_fts MATCH ?
+                      AND (? OR c.namespace = ?)
+                      AND (s.owner = ? OR s.owner = 'public')
+                    ORDER BY rank
+                    LIMIT ?
+                """,
+                    (self._fts_query(query), cross_namespace, self.namespace, self.owner, limit),
+                )
 
         rows = self.cursor.fetchall()
         return [self._row_to_dict(row, "summaries") for row in rows]
@@ -1589,7 +1727,7 @@ class LobsterDatabase:
         """
         from datetime import datetime, timedelta, timezone
 
-        from pipeline.chlr_scorer import CHLRScorer
+        from src.pipeline.chlr_scorer import CHLRScorer
 
         cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days_threshold)).isoformat()
         # v4.0.2: 增加近期消息保护期（7 天），避免误标未评分的新消息（Issue #136 Bug 5）

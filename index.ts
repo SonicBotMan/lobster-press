@@ -1403,7 +1403,10 @@ ${JSON.stringify(fullConfig, null, 2)}
           role: "user",
           content: JSON.stringify([{type: "text", text: userText}]),
           timestamp: new Date().toISOString(),
-          seq: 0,  // 用户输入总是 seq=0
+          // v5.1.1 (audit P1): 不再硬编码 seq=0。此前 user 固定 0、assistant 固定 1/2，
+          // 第二轮对话 seq 重复，messages.seq 完全不反映真实时序，
+          // lobster_expand 按 seq 排序还原的"原始对话"顺序错误。
+          // 省略 seq 让 Python 层 _get_next_seq() 按到达顺序自动分配。
         };
 
         try {
@@ -1548,7 +1551,7 @@ ${JSON.stringify(fullConfig, null, 2)}
         debugLog(`agent_end: filtered to ${filteredMessages.length} assistant messages (from ${allMessages.length} total)`);
         
         // 提取最后 2 条 assistant 消息
-        const messages = filteredMessages.slice(-2).map((msg: any, index: number) => {
+        const messages = filteredMessages.slice(-2).map((msg: any) => {
           // v4.0.77: 修复双重 JSON 编码问题
           let contentArray;
           if (typeof msg.content === "string") {
@@ -1579,7 +1582,8 @@ ${JSON.stringify(fullConfig, null, 2)}
             role: "assistant",  // v4.0.85: 明确指定为 assistant
             content: JSON.stringify(contentArray),  // 保存为数组 JSON
             timestamp: msg.timestamp || new Date().toISOString(),
-            seq: index + 1,  // v4.0.85: seq 从 1 开始（用户输入是 0）
+            // v5.1.1 (audit P1): 同 user 消息，不再硬编码 seq=index+1，
+            // 由 Python 层 _get_next_seq() 自动分配，保证跨轮次时序正确。
           };
         });
         

@@ -4,10 +4,14 @@
 LobsterPress Memory Viewer
 
 借鉴 MemOS Viewer 架构:
-  7 页: memories, tasks, skills, analytics, logs, import, settings
+  页面: memories（首页）+ tasks/skills/analytics JSON 接口
   安全: 仅 127.0.0.1，密码 SHA-256，HttpOnly Cookie
 
-Version: v5.0.0
+  v5.1.1 (audit P2): 移除"7 页"虚假声明——实际只有 memories 一个 HTML 页面，
+  tasks 接口返回硬编码空列表，analytics/logs/import/settings 页面未实现。
+  现在文档描述与实现一致。
+
+Version: v5.1.1
 """
 
 import hashlib
@@ -20,14 +24,21 @@ from urllib.parse import parse_qs, urlparse
 
 logger = logging.getLogger(__name__)
 
+# v5.1.1 (audit P2): /api/config 版本号从包常量取值，不再硬编码 5.0.0。
+# src.__init__ 导入失败时降级为文件版本声明，保证 viewer 独立可运行。
+try:
+    from src import __version__ as LOBSTERPRESS_VERSION
+except ImportError:  # pragma: no cover - 兼容以 src/ 为根的导入方式
+    LOBSTERPRESS_VERSION = "5.1.1"
+
 
 class ViewerHandler(BaseHTTPRequestHandler):
     """Viewer HTTP Handler
 
-    提供 7 个页面的 HTTP 服务:
+    提供 HTTP 服务:
     - GET /: 首页（memories 页面）
     - GET /api/memories: 记忆列表
-    - GET /api/tasks: 任务列表
+    - GET /api/tasks: 任务列表（未实现，返回 implemented: false）
     - GET /api/skills: 技能列表
     - GET /api/stats: 统计信息
     - GET /api/config: 配置信息
@@ -39,8 +50,13 @@ class ViewerHandler(BaseHTTPRequestHandler):
     _session_owner = None
 
     @classmethod
-    def setup(cls, db, password: str = None, owner: str = "default"):
+    def configure(cls, db, password: str = None, owner: str = "default"):
         """初始化处理器类变量
+
+        v5.1.1 (audit e2e 发现): 原方法名 `setup` 遮蔽了
+        BaseHTTPRequestHandler.setup()（socketserver 每个请求都会调用它做
+        连接初始化），导致任何 HTTP 请求都 TypeError——viewer 从未真正跑通过。
+        更名 configure 解除遮蔽。
 
         Args:
             db: LobsterDatabase 实例
@@ -157,13 +173,16 @@ class ViewerHandler(BaseHTTPRequestHandler):
         )
 
     def _api_tasks(self):
-        """任务列表 API"""
+        """任务列表 API
+
+        v5.1.1 (audit P2): 明确标注未实现——TaskDetector 存在但没有
+        持久化任务表，此处没有可返回的真实数据。
+        """
         if not self._check_auth():
             self._send_json({"error": "Unauthorized"}, 401)
             return
 
-        # 简化实现：返回空列表或从数据库读取
-        self._send_json({"tasks": [], "count": 0})
+        self._send_json({"tasks": [], "count": 0, "implemented": False})
 
     def _api_skills(self):
         """技能列表 API"""
@@ -228,7 +247,8 @@ class ViewerHandler(BaseHTTPRequestHandler):
         """配置信息 API"""
         self._send_json(
             {
-                "version": "5.0.0",
+                # v5.1.1 (audit P2): 从版本常量取值，不再硬编码 5.0.0
+                "version": LOBSTERPRESS_VERSION,
                 "owner": self._session_owner,
                 "features": {
                     "memories": True,
@@ -366,7 +386,7 @@ def start_viewer(db, port: int = 18799, password: str = None, owner: str = "defa
     Returns:
         HTTPServer 实例
     """
-    ViewerHandler.setup(db, password, owner)
+    ViewerHandler.configure(db, password, owner)
 
     server = HTTPServer(("127.0.0.1", port), ViewerHandler)
     logger.info(f"LobsterPress Viewer: http://127.0.0.1:{port}")

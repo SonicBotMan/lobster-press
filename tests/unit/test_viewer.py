@@ -61,32 +61,32 @@ def get_response(handler):
 
 
 class TestViewerHandlerSetup:
-    """测试 ViewerHandler.setup()"""
+    """测试 ViewerHandler.configure()"""
 
     def test_setup_sets_db(self):
         db = MagicMock()
-        ViewerHandler.setup(db)
+        ViewerHandler.configure(db)
         assert ViewerHandler._db is db
 
     def test_setup_sets_owner(self):
         db = MagicMock()
-        ViewerHandler.setup(db, owner="agent:42")
+        ViewerHandler.configure(db, owner="agent:42")
         assert ViewerHandler._session_owner == "agent:42"
 
     def test_setup_hashes_password(self):
         db = MagicMock()
-        ViewerHandler.setup(db, password="secret123")
+        ViewerHandler.configure(db, password="secret123")
         expected = hashlib.sha256("secret123".encode()).hexdigest()
         assert ViewerHandler._password_hash == expected
 
     def test_setup_no_password_sets_none(self):
         db = MagicMock()
-        ViewerHandler.setup(db, password=None)
+        ViewerHandler.configure(db, password=None)
         assert ViewerHandler._password_hash is None
 
     def test_setup_default_owner(self):
         db = MagicMock()
-        ViewerHandler.setup(db)
+        ViewerHandler.configure(db)
         assert ViewerHandler._session_owner == "default"
 
 
@@ -94,33 +94,33 @@ class TestCheckAuth:
     """测试 _check_auth()"""
 
     def test_returns_true_when_no_password(self):
-        ViewerHandler.setup(MagicMock(), password=None)
+        ViewerHandler.configure(MagicMock(), password=None)
         handler = make_handler("/")
         assert handler._check_auth() is True
 
     def test_returns_true_with_valid_cookie(self):
-        ViewerHandler.setup(MagicMock(), password="pass")
+        ViewerHandler.configure(MagicMock(), password="pass")
         handler = make_handler("/", headers={"Cookie": "viewer_auth=authenticated"})
         assert handler._check_auth() is True
 
     def test_returns_true_with_valid_bearer_token(self):
         pwd = "mypassword"
-        ViewerHandler.setup(MagicMock(), password=pwd)
+        ViewerHandler.configure(MagicMock(), password=pwd)
         handler = make_handler("/", headers={"Authorization": f"Bearer {pwd}"})
         assert handler._check_auth() is True
 
     def test_returns_false_with_invalid_bearer(self):
-        ViewerHandler.setup(MagicMock(), password="correct")
+        ViewerHandler.configure(MagicMock(), password="correct")
         handler = make_handler("/", headers={"Authorization": "Bearer wrong"})
         assert handler._check_auth() is False
 
     def test_returns_false_when_no_credentials(self):
-        ViewerHandler.setup(MagicMock(), password="secret")
+        ViewerHandler.configure(MagicMock(), password="secret")
         handler = make_handler("/", headers={})
         assert handler._check_auth() is False
 
     def test_returns_false_when_wrong_cookie(self):
-        ViewerHandler.setup(MagicMock(), password="secret")
+        ViewerHandler.configure(MagicMock(), password="secret")
         handler = make_handler("/", headers={"Cookie": "other=value"})
         assert handler._check_auth() is False
 
@@ -129,7 +129,7 @@ class TestSendJson:
     """测试 _send_json()"""
 
     def test_sends_json_with_correct_headers(self):
-        ViewerHandler.setup(MagicMock())
+        ViewerHandler.configure(MagicMock())
         handler = make_handler("/")
 
         with (
@@ -143,7 +143,7 @@ class TestSendJson:
             assert mock_header.call_count >= 2
 
     def test_encodes_json_correctly(self):
-        ViewerHandler.setup(MagicMock())
+        ViewerHandler.configure(MagicMock())
         handler = make_handler("/")
 
         with (
@@ -157,7 +157,7 @@ class TestSendJson:
             assert data["msg"] == "你好世界"
 
     def test_custom_status_code(self):
-        ViewerHandler.setup(MagicMock())
+        ViewerHandler.configure(MagicMock())
         handler = make_handler("/")
 
         with (
@@ -173,7 +173,7 @@ class TestApiMemories:
     """测试 _api_memories()"""
 
     def test_returns_unauthorized_when_not_authed(self):
-        ViewerHandler.setup(MagicMock(), password="secret")
+        ViewerHandler.configure(MagicMock(), password="secret")
         handler = make_handler("/api/memories", headers={})
 
         with (
@@ -192,7 +192,7 @@ class TestApiMemories:
             {"role": "user", "content": "hello"},
             {"role": "assistant", "content": "hi"},
         ]
-        ViewerHandler.setup(mock_db, password=None)
+        ViewerHandler.configure(mock_db, password=None)
         handler = make_handler("/api/memories?page=1&limit=10")
 
         with (
@@ -211,7 +211,7 @@ class TestApiMemories:
     def test_uses_conversation_id_param(self):
         mock_db = MagicMock()
         mock_db.get_messages.return_value = []
-        ViewerHandler.setup(mock_db, password=None)
+        ViewerHandler.configure(mock_db, password=None)
         handler = make_handler("/api/memories?conversation_id=conv_123")
 
         with (
@@ -227,7 +227,7 @@ class TestApiTasks:
     """测试 _api_tasks()"""
 
     def test_returns_empty_tasks_list(self):
-        ViewerHandler.setup(MagicMock(), password=None)
+        ViewerHandler.configure(MagicMock(), password=None)
         handler = make_handler("/api/tasks")
 
         with (
@@ -242,7 +242,7 @@ class TestApiTasks:
             assert data["count"] == 0
 
     def test_returns_unauthorized_when_not_authed(self):
-        ViewerHandler.setup(MagicMock(), password="secret")
+        ViewerHandler.configure(MagicMock(), password="secret")
         handler = make_handler("/api/tasks", headers={})
 
         with (
@@ -264,7 +264,7 @@ class TestApiSkills:
         mock_db.get_skills_by_owner.return_value = [
             {"name": "skill_a", "quality_score": 0.9},
         ]
-        ViewerHandler.setup(mock_db, password=None, owner="agent:1")
+        ViewerHandler.configure(mock_db, password=None, owner="agent:1")
         handler = make_handler("/api/skills")
 
         with (
@@ -280,7 +280,7 @@ class TestApiSkills:
             mock_db.get_skills_by_owner.assert_called_with("agent:1", include_public=True)
 
     def test_returns_unauthorized_when_not_authed(self):
-        ViewerHandler.setup(MagicMock(), password="secret")
+        ViewerHandler.configure(MagicMock(), password="secret")
         handler = make_handler("/api/skills", headers={})
 
         with (
@@ -301,7 +301,7 @@ class TestApiStats:
         mock_db = MagicMock()
         mock_db.cursor = MagicMock()
         mock_db.cursor.fetchone.return_value = (42,)
-        ViewerHandler.setup(mock_db, password=None, owner="default")
+        ViewerHandler.configure(mock_db, password=None, owner="default")
         handler = make_handler("/api/stats")
 
         with (
@@ -322,7 +322,7 @@ class TestApiStats:
         mock_db = MagicMock()
         mock_db.cursor = MagicMock()
         mock_db.cursor.execute.side_effect = Exception("DB Error")
-        ViewerHandler.setup(mock_db, password=None, owner="default")
+        ViewerHandler.configure(mock_db, password=None, owner="default")
         handler = make_handler("/api/stats")
 
         with (
@@ -338,7 +338,7 @@ class TestApiStats:
             assert data["embeddings_count"] == 0
 
     def test_returns_unauthorized_when_not_authed(self):
-        ViewerHandler.setup(MagicMock(), password="secret")
+        ViewerHandler.configure(MagicMock(), password="secret")
         handler = make_handler("/api/stats", headers={})
 
         with (
@@ -356,7 +356,7 @@ class TestApiConfig:
     """测试 _api_config()"""
 
     def test_returns_version_and_features(self):
-        ViewerHandler.setup(MagicMock(), owner="agent:99")
+        ViewerHandler.configure(MagicMock(), owner="agent:99")
         handler = make_handler("/api/config")
 
         with (
@@ -367,7 +367,10 @@ class TestApiConfig:
             handler._api_config()
             raw = get_response(handler)
             data = json.loads(raw.decode())
-            assert data["version"] == "5.0.0"
+            # v5.1.1: 版本号改从包常量取，不再硬编码——断言与 LOBSTERPRESS_VERSION 一致
+            from src.viewer.server import LOBSTERPRESS_VERSION
+
+            assert data["version"] == LOBSTERPRESS_VERSION
             assert data["owner"] == "agent:99"
             assert data["features"]["memories"] is True
             assert data["features"]["skills"] is True
@@ -377,7 +380,7 @@ class TestHealth:
     """测试 _health()"""
 
     def test_returns_status_ok(self):
-        ViewerHandler.setup(MagicMock())
+        ViewerHandler.configure(MagicMock())
         handler = make_handler("/health")
 
         with (
@@ -396,7 +399,7 @@ class TestApiLogin:
     """测试 _api_login()"""
 
     def test_login_success_with_correct_password(self):
-        ViewerHandler.setup(MagicMock(), password="mypass")
+        ViewerHandler.configure(MagicMock(), password="mypass")
         handler = make_handler("/api/login?password=mypass")
 
         with (
@@ -414,7 +417,7 @@ class TestApiLogin:
             assert "HttpOnly" in cookie_val
 
     def test_login_failure_with_wrong_password(self):
-        ViewerHandler.setup(MagicMock(), password="correct")
+        ViewerHandler.configure(MagicMock(), password="correct")
         handler = make_handler("/api/login?password=wrong")
 
         with (
@@ -428,7 +431,7 @@ class TestApiLogin:
             assert "error" in data
 
     def test_login_failure_when_no_password_set(self):
-        ViewerHandler.setup(MagicMock(), password=None)
+        ViewerHandler.configure(MagicMock(), password=None)
         handler = make_handler("/api/login?password=anything")
 
         with (
@@ -446,7 +449,7 @@ class TestServeIndex:
     """测试 _serve_index()"""
 
     def test_serves_html_when_authed(self):
-        ViewerHandler.setup(MagicMock(), password=None)
+        ViewerHandler.configure(MagicMock(), password=None)
         handler = make_handler("/")
 
         with (
@@ -460,7 +463,7 @@ class TestServeIndex:
             assert "LobsterPress Memory Viewer" in html
 
     def test_returns_401_when_not_authed(self):
-        ViewerHandler.setup(MagicMock(), password="secret")
+        ViewerHandler.configure(MagicMock(), password="secret")
         handler = make_handler("/", headers={})
 
         with (
@@ -476,7 +479,7 @@ class TestDoGET:
     """测试路由 do_GET()"""
 
     def test_health_route(self):
-        ViewerHandler.setup(MagicMock())
+        ViewerHandler.configure(MagicMock())
         handler = make_handler("/health")
 
         with (
@@ -490,7 +493,7 @@ class TestDoGET:
             assert data["status"] == "ok"
 
     def test_config_route(self):
-        ViewerHandler.setup(MagicMock())
+        ViewerHandler.configure(MagicMock())
         handler = make_handler("/api/config")
 
         with (
@@ -501,7 +504,10 @@ class TestDoGET:
             handler.do_GET()
             raw = get_response(handler)
             data = json.loads(raw.decode())
-            assert data["version"] == "5.0.0"
+            # v5.1.1: 版本号从包常量取
+            from src.viewer.server import LOBSTERPRESS_VERSION
+
+            assert data["version"] == LOBSTERPRESS_VERSION
 
 
 class TestStartViewer:
@@ -521,20 +527,21 @@ class TestStartViewer:
 
     def test_calls_setup_with_correct_args(self):
         mock_db = MagicMock()
-        with patch.object(ViewerHandler, "setup") as mock_setup:
+        # v5.1.1: setup() 更名 configure()（避免遮蔽 BaseHTTPRequestHandler.setup）
+        with patch.object(ViewerHandler, "configure") as mock_configure:
             try:
                 server = start_viewer(mock_db, port=0, password="test", owner="agent:x")
                 server.server_close()
             except Exception:
                 pass
-            mock_setup.assert_called_once_with(mock_db, "test", "agent:x")
+            mock_configure.assert_called_once_with(mock_db, "test", "agent:x")
 
 
 class TestViewerHtml:
     """测试 HTML 页面内容"""
 
     def test_html_contains_required_elements(self):
-        ViewerHandler.setup(MagicMock())
+        ViewerHandler.configure(MagicMock())
         handler = make_handler("/")
 
         with (

@@ -340,10 +340,23 @@ class DAGCompressor:
             min_fanout = self.condensed_min_fanout
 
         # 1. 获取指定深度的摘要
-        summaries = self.db.get_summaries(conversation_id, depth)
+        all_summaries = self.db.get_summaries(conversation_id, depth)
+
+        # Fix (audit 2026-09-01 P0-2): 排除已被更高层摘要消费过的父摘要，
+        # 否则每次调用都会对同一批摘要重复压缩（实测 4 叶子两次调用后
+        # condensed 从 3 个膨胀到 8 个，且 depth 无限增长）。
+        # summary_parents 表本身就是"已消费"标记：出现在 parent_summary_id
+        # 列里的摘要已经被某个 condensed 摘要覆盖。
+        self.db.cursor.execute(
+            """
+            SELECT DISTINCT parent_summary_id FROM summary_parents
+        """
+        )
+        consumed_ids = {row[0] for row in self.db.cursor.fetchall()}
+        summaries = [s for s in all_summaries if s["summary_id"] not in consumed_ids]
 
         if len(summaries) < min_fanout:
-            logger.warning(f"摘要数 ({len(summaries)}) < {min_fanout}，无需压缩")
+            logger.warning(f"未消费摘要数 ({len(summaries)}) < {min_fanout}，无需压缩")
             return None
 
         # Phase 2: 固定窗口批处理，处理所有可压缩的摘要
@@ -673,6 +686,23 @@ class DAGCompressor:
             new_summary_id: 新创建的摘要 ID
         """
         # Fix 2: 使用事务保护，确保原子性（Issue #174）
+        # Fix (audit 2026-09-01 P0-1): 被压缩的消息必须真正从 context_items 中移除。
+        # 原实现只插入摘要、从不删除消息，导致 context_items 只增不减——
+        # "压缩节省 token"的核心承诺实际从未生效（实测 12 条消息压缩 10 条后
+        # context 反而从 12 项变成 13 项）。
+        #
+        # 无损原则不受影响：消息本体永久保留在 messages 表，仅从上下文视图中移除。
+        # skip_message_ids 中未被本次压缩的 exempt 消息不受影响（只删传入的列表）。
+        placeholders = ",".join("?" * len(compressed_message_ids))
+        self.db.cursor.execute(
+            f"""
+            DELETE FROM context_items
+            WHERE conversation_id = ?
+              AND item_type = 'message'
+              AND item_id IN ({placeholders})
+        """,
+            [conversation_id] + list(compressed_message_ids),
+        )
         with self.db.conn:
             # 获取当前最大的 ordinal
             self.db.cursor.execute(

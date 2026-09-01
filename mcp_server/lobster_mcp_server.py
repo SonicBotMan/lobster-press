@@ -96,118 +96,22 @@ class LobsterPressMCPServer:
         # v4.0.12: Focus 定时触发的会话轮次计数器（Issue #150 Bug #5）
         self._turn_counters: dict = {}  # conversation_id -> turn_count_since_last_compress
 
-        # 统计数据
-        self.stats = {
-            "total_compressions": 0,
-            "total_messages_processed": 0,
-            "total_tokens_saved": 0,
-            "last_compression": None,
-        }
-
-        # 配置
-        self.config = {
-            "weights": {
-                "decision": 0.3,
-                "error": 0.25,
-                "config": 0.2,
-                "preference": 0.15,
-                "context": 0.05,
-                "chitchat": 0.02,
-                "other": 0.03,
-            },
-            "strategy": "medium",
-            "max_tokens": 800000,
-        }
+        # v5.1.1 (audit P1): 移除 self.stats / self.config——只被已删除的
+        # v2 工具（get_compression_stats / update_weights / _score_message）消费。
 
         # 注册工具
         self.tools = self._register_tools()
 
     def _register_tools(self) -> List[MCPTool]:
-        """注册 MCP 工具"""
+        """注册 MCP 工具
+
+        v5.1.1 (audit P1): 移除 5 个 v2 时代工具（compress_session /
+        preview_compression / get_compression_stats / update_weights /
+        list_sessions）——它们读取会话文件系统而非 LobsterPress 数据库，
+        与 v5 插件链路完全脱节（mcp_server/README.md 早已声明
+        "调用会收到 Unknown tool"），现在代码与文档一致。
+        """
         return [
-            MCPTool(
-                name="compress_session",
-                description="压缩 OpenClaw 会话历史，保留重要信息",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "session_id": {
-                            "type": "string",
-                            "description": "会话 ID（文件名，不含扩展名）",
-                        },
-                        "strategy": {
-                            "type": "string",
-                            "enum": ["light", "medium", "aggressive"],
-                            "description": "压缩策略：light（轻度）、medium（中度）、aggressive（激进）",
-                            "default": "medium",
-                        },
-                        "dry_run": {
-                            "type": "boolean",
-                            "description": "是否仅预览，不实际压缩",
-                            "default": False,
-                        },
-                    },
-                    "required": ["session_id"],
-                },
-            ),
-            MCPTool(
-                name="preview_compression",
-                description="预览压缩效果，显示将要保留和删除的消息",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "session_id": {"type": "string", "description": "会话 ID"},
-                        "strategy": {
-                            "type": "string",
-                            "enum": ["light", "medium", "aggressive"],
-                            "default": "medium",
-                        },
-                    },
-                    "required": ["session_id"],
-                },
-            ),
-            MCPTool(
-                name="get_compression_stats",
-                description="获取压缩统计数据",
-                input_schema={"type": "object", "properties": {}, "required": []},
-            ),
-            MCPTool(
-                name="update_weights",
-                description="更新消息类型权重配置",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "weights": {
-                            "type": "object",
-                            "description": "消息类型权重",
-                            "properties": {
-                                "decision": {"type": "number"},
-                                "error": {"type": "number"},
-                                "config": {"type": "number"},
-                                "preference": {"type": "number"},
-                                "context": {"type": "number"},
-                                "chitchat": {"type": "number"},
-                            },
-                        }
-                    },
-                    "required": ["weights"],
-                },
-            ),
-            MCPTool(
-                name="list_sessions",
-                description="列出所有可压缩的会话",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "min_tokens": {
-                            "type": "integer",
-                            "description": "最小 Token 数阈值",
-                            "default": 10000,
-                        }
-                    },
-                    "required": [],
-                },
-            ),
             # v3.2.2: OpenClaw 插件工具
             MCPTool(
                 name="lobster_grep",
@@ -610,29 +514,8 @@ class LobsterPressMCPServer:
         self, tool_name: str, arguments: Dict[str, Any]
     ) -> Dict[str, Any]:
         """调用工具"""
-        if tool_name == "compress_session":
-            return await self._compress_session(
-                arguments.get("session_id"),
-                arguments.get("strategy", "medium"),
-                arguments.get("dry_run", False),
-            )
-
-        elif tool_name == "preview_compression":
-            return await self._preview_compression(
-                arguments.get("session_id"), arguments.get("strategy", "medium")
-            )
-
-        elif tool_name == "get_compression_stats":
-            return self._get_stats()
-
-        elif tool_name == "update_weights":
-            return self._update_weights(arguments.get("weights", {}))
-
-        elif tool_name == "list_sessions":
-            return await self._list_sessions(arguments.get("min_tokens", 10000))
-
-        # v3.2.2: OpenClaw 插件工具
-        elif tool_name == "lobster_grep":
+        # v5.1.1 (audit P1): v2 工具分支已随工具注册一起移除
+        if tool_name == "lobster_grep":
             from src.agent_tools import lobster_grep
 
             db = self._get_db()
@@ -805,17 +688,43 @@ class LobsterPressMCPServer:
             # 获取三层记忆
             context = db.get_context_by_tier(conversation_id, tiers)
 
+            # v5.1.1 (audit P0-4): semantic 层落地。
+            # memory_tier='semantic' 的行从未被生产代码写入（promote 逻辑不存在），
+            # semantic 层永远为空。改为：semantic 层从 SemanticMemory notes 表
+            # （矛盾检测维护的稳定知识）取数——这是该表当前唯一有数据的语义层来源。
+            if "semantic" in tiers:
+                try:
+                    from src.semantic_memory import SemanticMemory
+
+                    semantic_memory = SemanticMemory(db)
+                    notes = semantic_memory.get_active_notes(
+                        conversation_id,
+                        max_tokens=tier_budgets.get("semantic", 0) or 1,
+                    )
+                    context["semantic"] = [
+                        {
+                            "role": "system",
+                            "content": note["content"],
+                            "token_count": len(note["content"]) // 4 + 10,
+                            "note_id": note["note_id"],
+                            "note_category": note["category"],
+                        }
+                        for note in notes
+                    ]
+                except Exception as e:
+                    logger.warning(f"[lobster_assemble] semantic(notes) 读取失败: {e}")
+
             # v4.0.94: 对 working 层进行压缩处理
             if "working" in context and context["working"]:
                 try:
                     # 1. EM-LLM 事件分割
-                    from pipeline.event_segmenter import EventSegmenter
+                    from src.pipeline.event_segmenter import EventSegmenter
 
                     segmenter = EventSegmenter()
                     episodes = segmenter.segment(context["working"])
 
                     # 2. 意图提取和摘要生成（v4.0.95）
-                    from pipeline.intent_extractor import IntentExtractor
+                    from src.pipeline.intent_extractor import IntentExtractor
 
                     intent_extractor = IntentExtractor()
                     intents_data = intent_extractor.extract_intents(context["working"])
@@ -824,7 +733,7 @@ class LobsterPressMCPServer:
                     )
 
                     # 3. CMV 三遍压缩每个情节
-                    from three_pass_trimmer import ThreePassTrimmer
+                    from src.three_pass_trimmer import ThreePassTrimmer
 
                     trimmer = ThreePassTrimmer()
                     compressed_episodes = []
@@ -1127,7 +1036,7 @@ class LobsterPressMCPServer:
             if str(src_dir) not in sys.path:
                 sys.path.insert(0, str(src_dir))
 
-            from database import LobsterDatabase
+            from src.database import LobsterDatabase
 
             # v3.6.0: 传递 namespace 到数据库（Issue #127 模块四）
             self._db = LobsterDatabase(self.db_path, namespace=self.namespace)
@@ -1136,7 +1045,7 @@ class LobsterPressMCPServer:
     def _get_llm(self):
         """获取 LLM 客户端（懒加载）"""
         if not hasattr(self, "_llm_client") or self._llm_client is None:
-            from llm_client import create_llm_client
+            from src.llm_client import create_llm_client
 
             self._llm_client = create_llm_client(
                 provider=self.llm_provider, model=self.llm_model
@@ -1176,226 +1085,6 @@ class LobsterPressMCPServer:
 
         return session_id
 
-    async def _compress_session(
-        self, session_id: str, strategy: str, dry_run: bool
-    ) -> Dict[str, Any]:
-        """压缩会话（v3.3.0: 使用真实 DAGCompressor，v3.4.0: 修复 dry_run）"""
-        # 验证 session_id（修复 Issue #12）
-        session_id = self._validate_session_id(session_id)
-        session_file = self.sessions_dir / f"{session_id}.jsonl"
-
-        if not session_file.exists():
-            raise FileNotFoundError(f"Session not found: {session_id}")
-
-        # v3.4.0: 修复 dry_run 被忽略的问题（修复 Bug #124）
-        if dry_run:
-            db = self._get_db()
-            messages = db.get_messages(session_id)
-            summaries = db.get_summaries(session_id)
-            total_tokens = sum(m.get("token_count", 0) for m in messages)
-
-            return {
-                "status": "preview",
-                "session_id": session_id,
-                "strategy": strategy,
-                "message_count": len(messages),
-                "summary_count": len(summaries),
-                "estimated_tokens": total_tokens,
-                "dry_run": True,
-                "note": "No compression performed. Call without dry_run=True to compress.",
-            }
-
-        # v3.3.0: 调用真实 DAGCompressor（不再使用假 DAG）
-        from src.dag_compressor import DAGCompressor
-
-        db = self._get_db()
-        llm = self._get_llm() if self.llm_provider else None
-        compressor = DAGCompressor(db, llm_client=llm)
-
-        # 根据策略决定阈值
-        thresholds = {
-            "light": 0.9,  # 只在 90% 时触发
-            "medium": 0.75,  # 在 75% 时触发
-            "aggressive": 0.5,  # 在 50% 时触发
-        }
-        threshold = thresholds.get(strategy, 0.75)
-
-        # v3.3.1: 错误处理和重试机制
-        max_retries = 3
-        last_error = None
-
-        for attempt in range(max_retries):
-            try:
-                # 执行真实 DAG 压缩
-                did_compress = compressor.incremental_compact(
-                    conversation_id=session_id,
-                    context_threshold=threshold,
-                    token_budget=128000,
-                )
-
-                # 获取压缩后的统计
-                messages = db.get_messages(session_id)
-                estimated_tokens = sum(m.get("token_count", 0) for m in messages)
-
-                return {
-                    "status": "success" if did_compress else "skipped",
-                    "session_id": session_id,
-                    "strategy": strategy,
-                    "threshold": threshold,
-                    "compressed": did_compress,
-                    "message_count": len(messages),
-                    "estimated_tokens": estimated_tokens,
-                    "method": "real_dag_v3.4.0",
-                    "attempt": attempt + 1,
-                }
-            except Exception as e:
-                last_error = str(e)
-                if attempt < max_retries - 1:
-                    # 等待后重试
-                    import asyncio
-
-                    await asyncio.sleep(1 * (attempt + 1))
-                    continue
-
-        # 所有重试都失败
-        return {
-            "status": "error",
-            "error": last_error,
-            "retries": max_retries,
-            "session_id": session_id,
-            "strategy": strategy,
-        }
-
-    async def _preview_compression(
-        self, session_id: str, strategy: str
-    ) -> Dict[str, Any]:
-        """预览压缩效果"""
-        return await self._compress_session(session_id, strategy, dry_run=True)
-
-    def _get_stats(self) -> Dict[str, Any]:
-        """获取统计数据"""
-        return {"stats": self.stats, "config": self.config}
-
-    def _update_weights(self, weights: Dict[str, float]) -> Dict[str, Any]:
-        """更新权重配置"""
-        # 验证权重
-        for key, value in weights.items():
-            if key in self.config["weights"]:
-                self.config["weights"][key] = value
-
-        return {"status": "success", "updated_weights": self.config["weights"]}
-
-    async def _list_sessions(self, min_tokens: int) -> Dict[str, Any]:
-        """列出会话"""
-        sessions = []
-
-        for session_file in self.sessions_dir.glob("*.jsonl"):
-            if session_file.name.endswith((".backup.", ".reset.", ".deleted.")):
-                continue
-
-            # 估算 Token 数
-            messages = []
-            with open(session_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    if line.strip():
-                        messages.append(json.loads(line))
-
-            estimated_tokens = self._estimate_tokens(messages)
-
-            if estimated_tokens >= min_tokens:
-                sessions.append(
-                    {
-                        "session_id": session_file.stem,
-                        "messages": len(messages),
-                        "estimated_tokens": estimated_tokens,
-                        "file_size": session_file.stat().st_size,
-                        "modified": datetime.fromtimestamp(
-                            session_file.stat().st_mtime
-                        ).isoformat(),
-                    }
-                )
-
-        # 按 Token 数排序
-        sessions.sort(key=lambda x: x["estimated_tokens"], reverse=True)
-
-        return {"sessions": sessions, "total": len(sessions)}
-
-    async def _list_resources(self) -> Dict[str, Any]:
-        """列出资源"""
-        resources = []
-
-        for session_file in self.sessions_dir.glob("*.jsonl"):
-            if not session_file.name.endswith((".backup.", ".reset.", ".deleted.")):
-                resources.append(
-                    {
-                        "uri": f"lobster://sessions/{session_file.stem}",
-                        "name": session_file.stem,
-                        "mimeType": "application/jsonl",
-                    }
-                )
-
-        return {"resources": resources}
-
-    async def _read_resource(self, uri: str) -> Dict[str, Any]:
-        """读取资源"""
-        if not uri.startswith("lobster://sessions/"):
-            raise ValueError(f"Invalid resource URI: {uri}")
-
-        session_id = uri.replace("lobster://sessions/", "")
-        validated_id = self._validate_session_id(session_id)
-        session_file = self.sessions_dir / f"{validated_id}.jsonl"
-
-        if not session_file.exists():
-            raise FileNotFoundError(f"Session not found: {validated_id}")
-
-        with open(session_file, "r", encoding="utf-8") as f:
-            content = f.read()
-
-        return {
-            "contents": [{"uri": uri, "mimeType": "application/jsonl", "text": content}]
-        }
-
-    def _estimate_tokens(self, messages: List[Dict]) -> int:
-        """估算 Token 数"""
-        total_chars = 0
-        for msg in messages:
-            content = msg.get("content", "")
-            if isinstance(content, str):
-                total_chars += len(content)
-            elif isinstance(content, list):
-                for part in content:
-                    if isinstance(part, dict) and "text" in part:
-                        total_chars += len(part["text"])
-
-        # 简单估算：3 字符 = 1 token
-        return total_chars // 3
-
-    def _score_message(self, msg: Dict) -> float:
-        """评分消息重要性"""
-        content = msg.get("content", "")
-        if isinstance(content, list):
-            content = " ".join(
-                p.get("text", "") for p in content if isinstance(p, dict)
-            )
-
-        content_lower = content.lower()
-        score = 0.0
-
-        # 关键词评分
-        patterns = {
-            "decision": ["决定", "方案", "选择", "决定采用", "decide", "choose"],
-            "error": ["错误", "失败", "异常", "error", "fail", "exception"],
-            "config": ["配置", "设置", "更新", "config", "setting", "update"],
-            "preference": ["偏好", "喜欢", "希望", "prefer", "like", "want"],
-        }
-
-        for category, keywords in patterns.items():
-            for keyword in keywords:
-                if keyword in content_lower:
-                    score += self.config["weights"].get(category, 0.1)
-
-        return score
-
     async def _handle_lobster_skill(self, args: Dict[str, Any]) -> Dict[str, Any]:
         """处理 lobster_skill 工具调用"""
         action = args.get("action")
@@ -1403,7 +1092,7 @@ class LobsterPressMCPServer:
 
         llm_client = None
         if self.llm_provider:
-            from llm_client import create_llm_client
+            from src.llm_client import create_llm_client
 
             llm_client = create_llm_client(
                 provider=self.llm_provider, model=self.llm_model, fallback=True
@@ -1698,13 +1387,6 @@ async def main():
         logger.info("可用工具:")
         for tool in server.tools:
             logger.info(f"  - {tool.name}: {tool.description}")
-
-        # 测试 list_sessions
-        result = await server._call_tool("list_sessions", {"min_tokens": 1000})
-        logger.info(f"找到 {result['total']} 个可压缩会话")
-        for session in result["sessions"][:3]:
-            logger.info(f"  - {session['session_id']}: {session['estimated_tokens']} tokens")
-
         logger.info("MCP Server 正常工作")
     else:
         # Phase 1 (Issue #115): 发送 ready handshake
