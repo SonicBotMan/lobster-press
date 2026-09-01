@@ -8,7 +8,7 @@ LobsterPress Database - 无损存储层
 借鉴 lossless-claw 的数据库设计
 
 Author: LobsterPress Team
-Version: 5.1.0
+Version: 5.1.1
 """
 
 import hashlib

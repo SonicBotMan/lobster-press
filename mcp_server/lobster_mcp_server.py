@@ -84,9 +84,7 @@ class LobsterPressMCPServer:
         # v3.2.2: OpenClaw 插件支持
         # v4.0.41: 修复 db_path 中 ~ 未展开的 Bug（Issue #181）
         self.db_path = (
-            os.path.expanduser(db_path)
-            if db_path
-            else os.path.expanduser("~/.openclaw/lobster.db")
+            os.path.expanduser(db_path) if db_path else os.path.expanduser("~/.openclaw/lobster.db")
         )
         self.llm_provider = llm_provider
         self.llm_model = llm_model
@@ -404,9 +402,7 @@ class LobsterPressMCPServer:
                 description="将技能设为公开，其他 Agent 可发现",
                 input_schema={
                     "type": "object",
-                    "properties": {
-                        "skill_id": {"type": "string", "description": "技能 ID"}
-                    },
+                    "properties": {"skill_id": {"type": "string", "description": "技能 ID"}},
                     "required": ["skill_id"],
                 },
             ),
@@ -416,9 +412,7 @@ class LobsterPressMCPServer:
                 description="将技能设为私有",
                 input_schema={
                     "type": "object",
-                    "properties": {
-                        "skill_id": {"type": "string", "description": "技能 ID"}
-                    },
+                    "properties": {"skill_id": {"type": "string", "description": "技能 ID"}},
                     "required": ["skill_id"],
                 },
             ),
@@ -510,9 +504,7 @@ class LobsterPressMCPServer:
         except Exception as e:
             return {"error": str(e)}
 
-    async def _call_tool(
-        self, tool_name: str, arguments: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def _call_tool(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """调用工具"""
         # v5.1.1 (audit P1): v2 工具分支已随工具注册一起移除
         if tool_name == "lobster_grep":
@@ -681,9 +673,7 @@ class LobsterPressMCPServer:
 
             # 按比例分配预算：semantic:episodic:working = 30%:30%:40%
             tier_ratios = {"semantic": 0.30, "episodic": 0.30, "working": 0.40}
-            tier_budgets = {
-                t: int(token_budget * tier_ratios.get(t, 0.33)) for t in tiers
-            }
+            tier_budgets = {t: int(token_budget * tier_ratios.get(t, 0.33)) for t in tiers}
 
             # 获取三层记忆
             context = db.get_context_by_tier(conversation_id, tiers)
@@ -728,9 +718,7 @@ class LobsterPressMCPServer:
 
                     intent_extractor = IntentExtractor()
                     intents_data = intent_extractor.extract_intents(context["working"])
-                    intent_summary = intent_extractor.generate_summary(
-                        intents_data, max_length=500
-                    )
+                    intent_summary = intent_extractor.generate_summary(intents_data, max_length=500)
 
                     # 3. CMV 三遍压缩每个情节
                     from src.three_pass_trimmer import ThreePassTrimmer
@@ -757,22 +745,15 @@ class LobsterPressMCPServer:
                                 "role": "system",
                                 "content": f"[LobsterPress Intent Summary]\n{intent_summary}",
                                 "seq": -1,
-                                "token_count": len(intent_summary)
-                                // 4,  # 估算 token 数
+                                "token_count": len(intent_summary) // 4,  # 估算 token 数
                             },
                         )
 
                     # 记录压缩统计
-                    total_original = sum(
-                        s.get("original_tokens", 0) for s in compression_stats
-                    )
-                    total_trimmed = sum(
-                        s.get("trimmed_tokens", 0) for s in compression_stats
-                    )
+                    total_original = sum(s.get("original_tokens", 0) for s in compression_stats)
+                    total_trimmed = sum(s.get("trimmed_tokens", 0) for s in compression_stats)
                     total_saved = sum(
-                        s.get("pass1_saved", 0)
-                        + s.get("pass2_saved", 0)
-                        + s.get("pass3_saved", 0)
+                        s.get("pass1_saved", 0) + s.get("pass2_saved", 0) + s.get("pass3_saved", 0)
                         for s in compression_stats
                     )
 
@@ -809,9 +790,7 @@ class LobsterPressMCPServer:
                 "assembled": assembled,
                 "total_tokens": used_tokens,
                 "token_budget": token_budget,
-                "tier_breakdown": {
-                    t: len([x for x in assembled if x["tier"] == t]) for t in tiers
-                },
+                "tier_breakdown": {t: len([x for x in assembled if x["tier"] == t]) for t in tiers},
             }
 
         # v3.6.0: 记忆纠错（Issue #127 模块三）
@@ -864,8 +843,7 @@ class LobsterPressMCPServer:
                     GROUP BY memory_tier
                 """)
             tier_dist = {
-                row[0]: {"count": row[1], "tokens": row[2]}
-                for row in db.cursor.fetchall()
+                row[0]: {"count": row[1], "tokens": row[2]} for row in db.cursor.fetchall()
             }
 
             # 实体数量（使用参数化查询）
@@ -932,9 +910,7 @@ class LobsterPressMCPServer:
                 return {
                     "dry_run": True,
                     "decayed_count": len(decayed_messages),
-                    "message_ids": [
-                        m[0] for m in decayed_messages[:10]
-                    ],  # 只返回前 10 个
+                    "message_ids": [m[0] for m in decayed_messages[:10]],  # 只返回前 10 个
                     "warning": "This is a dry run. No messages were deleted.",
                 }
 
@@ -943,20 +919,14 @@ class LobsterPressMCPServer:
             deleted_count = 0
             for msg_id, _ in decayed_messages:
                 # 先查 rowid
-                db.cursor.execute(
-                    "SELECT id FROM messages WHERE message_id = ?", (msg_id,)
-                )
+                db.cursor.execute("SELECT id FROM messages WHERE message_id = ?", (msg_id,))
                 row = db.cursor.fetchone()
                 if row:
                     rowid = row[0]
                     # 用 rowid 删除 FTS 记录
-                    db.cursor.execute(
-                        "DELETE FROM messages_fts WHERE rowid = ?", (rowid,)
-                    )
+                    db.cursor.execute("DELETE FROM messages_fts WHERE rowid = ?", (rowid,))
                 # 删除主表记录
-                db.cursor.execute(
-                    "DELETE FROM messages WHERE message_id = ?", (msg_id,)
-                )
+                db.cursor.execute("DELETE FROM messages WHERE message_id = ?", (msg_id,))
                 deleted_count += 1
             db.conn.commit()
 
@@ -1047,9 +1017,7 @@ class LobsterPressMCPServer:
         if not hasattr(self, "_llm_client") or self._llm_client is None:
             from src.llm_client import create_llm_client
 
-            self._llm_client = create_llm_client(
-                provider=self.llm_provider, model=self.llm_model
-            )
+            self._llm_client = create_llm_client(provider=self.llm_provider, model=self.llm_model)
         return self._llm_client
 
     def _validate_session_id(self, session_id: str) -> str:
@@ -1075,9 +1043,7 @@ class LobsterPressMCPServer:
 
         # 防止路径遍历
         if ".." in session_id or "/" in session_id or "\\" in session_id:
-            raise ValueError(
-                f"Invalid session_id: {session_id} (path traversal detected)"
-            )
+            raise ValueError(f"Invalid session_id: {session_id} (path traversal detected)")
 
         # 长度限制
         if len(session_id) > 255:
@@ -1162,9 +1128,7 @@ class LobsterPressMCPServer:
             if not target_task:
                 target_task = tasks[-1]
 
-            skill_id = evolver.evaluate_and_generate(
-                target_task, conversation_id, owner="default"
-            )
+            skill_id = evolver.evaluate_and_generate(target_task, conversation_id, owner="default")
 
             if not skill_id:
                 return {"status": "skipped", "reason": "Task did not pass evaluation"}
@@ -1216,24 +1180,18 @@ class LobsterPressMCPServer:
         if scope == "self":
             skills = db.get_skills_by_owner(owner, include_public=False)
             if query != "*":
-                skills = [
-                    s for s in skills if query.lower() in s.get("name", "").lower()
-                ]
+                skills = [s for s in skills if query.lower() in s.get("name", "").lower()]
         elif scope == "public":
             skills = db.get_skills_by_owner("public", include_public=True)
             skills = [s for s in skills if s.get("visibility") == "public"]
             if query != "*":
-                skills = [
-                    s for s in skills if query.lower() in s.get("name", "").lower()
-                ]
+                skills = [s for s in skills if query.lower() in s.get("name", "").lower()]
         else:
             skills = db.search_skills(query, owner=owner, visibility=None, limit=limit)
 
         return {"skills": skills[:limit], "count": len(skills), "scope": scope}
 
-    async def _handle_skill_publish(
-        self, args: Dict[str, Any], visibility: str
-    ) -> Dict[str, Any]:
+    async def _handle_skill_publish(self, args: Dict[str, Any], visibility: str) -> Dict[str, Any]:
         """发布/取消发布技能"""
         skill_id = args.get("skill_id")
 
@@ -1273,9 +1231,7 @@ class LobsterPressMCPServer:
                 return {"status": "already_running", "port": port}
 
             db = self._get_db()
-            self._viewer_server = start_viewer(
-                db, port=port, password=password, owner="default"
-            )
+            self._viewer_server = start_viewer(db, port=port, password=password, owner="default")
             # 在后台线程运行
             import threading
 

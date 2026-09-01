@@ -347,11 +347,9 @@ class DAGCompressor:
         # condensed 从 3 个膨胀到 8 个，且 depth 无限增长）。
         # summary_parents 表本身就是"已消费"标记：出现在 parent_summary_id
         # 列里的摘要已经被某个 condensed 摘要覆盖。
-        self.db.cursor.execute(
-            """
+        self.db.cursor.execute("""
             SELECT DISTINCT parent_summary_id FROM summary_parents
-        """
-        )
+        """)
         consumed_ids = {row[0] for row in self.db.cursor.fetchall()}
         summaries = [s for s in all_summaries if s["summary_id"] not in consumed_ids]
 

@@ -12,7 +12,14 @@ db = LobsterDatabase(namespace="demo")
 
 # Ingest messages
 db.save_message({"id": "msg-1", "role": "user", "content": "Hello!", "conversationId": "conv-1"})
-db.save_message({"id": "msg-2", "role": "assistant", "content": "Hi! How can I help?", "conversationId": "conv-1"})
+db.save_message(
+    {
+        "id": "msg-2",
+        "role": "assistant",
+        "content": "Hi! How can I help?",
+        "conversationId": "conv-1",
+    }
+)
 
 # Search (FTS5 trigram: >=3 chars uses full-text index, shorter queries fall back to LIKE)
 results = db.search_messages("hello", conversation_id="conv-1")
