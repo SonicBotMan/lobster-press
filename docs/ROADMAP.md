@@ -1,75 +1,48 @@
-# LobsterPress 开发路线图
+# 演进史与路线（Roadmap）
 
-## ✅ 已完成（v1.3.2）
+> 主 README 与架构文档只描述当前态。本文回答"为什么现在是这样"——每个版本的取舍与移除决策。逐版细节以 [CHANGELOG.md](../CHANGELOG.md) 为准。
 
-| Issue | 标题 | 版本 | 状态 |
-|-------|------|------|------|
-| #25 | Token 成本透明度 | v1.2.0 | ✅ 关闭 |
-| #26 | 动态模型选择 | v1.1.1 | ✅ 关闭 |
-| #30 | 压缩质量守卫 | v1.2.1 | ✅ 关闭 |
-| #32 | 五项核心优化 | v1.1.1 | ✅ 关闭 |
-| #36 | Shell/Python 双栈架构 | v1.2.1 | ✅ 关闭 |
-| #49 | Python 版本重写 | v1.2.4 | ✅ 关闭 |
-| #53 | tfidf_scorer.py ISO 8601 | v1.2.9 | ✅ 关闭 |
-| #54 | 批量压缩性能优化 | v1.3.2 | ✅ 关闭 |
-| #55 | 批量压缩性能优化 | v1.3.2 | ✅ 关闭 |
-| #56 | hotfix1 - 4 个高危 Bug | v1.2.4-hotfix1 | ✅ 关闭 |
-| #57 | hotfix2 - 6 个代码质量问题 | v1.2.4-hotfix2 | ✅ 关闭 |
-| #58 | hotfix3 - 剩余 Bug | v1.2.4-hotfix3 | ✅ 关闭 |
-| #59 | hotfix4 - 所有 Bug | v1.2.4-hotfix4 | ✅ 关闭 |
-| #60 | hotfix5 - 全面修复 | v1.2.4-hotfix5 | ✅ 关闭 |
-| #61 | hotfix6 - 4 个问题 | v1.2.4-hotfix6 | ✅ 关闭 |
+## 演进脉络
 
----
+| 阶段 | 时间 | 关键变化 |
+|------|------|----------|
+| v1–v3 | 2026 上半年 | 基础记忆层：SQLite 存储、FTS 检索、MCP 工具化 |
+| v4.x | 2026-03 | 记忆优先级排序（semantic > episodic > working）、ESM 兼容、Issue 修复潮 |
+| v5.0 | 2026-04 | 技能进化、多 Agent 隔离、Viewer、OpenClaw 插件化 |
+| v5.1.1 | 2026-09-01 | 全面审计修复 + 死代码清理（见下） |
 
-## 🔮 v1.4.0 计划（2026-04-01）
+## v5.1.1 审计：核心承诺修复
 
-| Issue | 标题 | 优先级 | 工作量 |
-|-------|------|--------|--------|
-| #28 | MCP 协议支持 | 🟡 中 | 3-5 天 |
-| #24 | Middleware 机制 | 🟡 中 | 2-3 天 |
-| #22 | Tool 接口设计 | 🟢 低 | 1-2 天 |
+v5.0 宣传的 5 条核心卖点中 3 条经独立审计发现实际失效，v5.1.1 修复：
 
-### 架构目标
+1. **压缩不缩容**：压缩只插入摘要不删除原消息展示位，上下文 12→13 反增 → 修复为真实缩容
+2. **中文搜索永远 0 结果**：unicode61 分词器把整句中文当一个 token → 换 trigram
+3. **语义记忆空架子**：`memory_tier='semantic'` 无写入方 → 接通 SemanticMemory notes
+4. 另修复：condensed 摘要无限重压缩、矛盾检测反向误判、viewer 全请求 500
 
-```
-v1.4.0 目标架构：
+## v5.1.1 移除项（及原因）
 
-systemd timer
-    └── lobster_runner.sh（轻量 Shell，仅负责调用）
-            │
-            ├── lobster_press_v140.py（所有核心逻辑）
-            │   ├── TF-IDF 评分
-            │   ├── 语义去重
-            │   ├── 提取式摘要
-            │   ├── Token 计数
-            │   ├── 净收益校验
-            │   └── 质量守卫 ✨ NEW
-            │
-            └── Middleware 层 ✨ NEW
-                ├── logging_middleware
-                ├── cache_middleware
-                └── retry_middleware
-```
+| 移除 | 原因 |
+|------|------|
+| `src/vector/`（VectorEmbedder + HybridRetriever） | 从未接入 MCP/插件主链路；离线 embedder 产生随机向量，检索结果是噪声。宣传的 RRF/MMR 混合检索在存在期间即不可用 |
+| `src/async_queue/` | 0 生产调用方 |
+| 5 个 v2 压缩链 MCP 工具 | 依赖上述死代码 |
 
----
+> 曾把向量检索列为 Phase 1 卖点，诚实的结论是：在 SQLite 场景下 trigram 全文检索已覆盖实际需求，向量层若有真实需求将以可选扩展形式回归（见下）。
 
-## 🎯 v2.0.0 计划（2026-05-01）
+## 移除后的框架说明
 
-- 完全移除 Shell 核心逻辑
-- 单元测试覆盖率 > 80%
-- 性能优化（目标：10x 提速）
-- MCP 协议完整支持
-- 文档完整更新
+v5.0 的 "MemOS 4-Phase" 框架名退役（Phase 1/4 的实体已删，且名称借自同类项目）。当前架构不再使用代号框架，直接按组件描述——见 [ARCHITECTURE.md](ARCHITECTURE.md)。
 
----
+## 待办 / 已知问题
 
-## 📊 当前状态
+- [ ] `freshTailCount` 配置未传给 Python 进程（改配置不生效，见 [CONFIGURATION.md](CONFIGURATION.md) 标注）
+- [ ] 压缩缩容已作用于 context_items 视图；`lobster_assemble` 的 working 层仍读 `messages.memory_tier`，token 缩减尚未完全传导到组装链路
+- [ ] `lobster_expand` 对不存在的 summary_id 静默返回空结果（不报错）
+- [ ] npm 包内混入 `__pycache__/*.pyc`（含已删模块残留），待加 pack 清理
 
-**版本**: v1.2.1
-**Open Issues**: 3（#28, #24, #22）
-**关闭率**: 86%（25/29）
+## 长期方向
 
----
-
-*更新时间: 2026-03-10*
+- 可选向量扩展（真实 embedding 后端接入后按需启用）
+- 双语文档一致性自动校验（章节锚点对齐）
+- v2 时代遗留文档全部清出 docs/archive/
